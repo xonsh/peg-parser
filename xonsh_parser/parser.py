@@ -1,7 +1,7 @@
 """Implements the xonsh parser."""
 
 
-def get_parser():
+def get_parser_cls():
     from .platform import PYTHON_VERSION_INFO
 
     if PYTHON_VERSION_INFO > (3, 10):
@@ -12,4 +12,4 @@ def get_parser():
         from .parsers.v38 import Parser as p
     else:
         from .parsers.v36 import Parser as p
-    return p()
+    return p

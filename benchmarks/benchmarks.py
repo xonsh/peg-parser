@@ -12,22 +12,22 @@ class TimeSuite:
     #     self.d = {}
 
     def time_parser_init(self):
-        from xonsh_parser.parser import get_parser
+        from xonsh_parser.parser import get_parser_cls
 
-        parser = get_parser()
+        parser = get_parser_cls()()
         parser.parse("ls -alh")
 
 
 class MemSuite:
     def mem_parser_init(self):
-        from xonsh_parser.parser import get_parser
+        from xonsh_parser.parser import get_parser_cls
 
-        return get_parser()
+        return get_parser_cls()()
 
 
 class PeakMemSuite:
     def peakmem_parser_init(self):
-        from xonsh_parser.parser import get_parser
+        from xonsh_parser.parser import get_parser_cls
 
-        parser = get_parser()
+        parser = get_parser_cls()()
         parser.parse("ls -alh")
