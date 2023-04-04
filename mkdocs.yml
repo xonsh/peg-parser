@@ -1,0 +1,58 @@
+site_name: xonsh-parser
+site_description: Xonsh parser using PLY
+
+repo_url: https://github.com/jnoortheen/xonsh-parser
+repo_name: jnoortheen/xonsh-parser
+
+theme:
+    name: material
+    icon:
+        logo: material/library
+    palette:
+        # Palette toggle for light mode
+        - media: "(prefers-color-scheme: light)"
+          scheme: default
+          primary: purple
+          accent: purple
+          toggle:
+            icon: material/brightness-7
+            name: Switch to dark mode
+
+        # Palette toggle for dark mode
+        - media: "(prefers-color-scheme: dark)"
+          scheme: slate
+          primary: purple
+          accent: purple
+          toggle:
+            icon: material/brightness-4
+            name: Switch to light mode
+
+markdown_extensions:
+    - toc:
+        permalink: true
+    - pymdownx.highlight:
+        anchor_linenums: true
+    - pymdownx.tasklist:
+        custom_checkbox: true
+    - pymdownx.inlinehilite
+    - pymdownx.snippets
+    - pymdownx.superfences
+
+plugins:
+    - search
+    - mkdocstrings:
+        handlers:
+            python:
+                import:
+                    - https://docs.python.org/3.9/objects.inv
+                options:
+                    docstring_style: google
+
+watch:
+    - docs
+    - xonsh_parser
+
+nav:
+    - About: index.md
+    - Reference:
+        - xonsh_parser: reference/xonsh_parser.md

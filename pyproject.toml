@@ -1,0 +1,68 @@
+[tool.ruff]
+extend-select = ["I"]
+
+[tool.pytest.ini_options]
+addopts = "--cov=xonsh_parser/ --cov-report=term-missing"
+
+
+[tool.hatch]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.version]
+source = "regex_commit"
+commit_extra_args = ["-e"]
+path = "xonsh_parser/__init__.py"
+
+[tool.hatch.envs.default]
+python = "3.9"
+dependencies = [
+    "black",
+    "mypy",
+    "ruff",
+    "pytest",
+    "pytest-cov",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+    
+]
+
+[tool.hatch.envs.default.scripts]
+test = "pytest"
+test-cov-xml = "pytest --cov-report=xml"
+lint = [
+  "black .",
+  "ruff --fix .",
+  "mypy xonsh_parser/",
+]
+lint-check = [
+  "black --check .",
+  "ruff .",
+  "mypy xonsh_parser/",
+]
+docs-serve = "mkdocs serve"
+docs-build = "mkdocs build"
+
+[build-system]
+requires = ["hatchling", "hatch-regex-commit"]
+build-backend = "hatchling.build"
+
+[project]
+name = "xonsh-parser"
+authors = [
+  { name = "xonsh-parser", email = "jnoortheen@gmail.com" }
+]
+description = "Xonsh parser using PLY"
+readme = "README.md"
+dynamic = ["version"]
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+]
+requires-python = ">=3.9"
+dependencies = [
+]
+
+[project.urls]
+Documentation = "https://jnoortheen.github.io/xonsh-parser/"
+Source = "https://github.com/jnoortheen/xonsh-parser"
