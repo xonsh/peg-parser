@@ -1,0 +1,9 @@
+# https://taskfile.dev
+
+version: '3'
+
+
+tasks:
+    add:
+        cmds:
+            - git subtree add --prefix=ply --squash https://github.com/dabeaz/ply.git master
