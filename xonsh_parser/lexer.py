@@ -9,7 +9,8 @@ import keyword as kwmod
 import re
 import typing as tp
 
-from .lazyasd import lazyobject, LazyObject
+from .lazyasd import LazyObject, lazyobject
+from .platform import PYTHON_VERSION_INFO
 from .tokenize import (
     CASE,
     COMMENT,
@@ -35,7 +36,6 @@ from .tokenize import (
     TokenError,
     tokenize,
 )
-from .platform import PYTHON_VERSION_INFO
 from .tools import check_bad_str_token
 
 

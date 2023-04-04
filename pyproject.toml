@@ -1,5 +1,30 @@
 [tool.ruff]
-extend-select = ["I"]
+extend-select = ["B", "I"]
+# ruff ignore file "xonsh_parser/ply/yacc.py"
+[tool.ruff.per-file-ignores]
+"xonsh_parser/ply/yacc.py" = [
+    "F401", # [*] `ast.Or` imported but unused
+    "E501", # Line too long (98 > 88 characters)
+    "I001", # [*] Import block is un-sorted or un-formatted
+    "E731", #  [*] Do not assign a `lambda` expression, use a `def`
+    "B007", # Loop control variable `rule` not used within loop body
+    "B904", # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+]
+"xonsh_parser/xast.py" = [
+    "F401", # [*] `ast.Add` imported but unused
+]
+"xonsh_parser/parsers/*.py" = [
+    "E501", # Line too long (121 > 88 characters)
+]
+"xonsh_parser/*.py" = [
+    "E741" # Ambiguous variable name: `l` -- todo: fix this
+]
+"xonsh_parser/tokenize.py" = [
+    "F821", # Undefined name `strstart`
+    "F841", # [*] Local variable `strstart` is assigned to but never used
+    "B904", # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+]
+
 
 [tool.pytest.ini_options]
 addopts = ""
@@ -83,20 +108,5 @@ Documentation = "https://jnoortheen.github.io/xonsh-parser/"
 Source = "https://github.com/jnoortheen/xonsh-parser"
 
 [tool.black]
-exclude = '''
-(
-  /(
-      \.git
-    | \.hg
-    | \.mypy_cache
-    | \.nox
-    | \.tox
-    | \.venv
-    | _build
-    | buck-out
-    | build
-    | dist
-    | xonsh_parser.+yacc.py
-  )/
-)
-'''
+# exclude extend to file "xonsh_parser/ply/yacc.py"
+extend-exclude = ".+ply/.+.py"

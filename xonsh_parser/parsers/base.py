@@ -1,6 +1,5 @@
 """Implements the base xonsh parser."""
 
-import os
 import re
 import textwrap
 import time
@@ -13,11 +12,12 @@ from xonsh_parser import xast as ast
 from xonsh_parser.lexer import Lexer, LexToken
 from xonsh_parser.ply import yacc
 from xonsh_parser.tokenize import SearchPath, StringPrefix
-from xonsh_parser.xast import xonsh_call, load_attribute_chain
-from .context_check import check_contexts
-from .fstring_adaptor import FStringAdaptor
+from xonsh_parser.xast import load_attribute_chain, xonsh_call
+
 from ..lazyasd import LazyObject
 from ..platform import PYTHON_VERSION_INFO
+from .context_check import check_contexts
+from .fstring_adaptor import FStringAdaptor
 
 RE_SEARCHPATH = LazyObject(lambda: re.compile(SearchPath), globals(), "RE_SEARCHPATH")
 RE_STRINGPREFIX = LazyObject(

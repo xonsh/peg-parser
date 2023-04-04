@@ -10,8 +10,8 @@ handle
 
 import ast
 
-from .v39 import Parser as ThreeNineParser
 from ..ply import yacc
+from .v39 import Parser as ThreeNineParser
 
 
 # noinspection PyCompatibility

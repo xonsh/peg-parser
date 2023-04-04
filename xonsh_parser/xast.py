@@ -36,9 +36,6 @@ from ast import (
     Dict,
     DictComp,
     Div,
-)
-from ast import Ellipsis as EllipsisNode
-from ast import (
     Eq,
     ExceptHandler,
     Expr,
@@ -116,10 +113,11 @@ from ast import (
     walk,
     withitem,
 )
+from ast import Ellipsis as EllipsisNode
 
+from xonsh_parser.tools import get_logical_line
 
 from .platform import PYTHON_VERSION_INFO
-from xonsh_parser.tools import get_logical_line
 
 if PYTHON_VERSION_INFO > (3, 8):
     from ast import NamedExpr  # type:ignore

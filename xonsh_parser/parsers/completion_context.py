@@ -21,9 +21,9 @@ from typing import (
 
 from ..lazyasd import lazyobject
 from ..lexer import Lexer
-from .base import Location, raise_parse_error
 from ..ply import yacc
 from ..tools import check_for_partial_string, get_line_continuation
+from .base import Location, raise_parse_error
 
 
 class CommandArg(NamedTuple):

@@ -1896,7 +1896,7 @@ class LRTable:
             for a, p, m in actlist:
                 if a in st_action:
                     if p is not st_actionp[a]:
-                        if not (a, m) in _actprint:
+                        if (a, m) not in _actprint:
                             log.debug('  ! %-15s [ %s ]', a, m)
                             not_used = 1
                             _actprint[(a, m)] = 1

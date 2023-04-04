@@ -1,6 +1,6 @@
 import re
 
-from .lazyasd import LazyObject, LazyDict, lazyobject
+from .lazyasd import LazyDict, LazyObject, lazyobject
 from .platform import ON_WINDOWS
 
 _RE_STRING_START = "[bBprRuUf]*"
