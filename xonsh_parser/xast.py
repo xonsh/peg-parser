@@ -119,7 +119,7 @@ from ast import (
 
 
 from .platform import PYTHON_VERSION_INFO
-from xonsh.tools import find_next_break, get_logical_line, subproc_toks
+from xonsh_parser.tools import get_logical_line
 
 if PYTHON_VERSION_INFO > (3, 8):
     from ast import NamedExpr  # type:ignore
@@ -383,28 +383,26 @@ class CtxAwareTransformer(NodeTransformer):
             mincol = max(min_col(node) - 1, 0)
             maxcol = max_col(node)
             if mincol == maxcol:
-                maxcol = find_next_break(line, mincol=mincol, lexer=self.parser.lexer)
+                maxcol = self.parser.lexer.find_next_break(line, mincol=mincol)
             elif nlogical > 1:
                 maxcol = None
             elif maxcol < len(line) and line[maxcol] == ";":
                 pass
             else:
                 maxcol += 1
-        spline = subproc_toks(
+        spline = self.parser.lexer.subproc_toks(
             line,
             mincol=mincol,
             maxcol=maxcol,
             returnline=False,
-            lexer=self.parser.lexer,
         )
         if spline is None or spline != f"![{line[mincol:maxcol].strip()}]":
             # failed to get something consistent, try greedy wrap
-            spline = subproc_toks(
+            spline = self.parser.lexer.subproc_toks(
                 line,
                 mincol=mincol,
                 maxcol=maxcol,
                 returnline=False,
-                lexer=self.parser.lexer,
                 greedy=True,
             )
         if spline is None:

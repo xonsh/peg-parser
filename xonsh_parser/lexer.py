@@ -9,7 +9,7 @@ import keyword as kwmod
 import re
 import typing as tp
 
-from .lazyasd import lazyobject
+from .lazyasd import lazyobject, LazyObject
 from .tokenize import (
     CASE,
     COMMENT,
@@ -36,6 +36,7 @@ from .tokenize import (
     tokenize,
 )
 from .platform import PYTHON_VERSION_INFO
+from .tools import check_bad_str_token
 
 
 @lazyobject
@@ -412,6 +413,24 @@ def _new_token(type, value, pos):
     return o
 
 
+BEG_TOK_SKIPS = LazyObject(
+    lambda: frozenset(["WS", "INDENT", "NOT", "LPAREN"]), globals(), "BEG_TOK_SKIPS"
+)
+END_TOK_TYPES = LazyObject(
+    lambda: frozenset(["SEMI", "AND", "OR", "RPAREN"]), globals(), "END_TOK_TYPES"
+)
+RE_END_TOKS = LazyObject(
+    lambda: re.compile(r"(;|and|\&\&|or|\|\||\))"), globals(), "RE_END_TOKS"
+)
+LPARENS = LazyObject(
+    lambda: frozenset(
+        ["LPAREN", "AT_LPAREN", "BANG_LPAREN", "DOLLAR_LPAREN", "ATDOLLAR_LPAREN"]
+    ),
+    globals(),
+    "LPARENS",
+)
+
+
 class Lexer:
     """Implements a lexer for the xonsh language."""
 
@@ -527,3 +546,143 @@ class Lexer:
             )
             self._tokens = t
         return self._tokens
+
+    def find_next_break(self, line, mincol=0):
+        """Returns the column number of the next logical break in subproc mode.
+        This function may be useful in finding the maxcol argument of
+        subproc_toks().
+        """
+        if mincol >= 1:
+            line = line[mincol:]
+        if RE_END_TOKS.search(line) is None:
+            return None
+        maxcol = None
+        lparens = []
+        self.input(line)
+        for tok in self:
+            if tok.type in LPARENS:
+                lparens.append(tok.type)
+            elif tok.type in END_TOK_TYPES:
+                if _is_not_lparen_and_rparen(lparens, tok):
+                    lparens.pop()
+                else:
+                    maxcol = tok.lexpos + mincol + 1
+                    break
+            elif tok.type == "ERRORTOKEN" and ")" in tok.value:
+                maxcol = tok.lexpos + mincol + 1
+                break
+            elif tok.type == "BANG":
+                maxcol = mincol + len(line) + 1
+                break
+        return maxcol
+
+    def subproc_toks(
+        self, line, mincol=-1, maxcol=None, returnline=False, greedy=False
+    ):
+        """Encapsulates tokens in a source code line in a uncaptured
+        subprocess ![] starting at a minimum column. If there are no tokens
+        (ie in a comment line) this returns None. If greedy is True, it will encapsulate
+        normal parentheses. Greedy is False by default.
+        """
+        if maxcol is None:
+            maxcol = len(line) + 1
+        self.reset()
+        self.input(line)
+        toks = []
+        lparens = []
+        saw_macro = False
+        end_offset = 0
+        for tok in self:
+            pos = tok.lexpos
+            if tok.type not in END_TOK_TYPES and pos >= maxcol:
+                break
+            if tok.type == "BANG":
+                saw_macro = True
+            if saw_macro and tok.type not in ("NEWLINE", "DEDENT"):
+                toks.append(tok)
+                continue
+            if tok.type in LPARENS:
+                lparens.append(tok.type)
+            if greedy and len(lparens) > 0 and "LPAREN" in lparens:
+                toks.append(tok)
+                if tok.type == "RPAREN":
+                    lparens.pop()
+                continue
+            if len(toks) == 0 and tok.type in BEG_TOK_SKIPS:
+                continue  # handle indentation
+            elif len(toks) > 0 and toks[-1].type in END_TOK_TYPES:
+                if _is_not_lparen_and_rparen(lparens, toks[-1]):
+                    lparens.pop()  # don't continue or break
+                elif pos < maxcol and tok.type not in ("NEWLINE", "DEDENT", "WS"):
+                    if not greedy:
+                        toks.clear()
+                    if tok.type in BEG_TOK_SKIPS:
+                        continue
+                else:
+                    break
+            if pos < mincol:
+                continue
+            toks.append(tok)
+            if tok.type == "WS" and tok.value == "\\":
+                pass  # line continuation
+            elif tok.type == "NEWLINE":
+                break
+            elif tok.type == "DEDENT":
+                # fake a newline when dedenting without a newline
+                tok.type = "NEWLINE"
+                tok.value = "\n"
+                tok.lineno -= 1
+                if len(toks) >= 2:
+                    prev_tok_end = toks[-2].lexpos + len(toks[-2].value)
+                else:
+                    prev_tok_end = len(line)
+                if "#" in line[prev_tok_end:]:
+                    tok.lexpos = prev_tok_end  # prevents wrapping comments
+                else:
+                    tok.lexpos = len(line)
+                break
+            elif check_bad_str_token(tok):
+                return
+        else:
+            if len(toks) > 0 and toks[-1].type in END_TOK_TYPES:
+                if _is_not_lparen_and_rparen(lparens, toks[-1]):
+                    pass
+                elif greedy and toks[-1].type == "RPAREN":
+                    pass
+                else:
+                    toks.pop()
+            if len(toks) == 0:
+                return  # handle comment lines
+            tok = toks[-1]
+            pos = tok.lexpos
+            if isinstance(tok.value, str):
+                end_offset = len(tok.value.rstrip())
+            else:
+                el = line[pos:].split("#")[0].rstrip()
+                end_offset = len(el)
+        if len(toks) == 0:
+            return  # handle comment lines
+        elif saw_macro or greedy:
+            end_offset = len(toks[-1].value.rstrip()) + 1
+        if toks[0].lineno != toks[-1].lineno:
+            # handle multiline cases
+            end_offset += _offset_from_prev_lines(line, toks[-1].lineno)
+        beg, end = toks[0].lexpos, (toks[-1].lexpos + end_offset)
+        end = len(line[:end].rstrip())
+        rtn = "![" + line[beg:end] + "]"
+        if returnline:
+            rtn = line[:beg] + rtn + line[end:]
+        return rtn
+
+
+def _is_not_lparen_and_rparen(lparens, rtok):
+    """Tests if an RPAREN token is matched with something other than a plain old
+    LPAREN type.
+    """
+    # note that any([]) is False, so this covers len(lparens) == 0
+    return rtok.type == "RPAREN" and any(x != "LPAREN" for x in lparens)
+
+
+def _offset_from_prev_lines(line, last):
+    lines = line.splitlines(keepends=True)[:last]
+    return sum(map(len, lines))
