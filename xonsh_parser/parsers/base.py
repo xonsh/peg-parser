@@ -6,11 +6,9 @@ import time
 import typing as tp
 from ast import parse as pyparse
 from collections.abc import Iterable, Mapping, Sequence
-from threading import Thread
 
 from xonsh_parser import xast as ast
 from xonsh_parser.lexer import Lexer, LexToken
-from xonsh_parser.ply import yacc
 from xonsh_parser.tokenize import SearchPath, StringPrefix
 from xonsh_parser.xast import load_attribute_chain, xonsh_call
 
@@ -221,20 +219,6 @@ def raise_parse_error(
     raise err
 
 
-class YaccLoader(Thread):
-    """Thread to load (but not shave) the yacc parser."""
-
-    def __init__(self, parser, yacc_kwargs, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.daemon = True
-        self.parser = parser
-        self.yacc_kwargs = yacc_kwargs
-        self.start()
-
-    def run(self):
-        self.parser.parser = yacc.yacc(**self.yacc_kwargs)
-
-
 class BaseParser:
     """A base class that parses the xonsh language."""
 
@@ -440,16 +424,15 @@ class BaseParser:
         for rule in tok_rules:
             self._tok_rule(rule)
 
-        yacc_kwargs = dict(
-            module=self,
-            debug=yacc_debug,
-            start="start_symbols",
-            optimize=yacc_optimize,
-        )
-        if not yacc_debug:
-            yacc_kwargs["errorlog"] = yacc.NullLogger()
-        # create parser on main thread
-        self.parser = yacc.yacc(**yacc_kwargs)
+        # yacc_kwargs = dict(
+        #     module=self,
+        #     debug=yacc_debug,
+        #     start="start_symbols",
+        # )
+        # if not yacc_debug:
+        #     yacc_kwargs["errorlog"] = yacc.NullLogger()
+        # # create parser on main thread
+        # self.parser = yacc.yacc(**yacc_kwargs)
 
         # Keeps track of the last token given to yacc (the lookahead token)
         self._last_yielded_token = None

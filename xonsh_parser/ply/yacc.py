@@ -61,11 +61,12 @@
 # own risk!
 # ----------------------------------------------------------------------------
 
-import re
-import types
-import sys
 import inspect
-from .common import PlyLogger, NullLogger
+import re
+import sys
+import types
+
+from .common import NullLogger, PlyLogger
 
 #-----------------------------------------------------------------------------
 #                     === User configurable parameters ===
@@ -1760,7 +1761,7 @@ class ParserReflect(object):
 # Build a parser
 # -----------------------------------------------------------------------------
 
-def yacc(module, *, debug=yaccdebug, start=None,
+def yacc(module, output_path:str=None, *, debug=yaccdebug, start=None,
          check_recursion=True, debugfile=debug_file,
          debuglog=None, errorlog=None):
     if errorlog is None:
@@ -1959,9 +1960,29 @@ def yacc(module, *, debug=yaccdebug, start=None,
                 errorlog.warning('Rule (%s) is never reduced', rejected)
                 warned_never.append(rejected)
 
+    return write_to_file(lr, output_path=output_path)
+
+def write_to_file(lr: LRTable, output_path:str=None):
+    import json
+    if not output_path:
+        output_path = 'parser.out.jsonl'
+
+    with open(output_path, 'w') as fw:
+        fw.write(json.dumps({"productions": [{
+            "name": p.name,
+            "len": p.len,
+            "str": p.str,
+            "func": p.func,
+        } for p in lr.lr_productions]}))
+        fw.write("\n")
+        fw.write(json.dumps({"action": lr.lr_action}))
+        fw.write("\n")
+        fw.write(json.dumps({"goto": lr.lr_goto}))
+        fw.write("\n")
     # Build the parser
     # lr.bind_callables(pinfo.pdict)
-    # parser = LRParser(lr, pinfo.error_func)
+    # parser = LRParser(lr.lr_productions, lr.lr_action, lr.lr_goto, pinfo.error_func)
 
     # return parser
     # this should write to output file
+    return output_path

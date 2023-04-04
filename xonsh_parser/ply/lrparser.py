@@ -9,6 +9,7 @@
 '''
 
 import sys
+
 from .common import PlyLogger, format_result, format_stack_entry
 
 error_count = 3                # Number of symbols that must be shifted to leave recovery mode
@@ -89,11 +90,16 @@ class YaccProduction:
 
 class LRParser:
     """The LR Parsing engine.  This is the core of the PLY parser generator."""
-    def __init__(self, lrtab, errorf):
-        self.productions: list = lrtab.lr_productions
-        # the numbers are very small around -2k to +2k
-        self.action: dict[int, dict[str, int]] = lrtab.lr_action
-        self.goto = lrtab.lr_goto
+
+    def __init__(self,
+                 productions: list,
+                 action: dict[int, dict[str, int]],
+                 goto: dict[int, dict[str, int]],
+                 errorf: callable):
+        self.productions = productions
+        # the int keys and values are very small around -2k to +2k
+        self.action = action
+        self.goto = goto
         self.errorfunc = errorf
         self.set_defaulted_states()
         self.errorok = True
