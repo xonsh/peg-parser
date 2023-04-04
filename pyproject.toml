@@ -2,10 +2,9 @@
 extend-select = ["B", "I"]
 # ruff ignore file "xonsh_parser/ply/yacc.py"
 [tool.ruff.per-file-ignores]
-"xonsh_parser/ply/yacc.py" = [
+"xonsh_parser/ply/*.py" = [
     "F401", # [*] `ast.Or` imported but unused
     "E501", # Line too long (98 > 88 characters)
-    "I001", # [*] Import block is un-sorted or un-formatted
     "E731", #  [*] Do not assign a `lambda` expression, use a `def`
     "B007", # Loop control variable `rule` not used within loop body
     "B904", # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
