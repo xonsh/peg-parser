@@ -2,7 +2,6 @@
 
 import re
 import textwrap
-import time
 import typing as tp
 from ast import parse as pyparse
 from collections.abc import Iterable, Mapping, Sequence
@@ -463,8 +462,6 @@ class BaseParser:
         self.reset()
         self._source = s
         self.lexer.fname = filename
-        while self.parser is None:
-            time.sleep(0.01)  # block until the parser is ready
         tree = self.parser.parse(input=s, lexer=self.lexer, debug=debug_level)
         if self._error is not None:
             self._parse_error(self._error[0], self._error[1])

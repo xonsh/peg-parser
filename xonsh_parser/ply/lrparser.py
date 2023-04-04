@@ -461,32 +461,15 @@ class Production(typing.NamedTuple):
 
 
 def load_parser(parser_table: Path, module):
-    import json
+    import pickle
 
-    lr_prods = []
-    lr_action = {}
-    lr_goto = {}
-    with parser_table.open() as fr:
-        for line in fr:
-            # each line is a valid json string
-            data = json.loads(line.strip(), parse_int=int) or {}  # type: dict
-            if productions := data.get("productions"):
-                # create Production object
-                lr_prods = [Production(
-                    name=p["name"],
-                    str=p["str"],
-                    len=p["len"],
-                    callable=getattr(module, p["func"]) if p["func"] else None
-                ) for p in productions]
-            if action := data.get("action"):
-                # create LRAction object
-                lr_action = action
-            if goto := data.get("goto"):
-                lr_goto = goto
-
-    if not all((lr_prods, lr_action, lr_goto)):
-        raise ValueError("invalid parser table")
-
-    del json
+    lr_prods, lr_action, lr_goto = pickle.load(parser_table.open('rb') )
+    lr_prods = [Production(
+        name=name,
+        str=str,
+        len=len,
+        callable=getattr(module, func) if func else None
+    ) for name, len, str, func in lr_prods]
+    del pickle
 
     return LRParser(lr_prods, lr_action, lr_goto, errorf=module.p_error)

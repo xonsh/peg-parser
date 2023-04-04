@@ -1764,6 +1764,7 @@ class ParserReflect(object):
 def yacc(module, output_path:str=None, *, debug=yaccdebug, start=None,
          check_recursion=True, debugfile=debug_file,
          debuglog=None, errorlog=None):
+
     if errorlog is None:
         errorlog = PlyLogger(sys.stderr)
 

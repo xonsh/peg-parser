@@ -18,9 +18,6 @@ def get_parser_cls():
 
 
 def write_parser_table(yacc_debug=False, output_path: Path = None) -> Path:
-    if output_path and output_path.exists():
-        return output_path
-
     from .ply import yacc
 
     cls = get_parser_cls()
@@ -30,6 +27,10 @@ def write_parser_table(yacc_debug=False, output_path: Path = None) -> Path:
     filename = f"{cls.__name__}.table.{py_version}.{format}.pickle"
     if not output_path:
         output_path = Path(__file__).parent / filename
+
+    if output_path.exists():
+        return output_path
+
     yacc_kwargs = dict(
         module=module,
         debug=yacc_debug,
