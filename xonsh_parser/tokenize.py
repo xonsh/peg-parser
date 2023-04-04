@@ -80,8 +80,8 @@ from token import (
     tok_name,
 )
 
-from xonsh.lazyasd import LazyObject
-from xonsh.platform import PYTHON_VERSION_INFO
+from .lazyasd import LazyObject
+from .platform import PYTHON_VERSION_INFO
 
 HAS_WALRUS = PYTHON_VERSION_INFO > (3, 8)
 if HAS_WALRUS:

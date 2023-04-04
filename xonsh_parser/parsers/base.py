@@ -1,4 +1,5 @@
 """Implements the base xonsh parser."""
+
 import os
 import re
 import textwrap
@@ -9,12 +10,14 @@ from collections.abc import Iterable, Mapping, Sequence
 from threading import Thread
 
 from xonsh_parser import xast as ast
-from xonsh_parser.ply import yacc
 from xonsh_parser.lexer import Lexer, LexToken
+from xonsh_parser.ply import yacc
+from xonsh_parser.tokenize import SearchPath, StringPrefix
+from xonsh_parser.xast import xonsh_call, load_attribute_chain
 from .context_check import check_contexts
 from .fstring_adaptor import FStringAdaptor
-from xonsh_parser.tokenize import SearchPath, StringPrefix
 from ..lazyasd import LazyObject
+from ..platform import PYTHON_VERSION_INFO
 
 RE_SEARCHPATH = LazyObject(lambda: re.compile(SearchPath), globals(), "RE_SEARCHPATH")
 RE_STRINGPREFIX = LazyObject(
@@ -48,7 +51,7 @@ class Index(tp.NamedTuple):
 
 def ensure_has_elts(x, lineno=None, col_offset=None):
     """Ensures that x is an AST node with elements."""
-    if not has_elts(x):
+    if not ast.has_elts(x):
         if not isinstance(x, Iterable):
             x = [x]
         lineno = x[0].lineno if lineno is None else lineno

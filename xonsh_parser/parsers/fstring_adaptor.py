@@ -2,9 +2,9 @@
 import re
 from ast import parse as pyparse
 
-from xonsh import ast
-from xonsh.lazyasd import lazyobject
-from xonsh.platform import PYTHON_VERSION_INFO
+from .. import xast as ast
+from ..lazyasd import lazyobject
+from ..platform import PYTHON_VERSION_INFO
 
 
 @lazyobject

@@ -10,10 +10,11 @@ handle
 
 import ast
 
-from xonsh.parsers.v39 import Parser as ThreeNineParser
-from xonsh.ply.ply import yacc
+from .v39 import Parser as ThreeNineParser
+from ..ply import yacc
 
 
+# noinspection PyCompatibility
 class Parser(ThreeNineParser):
     def p_import_from_post_times(self, p):
         """import_from_post : TIMES"""
