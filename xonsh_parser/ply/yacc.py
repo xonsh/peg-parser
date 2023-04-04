@@ -2272,8 +2272,6 @@ def yacc(*, debug=yaccdebug, module=None, start=None,
          check_recursion=True, optimize=False, debugfile=debug_file,
          debuglog=None, errorlog=None):
 
-    # Reference to the parsing method of the last built parser
-    global parse
 
     if errorlog is None:
         errorlog = PlyLogger(sys.stderr)
@@ -2478,5 +2476,4 @@ def yacc(*, debug=yaccdebug, module=None, start=None,
     lr.bind_callables(pinfo.pdict)
     parser = LRParser(lr, pinfo.error_func)
 
-    parse = parser.parse
     return parser
