@@ -7,8 +7,9 @@
 # table generation algorithm
 #-----------------------------------------------------------------------------
 '''
-
 import sys
+import typing
+from pathlib import Path
 
 from .common import PlyLogger, format_result, format_stack_entry
 
@@ -451,3 +452,41 @@ class LRParser:
             # If we'r here, something really bad happened
             raise RuntimeError('yacc: internal parser error!!!\n')
 
+
+class Production(typing.NamedTuple):
+    name: str
+    str: str
+    callable: typing.Callable
+    len: int
+
+
+def load_parser(parser_table: Path, module):
+    import json
+
+    lr_prods = []
+    lr_action = {}
+    lr_goto = {}
+    with parser_table.open() as fr:
+        for line in fr:
+            # each line is a valid json string
+            data = json.loads(line.strip(), parse_int=int) or {}  # type: dict
+            if productions := data.get("productions"):
+                # create Production object
+                lr_prods = [Production(
+                    name=p["name"],
+                    str=p["str"],
+                    len=p["len"],
+                    callable=getattr(module, p["func"]) if p["func"] else None
+                ) for p in productions]
+            if action := data.get("action"):
+                # create LRAction object
+                lr_action = action
+            if goto := data.get("goto"):
+                lr_goto = goto
+
+    if not all((lr_prods, lr_action, lr_goto)):
+        raise ValueError("invalid parser table")
+
+    del json
+
+    return LRParser(lr_prods, lr_action, lr_goto, errorf=module.p_error)

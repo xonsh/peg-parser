@@ -12,6 +12,7 @@ repos:
         pass_filenames: false
         args:
           - xonsh_parser
+          - tests
         language_version: python3.8
 
 

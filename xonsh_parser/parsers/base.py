@@ -6,6 +6,7 @@ import time
 import typing as tp
 from ast import parse as pyparse
 from collections.abc import Iterable, Mapping, Sequence
+from pathlib import Path
 
 from xonsh_parser import xast as ast
 from xonsh_parser.lexer import Lexer, LexToken
@@ -14,6 +15,7 @@ from xonsh_parser.xast import load_attribute_chain, xonsh_call
 
 from ..lazyasd import LazyObject
 from ..platform import PYTHON_VERSION_INFO
+from ..ply import lrparser
 from .context_check import check_contexts
 from .fstring_adaptor import FStringAdaptor
 
@@ -222,13 +224,11 @@ def raise_parse_error(
 class BaseParser:
     """A base class that parses the xonsh language."""
 
-    def __init__(self, yacc_optimize=True, yacc_debug=False, **_):
+    def __init__(self, parser_table: Path = None, **_):
         """Parameters
         ----------
-        yacc_optimize : bool, optional
-            Set to false when unstable and true when parser is stable.
-        yacc_debug : debug, optional
-            Dumps extra debug info.
+        parser_table : str, optional
+            Path to the parser table generated from yacc. If not given it will not be able to parse
         """
         self.lexer = lexer = Lexer()
         self.tokens = lexer.tokens
@@ -424,15 +424,11 @@ class BaseParser:
         for rule in tok_rules:
             self._tok_rule(rule)
 
-        # yacc_kwargs = dict(
-        #     module=self,
-        #     debug=yacc_debug,
-        #     start="start_symbols",
-        # )
-        # if not yacc_debug:
-        #     yacc_kwargs["errorlog"] = yacc.NullLogger()
-        # # create parser on main thread
-        # self.parser = yacc.yacc(**yacc_kwargs)
+        if parser_table:
+            # create parser on main thread
+            self.parser = lrparser.load_parser(parser_table, module=self)
+        else:
+            self.parser = None
 
         # Keeps track of the last token given to yacc (the lookahead token)
         self._last_yielded_token = None

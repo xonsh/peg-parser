@@ -10,22 +10,9 @@ class Parser(ThreeSixParser):
 
     def __init__(
         self,
-        yacc_optimize=True,
-        yacc_table="xonsh.parser_table",
-        yacc_debug=False,
-        outputdir=None,
+        *args,
+        **kwargs,
     ):
-        """Parameters
-        ----------
-        yacc_optimize : bool, optional
-            Set to false when unstable and true when parser is stable.
-        yacc_table : str, optional
-            Parser module used when optimized.
-        yacc_debug : debug, optional
-            Dumps extra debug info.
-        outputdir : str or None, optional
-            The directory to place generated tables within.
-        """
         # Rule creation and modification *must* take place before super()
         opt_rules = ["testlist_star_expr"]
         for rule in opt_rules:
@@ -37,10 +24,8 @@ class Parser(ThreeSixParser):
         for rule in tok_rules:
             self._tok_rule(rule)
         super().__init__(
-            yacc_optimize=yacc_optimize,
-            yacc_table=yacc_table,
-            yacc_debug=yacc_debug,
-            outputdir=outputdir,
+            *args,
+            **kwargs,
         )
 
     def _set_posonly_args_def(self, argmts, vals):

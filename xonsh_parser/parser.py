@@ -18,12 +18,16 @@ def get_parser_cls():
 
 
 def write_parser_table(yacc_debug=False, output_path: Path = None) -> Path:
+    if output_path and output_path.exists():
+        return output_path
+
     from .ply import yacc
 
     cls = get_parser_cls()
     module = cls()
     py_version = ".".join(str(x) for x in PYTHON_VERSION_INFO[:2])
-    filename = f"{cls.__name__}.{py_version}.jsonl"
+    format = "v1"
+    filename = f"{cls.__name__}.table.{py_version}.{format}.pickle"
     if not output_path:
         output_path = Path(__file__).parent / filename
     yacc_kwargs = dict(

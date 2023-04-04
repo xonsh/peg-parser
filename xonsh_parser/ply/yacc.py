@@ -1967,21 +1967,21 @@ def write_to_file(lr: LRTable, output_path:str=None):
     if not output_path:
         output_path = 'parser.out.jsonl'
 
-    with open(output_path, 'w') as fw:
-        fw.write(json.dumps({"productions": [{
-            "name": p.name,
-            "len": p.len,
-            "str": p.str,
-            "func": p.func,
-        } for p in lr.lr_productions]}))
-        fw.write("\n")
-        fw.write(json.dumps({"action": lr.lr_action}))
-        fw.write("\n")
-        fw.write(json.dumps({"goto": lr.lr_goto}))
-        fw.write("\n")
+    productions = [(p.name, p.len, p.str, p.func) for p in lr.lr_productions]
+    if output_path.endswith('.jsonl'):
+        with open(output_path, 'w') as fw:
+            fw.write(json.dumps({"productions": productions}))
+            fw.write("\n")
+            fw.write(json.dumps({"action": lr.lr_action}))
+            fw.write("\n")
+            fw.write(json.dumps({"goto": lr.lr_goto}))
+            fw.write("\n")
+    else:
+        # write to a pickle file
+        import pickle
+        pickle.dump((productions, lr.lr_action, lr.lr_goto), open(output_path, 'wb'), protocol=5)
     # Build the parser
     # lr.bind_callables(pinfo.pdict)
-    # parser = LRParser(lr.lr_productions, lr.lr_action, lr.lr_goto, pinfo.error_func)
 
     # return parser
     # this should write to output file
