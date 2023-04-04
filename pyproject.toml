@@ -81,3 +81,22 @@ dependencies = [
 [project.urls]
 Documentation = "https://jnoortheen.github.io/xonsh-parser/"
 Source = "https://github.com/jnoortheen/xonsh-parser"
+
+[tool.black]
+exclude = '''
+(
+  /(
+      \.git
+    | \.hg
+    | \.mypy_cache
+    | \.nox
+    | \.tox
+    | \.venv
+    | _build
+    | buck-out
+    | build
+    | dist
+    | xonsh_parser.+yacc.py
+  )/
+)
+'''
