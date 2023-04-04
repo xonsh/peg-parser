@@ -22,7 +22,8 @@ class MemSuite:
     def mem_parser_init(self):
         from xonsh_parser.parser import get_parser_cls
 
-        return get_parser_cls()()
+        parser = get_parser_cls()()
+        return parser.parser
 
 
 class PeakMemSuite:
@@ -31,3 +32,14 @@ class PeakMemSuite:
 
         parser = get_parser_cls()()
         parser.parse("ls -alh")
+
+
+class TrackLrParserSize:
+    unit = "bytes"
+
+    def track_lr_parser_size(self):
+        from xonsh_parser.parser import get_parser_cls
+        from pympler import asizeof
+
+        parser = get_parser_cls()()
+        return asizeof.asizeof(parser.parser)

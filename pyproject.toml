@@ -33,6 +33,7 @@ docs = [
 profile = [
     "asv>=0.5.1",
     "virtualenv>=20.21.0",
+    "pympler>=1.0.1",
 ]
 
 [tool.hatch.envs.default.scripts]
