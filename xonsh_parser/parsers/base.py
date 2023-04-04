@@ -238,24 +238,13 @@ class YaccLoader(Thread):
 class BaseParser:
     """A base class that parses the xonsh language."""
 
-    def __init__(
-        self,
-        yacc_optimize=True,
-        yacc_table="xonsh.parser_table",
-        yacc_debug=False,
-        outputdir=None,
-    ):
+    def __init__(self, yacc_optimize=True, yacc_debug=False, **_):
         """Parameters
         ----------
         yacc_optimize : bool, optional
             Set to false when unstable and true when parser is stable.
-        yacc_table : str, optional
-            Parser module used when optimized.
         yacc_debug : debug, optional
             Dumps extra debug info.
-        outputdir : str or None, optional
-            The directory to place generated tables within. Defaults to the root
-            xonsh dir.
         """
         self.lexer = lexer = Lexer()
         self.tokens = lexer.tokens
@@ -456,19 +445,11 @@ class BaseParser:
             debug=yacc_debug,
             start="start_symbols",
             optimize=yacc_optimize,
-            tabmodule=yacc_table,
         )
         if not yacc_debug:
             yacc_kwargs["errorlog"] = yacc.NullLogger()
-        if outputdir is None:
-            outputdir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-        yacc_kwargs["outputdir"] = outputdir
-        if yacc_debug:
-            # create parser on main thread
-            self.parser = yacc.yacc(**yacc_kwargs)
-        else:
-            self.parser = None
-            YaccLoader(self, yacc_kwargs)
+        # create parser on main thread
+        self.parser = yacc.yacc(**yacc_kwargs)
 
         # Keeps track of the last token given to yacc (the lookahead token)
         self._last_yielded_token = None

@@ -12,4 +12,4 @@ def get_parser():
         from .parsers.v38 import Parser as p
     else:
         from .parsers.v36 import Parser as p
-    return p
+    return p()
