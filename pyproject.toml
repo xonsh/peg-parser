@@ -51,8 +51,10 @@ lint-check = [
 ]
 bench = [
     "asv run --python=same --show-stderr", # quickly run benchmarks
-    "asv publish", # generate html
-    "asv preview", # preview the results
+]
+bench-view = [
+    "asv publish",
+    "asv preview",
 ]
 docs-serve = "mkdocs serve"
 docs-build = "mkdocs build"
