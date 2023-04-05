@@ -11,6 +11,7 @@ import typing as tp
 
 from .lazyasd import LazyObject, lazyobject
 from .platform import PYTHON_VERSION_INFO
+from .ply.lrparser import LexToken
 from .tokenize import (
     CASE,
     COMMENT,
@@ -397,20 +398,10 @@ def get_tokens(s, tolerant):
             break
 
 
-class LexToken:
-    __slots__ = ("type", "value", "lineno", "lexpos")
-
-    def __repr__(self):
-        return f"LexToken({self.type},{self.value!r},{self.lineno},{self.lexpos})"
-
-
 # synthesize a new PLY token
-def _new_token(type, value, pos):
-    o = LexToken()
-    o.type = type
-    o.value = value
-    o.lineno, o.lexpos = pos
-    return o
+def _new_token(type: str, value: str, pos):
+    linn, col = pos
+    return LexToken(type, value, linn, col)
 
 
 BEG_TOK_SKIPS = LazyObject(
@@ -434,7 +425,7 @@ LPARENS = LazyObject(
 class Lexer:
     """Implements a lexer for the xonsh language."""
 
-    _tokens: tp.Optional[tp.Tuple[str, ...]] = None
+    _tokens: tp.Optional[tuple[str, ...]] = None
 
     def __init__(self, tolerant=False):
         """

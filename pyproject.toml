@@ -138,4 +138,5 @@ ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = "xonsh_parser.ply.lrparser"
+allow_untyped_defs = false
 #strict = true
