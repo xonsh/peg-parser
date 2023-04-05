@@ -36,14 +36,14 @@
         "warmup_time": -1
     },
     "benchmarks.TrackLrParserSize.track_lr_parser_size": {
-        "code": "class TrackLrParserSize:\n    def track_lr_parser_size(self):\n        from xonsh_parser.parser import get_parser_cls\n        from pympler import asizeof\n    \n        parser = get_parser_cls()()\n        return asizeof.asizeof(parser.parser)\n\n    def setup(self):\n        from xonsh_parser.parser import write_parser_table\n        write_parser_table()",
+        "code": "class TrackLrParserSize:\n    def track_lr_parser_size(self):\n        from pympler import asizeof\n    \n        from xonsh_parser.parser import get_parser_cls\n    \n        parser = get_parser_cls()()\n        return asizeof.asizeof(parser.parser)\n\n    def setup(self):\n        from xonsh_parser.parser import write_parser_table\n        write_parser_table()",
         "name": "benchmarks.TrackLrParserSize.track_lr_parser_size",
         "param_names": [],
         "params": [],
         "timeout": 60.0,
         "type": "track",
         "unit": "bytes",
-        "version": "009540996f1091d99109cb7bac89db1a3d463e3e7201396b56dc862075a3aa54"
+        "version": "5c2ee1d6c02c954f783f168723747a697bd1226feb95ad3c24dfa9eed58372e7"
     },
     "version": 2
 }

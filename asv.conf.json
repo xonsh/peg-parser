@@ -21,9 +21,10 @@
     // Customizable commands for building, installing, and
     // uninstalling the project. See asv.conf.json documentation.
     //
-//     "install_command": [
-//       "in-dir={env_dir} python -mpip install {wheel_file}"
-//     ],
+     "install_command": [
+       "in-dir={env_dir} python -mpip install {wheel_file} pympler"
+     ],
+
     // "uninstall_command": ["return-code=any python -mpip uninstall -y {project}"],
      "build_command": [
          "python -m pip wheel -w {build_cache_dir} {build_dir}",
@@ -38,7 +39,7 @@
     // determined from "repo" by looking at the protocol in the URL
     // (if remote), or by looking for special directories, such as
     // ".git" (if local).
-    // "dvcs": "git",
+     "dvcs": "git",
 
     // The tool to use to create environments.  May be "conda",
     // "virtualenv" or other value depending on the plugins in use.
