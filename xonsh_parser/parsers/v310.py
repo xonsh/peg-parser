@@ -9,9 +9,12 @@ handle
 """
 
 import ast
+from typing import TYPE_CHECKING
 
-from ..ply import yacc
 from .v39 import Parser as ThreeNineParser
+
+if TYPE_CHECKING:
+    from ..ply.lrparser import YaccProduction
 
 
 # noinspection PyCompatibility
@@ -24,7 +27,7 @@ class Parser(ThreeNineParser):
         """import_as_name : name_str as_name_opt"""
         self.p_dotted_as_name(p)
 
-    def p_dotted_as_name(self, p: yacc.YaccProduction):
+    def p_dotted_as_name(self, p: "YaccProduction"):
         """dotted_as_name : dotted_name as_name_opt"""
         alias_idx = 2
         p[0] = ast.alias(
@@ -32,7 +35,7 @@ class Parser(ThreeNineParser):
         )
 
     @staticmethod
-    def get_line_cols(p: yacc.YaccProduction, idx: int):
+    def get_line_cols(p: "YaccProduction", idx: int):
         line_no, end_line_no = p.linespan(idx)
         col_offset, end_col_offset = p.lexspan(idx)
         return dict(
