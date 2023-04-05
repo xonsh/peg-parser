@@ -78,13 +78,28 @@ def trace(limit=10, show_tb=False):
 
 
 if __name__ == '__main__':
+    from xonsh_parser.parser import get_parser_cls, write_parser_table
+
     with timeit(), trace():
-        from xonsh_parser.parser import get_parser_cls
+        import tempfile
+        path = Path(tempfile.gettempdir()) / "parser_table.py"
+        if path.exists():
+            path.unlink()
+        result = write_parser_table(output_path=path)
+        # Output: writing parser-table
+        # current=3103.5KiB,  peak=22563.3KiB
+        # Total allocated size: 5991.8 KiB
+        # Took:  6.25s
 
-        parser = get_parser_cls()()
+
+    with timeit(), trace():
+        parser = get_parser_cls()(parser_table=result)
         parser.parse("ls -alh")
+        # Output: reading parser-table
+        # current=7457.5KiB,  peak=7531.1KiB
+        # Total allocated size: 7470.4 KiB
+        # Took:  1.47s
 
-# Output:
-# Total allocated size: 9533.7 KiB
-# Took:  2.19s
+
+
 

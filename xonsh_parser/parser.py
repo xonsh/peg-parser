@@ -17,7 +17,7 @@ def get_parser_cls():
     return p
 
 
-def write_parser_table(yacc_debug=False, output_path: Path = None) -> Path:
+def write_parser_table(yacc_debug=False, output_path: None | Path = None) -> Path:
     from .ply import yacc
 
     cls = get_parser_cls()
