@@ -8,8 +8,10 @@ class TimeSuite:
     of iterating over dictionaries in Python.
     """
 
-    # def setup(self):
-    #     self.d = {}
+    def setup(self):
+        from xonsh_parser.parser import write_parser_table
+        write_parser_table()
+
 
     def time_parser_init(self):
         from xonsh_parser.parser import get_parser_cls
@@ -19,6 +21,10 @@ class TimeSuite:
 
 
 class MemSuite:
+    def setup(self):
+        from xonsh_parser.parser import write_parser_table
+        write_parser_table()
+
     def mem_parser_init(self):
         from xonsh_parser.parser import get_parser_cls
 
@@ -27,6 +33,10 @@ class MemSuite:
 
 
 class PeakMemSuite:
+    def setup(self):
+        from xonsh_parser.parser import write_parser_table
+        write_parser_table()
+
     def peakmem_parser_init(self):
         from xonsh_parser.parser import get_parser_cls
 
@@ -37,9 +47,14 @@ class PeakMemSuite:
 class TrackLrParserSize:
     unit = "bytes"
 
+    def setup(self):
+        from xonsh_parser.parser import write_parser_table
+        write_parser_table()
+
     def track_lr_parser_size(self):
-        from xonsh_parser.parser import get_parser_cls
         from pympler import asizeof
+
+        from xonsh_parser.parser import get_parser_cls
 
         parser = get_parser_cls()()
         return asizeof.asizeof(parser.parser)

@@ -5,8 +5,5 @@ def test_write_table(tmp_path):
     assert path.exists()
 
 
-def test_basic(parser_table):
-    from xonsh_parser.parser import get_parser_cls
-
-    p = get_parser_cls()(parser_table)
-    p.parse("ls -alh")
+def test_basic(parser):
+    parser.parse("ls -alh")

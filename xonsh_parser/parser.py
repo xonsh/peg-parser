@@ -21,12 +21,10 @@ def write_parser_table(yacc_debug=False, output_path: Path = None) -> Path:
     from .ply import yacc
 
     cls = get_parser_cls()
-    module = cls()
-    py_version = ".".join(str(x) for x in PYTHON_VERSION_INFO[:2])
-    format = "v1"
-    filename = f"{cls.__name__}.table.{py_version}.{format}.pickle"
+    module = cls(is_write_table=True)
+
     if not output_path:
-        output_path = Path(__file__).parent / filename
+        output_path = cls.default_table_name()
 
     if output_path.exists():
         return output_path

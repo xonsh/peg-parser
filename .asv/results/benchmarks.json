@@ -1,26 +1,26 @@
 {
     "benchmarks.MemSuite.mem_parser_init": {
-        "code": "class MemSuite:\n    def mem_parser_init(self):\n        from xonsh_parser.parser import get_parser_cls\n    \n        parser = get_parser_cls()()\n        return parser.parser",
+        "code": "class MemSuite:\n    def mem_parser_init(self):\n        from xonsh_parser.parser import get_parser_cls\n    \n        parser = get_parser_cls()()\n        return parser.parser\n\n    def setup(self):\n        from xonsh_parser.parser import write_parser_table\n        write_parser_table()",
         "name": "benchmarks.MemSuite.mem_parser_init",
         "param_names": [],
         "params": [],
         "timeout": 60.0,
         "type": "memory",
         "unit": "bytes",
-        "version": "bb8f98f3f13b62277b442393caa8f4200994037053d97d9a16f1277b17a34e82"
+        "version": "fef8294dd8f9528bab51728ace954f992f353699e8c20ddba9cb190744896302"
     },
     "benchmarks.PeakMemSuite.peakmem_parser_init": {
-        "code": "class PeakMemSuite:\n    def peakmem_parser_init(self):\n        from xonsh_parser.parser import get_parser_cls\n    \n        parser = get_parser_cls()()\n        parser.parse(\"ls -alh\")",
+        "code": "class PeakMemSuite:\n    def peakmem_parser_init(self):\n        from xonsh_parser.parser import get_parser_cls\n    \n        parser = get_parser_cls()()\n        parser.parse(\"ls -alh\")\n\n    def setup(self):\n        from xonsh_parser.parser import write_parser_table\n        write_parser_table()",
         "name": "benchmarks.PeakMemSuite.peakmem_parser_init",
         "param_names": [],
         "params": [],
         "timeout": 60.0,
         "type": "peakmemory",
         "unit": "bytes",
-        "version": "891de105fd5a77acd17248238e5ed8f96767aeea19d597113d4940398a405fcb"
+        "version": "5395f5577f2ddc095088b4765b106fbc215e28fda9ae9433dcb13f718c8e3272"
     },
     "benchmarks.TimeSuite.time_parser_init": {
-        "code": "class TimeSuite:\n    def time_parser_init(self):\n        from xonsh_parser.parser import get_parser_cls\n    \n        parser = get_parser_cls()()\n        parser.parse(\"ls -alh\")",
+        "code": "class TimeSuite:\n    def time_parser_init(self):\n        from xonsh_parser.parser import get_parser_cls\n    \n        parser = get_parser_cls()()\n        parser.parse(\"ls -alh\")\n\n    def setup(self):\n        from xonsh_parser.parser import write_parser_table\n        write_parser_table()",
         "min_run_count": 2,
         "name": "benchmarks.TimeSuite.time_parser_init",
         "number": 0,
@@ -32,18 +32,18 @@
         "timeout": 60.0,
         "type": "time",
         "unit": "seconds",
-        "version": "8a8a18a69fc474da00f5b862153704498b64db8ea1c3ae851302de8cfed36e23",
+        "version": "e35e8735a755146c49df0237cdf07c88a943702d6e364e50d29f2aa842bb1990",
         "warmup_time": -1
     },
     "benchmarks.TrackLrParserSize.track_lr_parser_size": {
-        "code": "class TrackLrParserSize:\n    def track_lr_parser_size(self):\n        from xonsh_parser.parser import get_parser_cls\n        from pympler import asizeof\n    \n        parser = get_parser_cls()()\n        return asizeof.asizeof(parser.parser)",
+        "code": "class TrackLrParserSize:\n    def track_lr_parser_size(self):\n        from xonsh_parser.parser import get_parser_cls\n        from pympler import asizeof\n    \n        parser = get_parser_cls()()\n        return asizeof.asizeof(parser.parser)\n\n    def setup(self):\n        from xonsh_parser.parser import write_parser_table\n        write_parser_table()",
         "name": "benchmarks.TrackLrParserSize.track_lr_parser_size",
         "param_names": [],
         "params": [],
         "timeout": 60.0,
         "type": "track",
         "unit": "bytes",
-        "version": "b56d1dd056fa3e5310eebad2eac27bf1e43a514d0c63fefce5d42bf6f806a328"
+        "version": "009540996f1091d99109cb7bac89db1a3d463e3e7201396b56dc862075a3aa54"
     },
     "version": 2
 }

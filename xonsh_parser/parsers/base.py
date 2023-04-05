@@ -223,11 +223,13 @@ def raise_parse_error(
 class BaseParser:
     """A base class that parses the xonsh language."""
 
-    def __init__(self, parser_table: Path = None, **_):
+    def __init__(self, parser_table: Path = None, is_write_table=False, **_):
         """Parameters
         ----------
         parser_table : str, optional
-            Path to the parser table generated from yacc. If not given it will not be able to parse
+            Path to the parser table generated from yacc. If not given it will try to load from default location
+        is_write_table : bool
+            while writing do not try to load parser table
         """
         self.lexer = lexer = Lexer()
         self.tokens = lexer.tokens
@@ -423,7 +425,10 @@ class BaseParser:
         for rule in tok_rules:
             self._tok_rule(rule)
 
-        if parser_table:
+        if not parser_table:
+            parser_table = self.default_table_name()
+
+        if not is_write_table:
             # create parser on main thread
             self.parser = lrparser.load_parser(parser_table, module=self)
         else:
@@ -432,6 +437,13 @@ class BaseParser:
         # Keeps track of the last token given to yacc (the lookahead token)
         self._last_yielded_token = None
         self._error = None
+
+    @classmethod
+    def default_table_name(cls):
+        py_version = ".".join(str(x) for x in PYTHON_VERSION_INFO[:2])
+        format = "v1"
+        filename = f"{cls.__name__}.table.{py_version}.{format}.pickle"
+        return Path(__file__).parent / filename
 
     def reset(self):
         """Resets for clean parsing."""
