@@ -8,6 +8,7 @@
 #-----------------------------------------------------------------------------
 '''
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, NamedTuple, Protocol
 
@@ -18,18 +19,15 @@ error_count = 3                # Number of symbols that must be shifted to leave
 
 # This class is used to hold non-terminal grammar symbols during parsing.
 # It normally has the following attributes set:
-#        .type       = Grammar symbol type
-#        .value      = Symbol value
-#        .lineno     = Starting line number
-#        .endlineno  = Ending line number (optional, set automatically)
-#        .lexpos     = Starting lex position
-#        .endlexpos  = Ending lex position (optional, set automatically)
+@dataclass()
 class YaccSymbol:
-    def __str__(self):
-        return self.type
+    type: str  # = Grammar symbol type
+    value: Any = None  # = Symbol value
+    lineno: int | None = None  # = Starting line number
+    endlineno: int | None = None  # = Ending line number (optional, set automatically)
+    lexpos: int | None = None  # = Starting lex position
+    endlexpos: int | None = None  # = Ending lex position (optional, set automatically)
 
-    def __repr__(self):
-        return str(self)
 
 # This class is a wrapper around the objects actually passed to each
 # grammar rule.   Index lookup and assignment actually assign the
@@ -41,7 +39,7 @@ class YaccSymbol:
 # representing the range of positional information for a symbol.
 
 class YaccProduction:
-    def __init__(self, s, stack=None):
+    def __init__(self, s: Any, stack: Any = None) -> None:
         self.slice = s
         self.stack = stack
         self.lexer = None
@@ -111,8 +109,7 @@ class LRParser:
     def restart(self):
         del self.statestack[:]
         del self.symstack[:]
-        sym = YaccSymbol()
-        sym.type = '$end'
+        sym = YaccSymbol(type='$end')
         self.symstack.append(sym)
         self.statestack.append(0)
 
@@ -184,8 +181,7 @@ class LRParser:
         # The start state is assumed to be (0,$end)
 
         statestack.append(0)
-        sym = YaccSymbol()
-        sym.type = '$end'
+        sym = YaccSymbol(type='$end')
         symstack.append(sym)
         state = 0
         while True:
@@ -203,8 +199,7 @@ class LRParser:
                     else:
                         lookahead = lookaheadstack.pop()
                     if not lookahead:
-                        lookahead = YaccSymbol()
-                        lookahead.type = '$end'
+                        lookahead = YaccSymbol(type='$end')
 
                 # Check the action table
                 ltype = lookahead.type
@@ -216,7 +211,7 @@ class LRParser:
 
             if debug:
                 debug.debug('Stack  : %s',
-                            ('%s . %s' % (' '.join([xx.type for xx in symstack][1:]), str(lookahead))).lstrip())
+                            ('{} . {}'.format(' '.join([xx.type for xx in symstack][1:]), str(lookahead))).lstrip())
 
             if t is not None:
                 if t > 0:
@@ -239,18 +234,17 @@ class LRParser:
                     # reduce a symbol on the stack, emit a production
                     p = prod[-t]
                     pname = p.name
-                    plen  = p.len
+                    plen = p.len
 
                     # Get production function
-                    sym = YaccSymbol()
-                    sym.type = pname       # Production name
-                    sym.value = None
+                    sym = YaccSymbol(type=pname,  # Production name
+                                     value=None)
 
                     if debug:
                         if plen:
                             debug.info('Action : Reduce rule [%s] with %s and goto state %d', p.str,
-                                       '['+','.join([format_stack_entry(_v.value) for _v in symstack[-plen:]])+']',
-                                       goto[statestack[-1-plen]][pname])
+                                       '[' + ','.join([format_stack_entry(_v.value) for _v in symstack[-plen:]]) + ']',
+                                       goto[statestack[-1 - plen]][pname])
                         else:
                             debug.info('Action : Reduce rule [%s] with %s and goto state %d', p.str, [],
                                        goto[statestack[-1]][pname])
@@ -350,7 +344,7 @@ class LRParser:
 
                 if debug:
                     debug.error('Error  : %s',
-                                ('%s . %s' % (' '.join([xx.type for xx in symstack][1:]), str(lookahead))).lstrip())
+                                ('{} . {}'.format(' '.join([xx.type for xx in symstack][1:]), str(lookahead))).lstrip())
 
                 # We have some kind of parsing error here.  To handle
                 # this, we are going to push the current token onto
@@ -429,8 +423,7 @@ class LRParser:
                         continue
 
                     # Create the error symbol for the first time and make it the new lookahead symbol
-                    t = YaccSymbol()
-                    t.type = 'error'
+                    t = YaccSymbol(type='error')
 
                     if hasattr(lookahead, 'lineno'):
                         t.lineno = t.endlineno = lookahead.lineno

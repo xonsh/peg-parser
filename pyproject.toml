@@ -1,5 +1,5 @@
 [tool.ruff]
-extend-select = ["B", "I"]
+extend-select = ["B", "I", "UP"]
 # ruff ignore file "xonsh_parser/ply/yacc.py"
 [tool.ruff.per-file-ignores]
 "xonsh_parser/ply/*.py" = [
@@ -125,7 +125,7 @@ packages = "xonsh_parser"
 ignore_missing_imports = true
 warn_unused_configs = true
 #warn_unused_ignores = true
-strict_optional = false
+#strict_optional = false
 #warn_redundant_casts = true
 exclude = [
     'xonsh_parser/ply/.*.py',
@@ -136,6 +136,6 @@ exclude = [
 module = "xonsh_parser.ply.yacc"
 ignore_errors = true
 
-#[[tool.mypy.overrides]]
-#module = "xonsh_parser.ply.lrparser"
+[[tool.mypy.overrides]]
+module = "xonsh_parser.ply.lrparser"
 #strict = true

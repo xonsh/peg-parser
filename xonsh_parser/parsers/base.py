@@ -188,10 +188,10 @@ def hasglobstar(x):
 
 
 def raise_parse_error(
-    msg: tp.Union[str, tp.Tuple[str]],
+    msg: tp.Union[str, tuple[str]],
     loc: tp.Optional[Location] = None,
     code: tp.Optional[str] = None,
-    lines: tp.Optional[tp.List[str]] = None,
+    lines: tp.Optional[list[str]] = None,
 ):
     err_line = None
     if loc is None or code is None or lines is None:
@@ -223,7 +223,7 @@ def raise_parse_error(
 class BaseParser:
     """A base class that parses the xonsh language."""
 
-    def __init__(self, parser_table: Path = None, is_write_table=False, **_):
+    def __init__(self, parser_table: None | Path = None, is_write_table=False, **_):
         """Parameters
         ----------
         parser_table : str, optional
@@ -425,12 +425,13 @@ class BaseParser:
         for rule in tok_rules:
             self._tok_rule(rule)
 
-        if not parser_table:
-            parser_table = self.default_table_name()
+        parser_table = parser_table or self.default_table_name()
 
         if not is_write_table:
             # create parser on main thread
-            self.parser = lrparser.load_parser(parser_table, module=self)
+            self.parser: None | lrparser.LRParser = lrparser.load_parser(
+                parser_table, module=self
+            )
         else:
             self.parser = None
 
@@ -439,7 +440,7 @@ class BaseParser:
         self._error = None
 
     @classmethod
-    def default_table_name(cls):
+    def default_table_name(cls) -> Path:
         py_version = ".".join(str(x) for x in PYTHON_VERSION_INFO[:2])
         format = "v1"
         filename = f"{cls.__name__}.table.{py_version}.{format}.pickle"

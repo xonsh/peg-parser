@@ -22,8 +22,7 @@ def write_parser_table(yacc_debug=False, output_path: None | Path = None) -> Pat
 
     cls = get_parser_cls()
 
-    if not output_path:
-        output_path = cls.default_table_name()
+    output_path = output_path or cls.default_table_name()
 
     if output_path.exists():
         return output_path
