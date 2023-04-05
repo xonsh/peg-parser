@@ -100,6 +100,7 @@ classifiers = [
 ]
 requires-python = ">=3.9"
 dependencies = [
+    "mypy-extensions>=1.0.0",
 ]
 
 [project.urls]
@@ -109,3 +110,24 @@ Source = "https://github.com/jnoortheen/xonsh-parser"
 [tool.black]
 # exclude extend to file "xonsh_parser/ply/yacc.py"
 extend-exclude = ".+ply/.+.py"
+
+[tool.mypy]
+# mypy ignore file "xonsh_parser/ply/yacc.py"
+packages = "xonsh_parser"
+ignore_missing_imports = true
+warn_unused_configs = true
+#warn_unused_ignores = true
+strict_optional = false
+#warn_redundant_casts = true
+exclude = [
+    'xonsh_parser/ply/.*.py',
+    'xonsh_parser/parsers/'
+]
+
+[[tool.mypy.overrides]]
+module = "xonsh_parser.ply.yacc"
+ignore_errors = true
+
+#[[tool.mypy.overrides]]
+#module = "xonsh_parser.ply.lrparser"
+#strict = true

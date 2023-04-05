@@ -21,7 +21,6 @@ def write_parser_table(yacc_debug=False, output_path: Path = None) -> Path:
     from .ply import yacc
 
     cls = get_parser_cls()
-    module = cls(is_write_table=True)
 
     if not output_path:
         output_path = cls.default_table_name()
@@ -30,7 +29,7 @@ def write_parser_table(yacc_debug=False, output_path: Path = None) -> Path:
         return output_path
 
     yacc_kwargs = dict(
-        module=module,
+        module=cls(is_write_table=True),
         debug=yacc_debug,
         start="start_symbols",
         output_path=str(output_path),

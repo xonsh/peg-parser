@@ -8,8 +8,8 @@
 #-----------------------------------------------------------------------------
 '''
 import sys
-import typing
 from pathlib import Path
+from typing import Any, Callable, NamedTuple, Protocol
 
 from .common import PlyLogger, format_result, format_stack_entry
 
@@ -96,7 +96,7 @@ class LRParser:
                  productions: list,
                  action: dict[int, dict[str, int]],
                  goto: dict[int, dict[str, int]],
-                 errorf: callable):
+                 errorf: Callable):
         self.productions = productions
         # the int keys and values are very small around -2k to +2k
         self.action = action
@@ -453,14 +453,18 @@ class LRParser:
             raise RuntimeError('yacc: internal parser error!!!\n')
 
 
-class Production(typing.NamedTuple):
+class Production(NamedTuple):
     name: str
     str: str
-    callable: typing.Callable
+    callable: Callable[[YaccProduction], None]
     len: int
 
 
-def load_parser(parser_table: Path, module):
+class ParserProtocol(Protocol):
+    def p_error(self, p: YaccProduction) -> None:
+        ...
+
+def load_parser(parser_table: Path, module: ParserProtocol) -> LRParser:
     import pickle
 
     lr_prods, lr_action, lr_goto = pickle.load(parser_table.open('rb') )
