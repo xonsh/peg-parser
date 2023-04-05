@@ -46,7 +46,7 @@ class YaccProduction:
     def __init__(self, s: list["YaccSymbol"] | None = None, stack: Any = None) -> None:
         self.slice = s or []
         self.stack: list["YaccSymbol"] = stack or []
-        self.lexer = None
+        self.lexer: Any = None
         self.parser: None | "LRParser" = None
 
     def __getitem__(self, n: int) -> Any:
@@ -113,7 +113,7 @@ class LRParser:
                  productions: list["Production"],
                  action: dict[int, dict[str, int]],
                  goto: dict[int, dict[str, int]],
-                 errorf: Callable[["YaccSymbol" | None], None]|None) -> None:
+                 errorf: Callable[[YaccSymbol | None], None] | None) -> None:
         self.productions = productions
         # the int keys and values are very small around -2k to +2k
         self.action = action
