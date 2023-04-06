@@ -1,4 +1,4 @@
-'''
+"""
 #-----------------------------------------------------------------------------
 #                        ===  LR Parsing Engine ===
 #
@@ -6,7 +6,7 @@
 # used during table construction and are independent of the actual LR
 # table generation algorithm
 #-----------------------------------------------------------------------------
-'''
+"""
 import sys
 from ast import Expression
 from dataclasses import dataclass
@@ -29,7 +29,8 @@ class YaccSymbol:
     lexpos: int | None = None  # = Starting lex position
     endlexpos: int | None = None  # = Ending lex position (optional, set automatically)
 
-LexToken = YaccSymbol # For backwards compatibility
+
+LexToken = YaccSymbol  # For backwards compatibility
 
 # This class is a wrapper around the objects actually passed to each
 # grammar rule.   Index lookup and assignment actually assign the
@@ -39,6 +40,7 @@ LexToken = YaccSymbol # For backwards compatibility
 # a tuple of (startline,endline) representing the range of lines
 # for a symbol.  The lexspan() method returns a tuple (lexpos,endlexpos)
 # representing the range of positional information for a symbol.
+
 
 class YaccProduction:
     def __init__(self, s: list["YaccSymbol"] | None = None, stack: Any = None) -> None:
@@ -64,25 +66,25 @@ class YaccProduction:
         return len(self.slice)
 
     def lineno(self, n: int) -> int:
-        return getattr(self.slice[n], 'lineno', 0)
+        return getattr(self.slice[n], "lineno", 0)
 
     def set_lineno(self, n: int, lineno: int) -> None:
         self.slice[n].lineno = lineno
 
     def linespan(self, n: int) -> tuple[int, int]:
-        startline = getattr(self.slice[n], 'lineno', 0)
-        endline = getattr(self.slice[n], 'endlineno', startline)
+        startline = getattr(self.slice[n], "lineno", 0)
+        endline = getattr(self.slice[n], "endlineno", startline)
         return startline, endline
 
     def lexpos(self, n: int) -> int:
-        return getattr(self.slice[n], 'lexpos', 0)
+        return getattr(self.slice[n], "lexpos", 0)
 
     def set_lexpos(self, n: int, lexpos: int) -> None:
         self.slice[n].lexpos = lexpos
 
     def lexspan(self, n: int) -> tuple[int, int]:
-        startpos = getattr(self.slice[n], 'lexpos', 0)
-        endpos = getattr(self.slice[n], 'endlexpos', startpos)
+        startpos = getattr(self.slice[n], "lexpos", 0)
+        endpos = getattr(self.slice[n], "endlexpos", startpos)
         return startpos, endpos
 
     def error(self) -> None:
@@ -107,11 +109,13 @@ class ParserProtocol(Protocol):
 class LRParser:
     """The LR Parsing engine.  This is the core of the PLY parser generator."""
 
-    def __init__(self,
-                 productions: tuple["Production", ...],
-                 action: tuple[dict[str, int]],
-                 goto: tuple[dict[str, int]],
-                 errorf: Callable[[YaccSymbol | None], None] | None) -> None:
+    def __init__(
+        self,
+        productions: tuple["Production", ...],
+        action: tuple[dict[str, int]],
+        goto: tuple[dict[str, int]],
+        errorf: Callable[[YaccSymbol | None], None] | None,
+    ) -> None:
         self.productions = productions
         # the int keys and values are very small around -2k to +2k
         self.action = action
@@ -127,7 +131,7 @@ class LRParser:
     def restart(self) -> None:
         del self.statestack[:]
         del self.symstack[:]
-        sym = YaccSymbol(type='$end')
+        sym = YaccSymbol(type="$end")
         self.symstack.append(sym)
         self.statestack.append(0)
 
@@ -156,24 +160,33 @@ class LRParser:
     # tracking.  In this mode, symbols will record the starting/ending line number and
     # character index.
 
-    def parse(self, input: Optional[str] = None, lexer: Any = None, debug: int = 0,
-              tracking: bool = False) -> Expression:
+    def parse(
+        self,
+        input: Optional[str] = None,
+        lexer: Any = None,
+        debug: int = 0,
+        tracking: bool = False,
+    ) -> Expression:
         # If debugging has been specified as a flag, turn it into a logging object
-        logger: None|PlyLogger = None
+        logger: None | PlyLogger = None
         if isinstance(debug, int) and debug:
             logger = PlyLogger(sys.stderr)
 
-        lookahead: None | YaccSymbol = None                         # Current lookahead symbol
-        lookaheadstack: list[YaccSymbol] = []                      # Stack of lookahead symbols
-        actions = self.action                    # Local reference to action table (to avoid lookup on self.)
-        goto    = self.goto                      # Local reference to goto table (to avoid lookup on self.)
-        prod    = self.productions               # Local reference to production list (to avoid lookup on self.)
-        defaulted_states = self.defaulted_states # Local reference to defaulted states
-        pslice  = YaccProduction(None)           # Production object passed to grammar rules
-        errorcount = 0                           # Used during error recovery
+        lookahead: None | YaccSymbol = None  # Current lookahead symbol
+        lookaheadstack: list[YaccSymbol] = []  # Stack of lookahead symbols
+        actions = (
+            self.action
+        )  # Local reference to action table (to avoid lookup on self.)
+        goto = self.goto  # Local reference to goto table (to avoid lookup on self.)
+        prod = (
+            self.productions
+        )  # Local reference to production list (to avoid lookup on self.)
+        defaulted_states = self.defaulted_states  # Local reference to defaulted states
+        pslice = YaccProduction(None)  # Production object passed to grammar rules
+        errorcount = 0  # Used during error recovery
 
         if logger:
-            logger.info('PLY: PARSE DEBUG START')
+            logger.info("PLY: PARSE DEBUG START")
 
         # Set up the lexer and parser objects on pslice
         pslice.lexer = lexer
@@ -187,17 +200,17 @@ class LRParser:
         get_token = self.token = lexer.token
 
         # Set up the state and symbol stacks
-        self.statestack: list[int] = []   # Stack of parsing states
+        self.statestack: list[int] = []  # Stack of parsing states
         statestack = self.statestack
-        self.symstack: list[YaccSymbol] = []       # Stack of grammar symbols
+        self.symstack: list[YaccSymbol] = []  # Stack of grammar symbols
         symstack = self.symstack
-        pslice.stack = symstack             # Put in the production
-        errtoken   = None                   # Err token
+        pslice.stack = symstack  # Put in the production
+        errtoken = None  # Err token
 
         # The start state is assumed to be (0,$end)
 
         statestack.append(0)
-        sym = YaccSymbol(type='$end')
+        sym = YaccSymbol(type="$end")
         symstack.append(sym)
         state = 0
         while True:
@@ -206,16 +219,16 @@ class LRParser:
             # the next token off of the lookaheadstack or from the lexer
 
             if logger:
-                logger.debug('State  : %s', state)
+                logger.debug("State  : %s", state)
 
             if state not in defaulted_states:
                 if not lookahead:
                     if not lookaheadstack:
-                        lookahead = get_token()     # Get the next token
+                        lookahead = get_token()  # Get the next token
                     else:
                         lookahead = lookaheadstack.pop()
                     if not lookahead:
-                        lookahead = YaccSymbol(type='$end')
+                        lookahead = YaccSymbol(type="$end")
 
                 # Check the action table
                 ltype = lookahead.type
@@ -223,11 +236,17 @@ class LRParser:
             else:
                 t = defaulted_states[state]
                 if logger:
-                    logger.debug('Defaulted state %s: Reduce using %d', state, -t)
+                    logger.debug("Defaulted state %s: Reduce using %d", state, -t)
 
             if logger:
-                logger.debug('Stack  : %s',
-                             ('{} . {}'.format(' '.join([xx.type for xx in symstack][1:]), str(lookahead))).lstrip())
+                logger.debug(
+                    "Stack  : %s",
+                    (
+                        "{} . {}".format(
+                            " ".join([xx.type for xx in symstack][1:]), str(lookahead)
+                        )
+                    ).lstrip(),
+                )
 
             if t is not None:
                 if t > 0:
@@ -236,7 +255,7 @@ class LRParser:
                     state = t
 
                     if logger:
-                        logger.debug('Action : Shift and goto state %s', t)
+                        logger.debug("Action : Shift and goto state %s", t)
 
                     if lookahead is not None:
                         symstack.append(lookahead)
@@ -254,20 +273,33 @@ class LRParser:
                     plen = p.len
 
                     # Get production function
-                    sym = YaccSymbol(type=pname,  # Production name
-                                     value=None)
+                    sym = YaccSymbol(type=pname, value=None)  # Production name
 
                     if logger:
                         if plen:
-                            logger.info('Action : Reduce rule [%s] with %s and goto state %d', p.str,
-                                       '[' + ','.join([format_stack_entry(_v.value) for _v in symstack[-plen:]]) + ']',
-                                        goto[statestack[-1 - plen]][pname])
+                            logger.info(
+                                "Action : Reduce rule [%s] with %s and goto state %d",
+                                p.str,
+                                "["
+                                + ",".join(
+                                    [
+                                        format_stack_entry(_v.value)
+                                        for _v in symstack[-plen:]
+                                    ]
+                                )
+                                + "]",
+                                goto[statestack[-1 - plen]][pname],
+                            )
                         else:
-                            logger.info('Action : Reduce rule [%s] with %s and goto state %d', p.str, [],
-                                        goto[statestack[-1]][pname])
+                            logger.info(
+                                "Action : Reduce rule [%s] with %s and goto state %d",
+                                p.str,
+                                [],
+                                goto[statestack[-1]][pname],
+                            )
 
                     if plen:
-                        targ = symstack[-plen-1:]
+                        targ = symstack[-plen - 1 :]
                         targ[0] = sym
 
                         if tracking:
@@ -275,8 +307,8 @@ class LRParser:
                             sym.lineno = t1.lineno
                             sym.lexpos = t1.lexpos
                             t1 = targ[-1]
-                            sym.endlineno = getattr(t1, 'endlineno', t1.lineno)
-                            sym.endlexpos = getattr(t1, 'endlexpos', t1.lexpos)
+                            sym.endlineno = getattr(t1, "endlineno", t1.lineno)
+                            sym.endlexpos = getattr(t1, "endlexpos", t1.lexpos)
 
                         # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                         # The code enclosed in this section is duplicated
@@ -292,19 +324,23 @@ class LRParser:
                             p.callable(pslice)
                             del statestack[-plen:]
                             if logger:
-                                logger.info('Result : %s', format_result(pslice[0]))
+                                logger.info("Result : %s", format_result(pslice[0]))
                             symstack.append(sym)
                             state = goto[statestack[-1]][pname]
                             statestack.append(state)
                         except SyntaxError:
                             # If an error was set. Enter error recovery state
                             if lookahead:
-                                lookaheadstack.append(lookahead)    # Save the current lookahead token
-                            symstack.extend(targ[1:-1])         # Put the production slice back on the stack
-                            statestack.pop()                    # Pop back one state (before the reduce)
+                                lookaheadstack.append(
+                                    lookahead
+                                )  # Save the current lookahead token
+                            symstack.extend(
+                                targ[1:-1]
+                            )  # Put the production slice back on the stack
+                            statestack.pop()  # Pop back one state (before the reduce)
                             state = statestack[-1]
-                            sym.type = 'error'
-                            sym.value = 'error'
+                            sym.type = "error"
+                            sym.value = "error"
                             lookahead = sym
                             errorcount = error_count
                             self.errorok = False
@@ -312,7 +348,6 @@ class LRParser:
                         continue
 
                     else:
-
                         if tracking:
                             sym.lineno = lexer.lineno
                             sym.lexpos = lexer.lexpos
@@ -331,18 +366,20 @@ class LRParser:
                             self.state = state
                             p.callable(pslice)
                             if logger:
-                                logger.info('Result : %s', format_result(pslice[0]))
+                                logger.info("Result : %s", format_result(pslice[0]))
                             symstack.append(sym)
                             state = goto[statestack[-1]][pname]
                             statestack.append(state)
                         except SyntaxError:
                             # If an error was set. Enter error recovery state
                             if lookahead:
-                                lookaheadstack.append(lookahead)    # Save the current lookahead token
-                            statestack.pop()                    # Pop back one state (before the reduce)
+                                lookaheadstack.append(
+                                    lookahead
+                                )  # Save the current lookahead token
+                            statestack.pop()  # Pop back one state (before the reduce)
                             state = statestack[-1]
-                            sym.type = 'error'
-                            sym.value = 'error'
+                            sym.type = "error"
+                            sym.value = "error"
                             lookahead = sym
                             errorcount = error_count
                             self.errorok = False
@@ -351,21 +388,27 @@ class LRParser:
 
                 if t == 0:
                     n = symstack[-1]
-                    result = getattr(n, 'value', None)
+                    result = getattr(n, "value", None)
 
                     if logger:
-                        logger.info('Done   : Returning %s', format_result(result))
-                        logger.info('PLY: PARSE DEBUG END')
+                        logger.info("Done   : Returning %s", format_result(result))
+                        logger.info("PLY: PARSE DEBUG END")
 
                     if isinstance(result, Expression):
                         return result
                     raise TypeError("Parser state did not return an Expression object.")
 
             if t is None:
-
                 if logger:
-                    logger.error('Error  : %s',
-                                 ('{} . {}'.format(' '.join([xx.type for xx in symstack][1:]), str(lookahead))).lstrip())
+                    logger.error(
+                        "Error  : %s",
+                        (
+                            "{} . {}".format(
+                                " ".join([xx.type for xx in symstack][1:]),
+                                str(lookahead),
+                            )
+                        ).lstrip(),
+                    )
 
                 # We have some kind of parsing error here.  To handle
                 # this, we are going to push the current token onto
@@ -380,15 +423,15 @@ class LRParser:
                 if errorcount == 0 or self.errorok:
                     errorcount = error_count
                     self.errorok = False
-                    if lookahead and lookahead.type == '$end':
-                        errtoken = None               # End of file!
+                    if lookahead and lookahead.type == "$end":
+                        errtoken = None  # End of file!
                     else:
                         errtoken = lookahead
                     if self.errorfunc:
                         # if errtoken and not hasattr(errtoken, 'lexer'):
                         #     errtoken.lexer = lexer
                         self.state = state
-                        tok : None = self.errorfunc(errtoken)
+                        tok: None = self.errorfunc(errtoken)
                         if self.errorok:
                             # User must have done some kind of panic
                             # mode recovery on their own.  The
@@ -398,17 +441,22 @@ class LRParser:
                             continue
                     else:
                         if errtoken:
-                            if hasattr(errtoken, 'lineno'):
+                            if hasattr(errtoken, "lineno"):
                                 lineno = errtoken.lineno
                             else:
                                 lineno = 0
                             if lineno:
-                                sys.stderr.write('yacc: Syntax error at line %d, token=%s\n' % (lineno, errtoken.type))
+                                sys.stderr.write(
+                                    "yacc: Syntax error at line %d, token=%s\n"
+                                    % (lineno, errtoken.type)
+                                )
                             else:
-                                sys.stderr.write('yacc: Syntax error, token=%s' % errtoken.type)
+                                sys.stderr.write(
+                                    "yacc: Syntax error, token=%s" % errtoken.type
+                                )
                         else:
-                            sys.stderr.write('yacc: Parse error in input. EOF\n')
-                            return Expression('EOF')
+                            sys.stderr.write("yacc: Parse error in input. EOF\n")
+                            return Expression("EOF")
 
                 else:
                     errorcount = error_count
@@ -417,7 +465,7 @@ class LRParser:
                 # entire parse has been rolled back and we're completely hosed.   The token is
                 # discarded and we just keep going.
 
-                if len(statestack) <= 1 and lookahead and lookahead.type != '$end':
+                if len(statestack) <= 1 and lookahead and lookahead.type != "$end":
                     lookahead = None
                     errtoken = None
                     state = 0
@@ -429,27 +477,27 @@ class LRParser:
                 # at the end of the file. nuke the top entry and generate an error token
 
                 # Start nuking entries on the stack
-                if lookahead and lookahead.type == '$end':
+                if lookahead and lookahead.type == "$end":
                     # Whoa. We're really hosed here. Bail out
-                    return Expression('EOF')
+                    return Expression("EOF")
 
-                if lookahead and lookahead.type != 'error':
+                if lookahead and lookahead.type != "error":
                     sym = symstack[-1]
-                    if sym.type == 'error':
+                    if sym.type == "error":
                         # Hmmm. Error is on top of stack, we'll just nuke input
                         # symbol and continue
                         if tracking:
-                            sym.endlineno = getattr(lookahead, 'lineno', sym.lineno)
-                            sym.endlexpos = getattr(lookahead, 'lexpos', sym.lexpos)
+                            sym.endlineno = getattr(lookahead, "lineno", sym.lineno)
+                            sym.endlexpos = getattr(lookahead, "lexpos", sym.lexpos)
                         lookahead = None
                         continue
 
                     # Create the error symbol for the first time and make it the new lookahead symbol
-                    new_error = YaccSymbol(type='error')
+                    new_error = YaccSymbol(type="error")
 
-                    if hasattr(lookahead, 'lineno'):
+                    if hasattr(lookahead, "lineno"):
                         new_error.lineno = new_error.endlineno = lookahead.lineno
-                    if hasattr(lookahead, 'lexpos'):
+                    if hasattr(lookahead, "lexpos"):
                         new_error.lexpos = new_error.endlexpos = lookahead.lexpos
                     new_error.value = lookahead
                     lookaheadstack.append(lookahead)
@@ -465,20 +513,23 @@ class LRParser:
                 continue
 
             # If we'r here, something really bad happened
-            raise RuntimeError('yacc: internal parser error!!!\n')
+            raise RuntimeError("yacc: internal parser error!!!\n")
 
 
 def load_parser(parser_table: Path, module: ParserProtocol) -> LRParser:
     import pickle
 
-    with parser_table.open('rb') as fr:
+    with parser_table.open("rb") as fr:
         lr_prods, lr_action, lr_goto = pickle.load(fr)
-    prods = tuple(Production(
-        name=name,
-        str=str,
-        len=len,
-        callable=getattr(module, func) if func else None
-    ) for name, len, str, func in lr_prods)
+    prods = tuple(
+        Production(
+            name=name,
+            str=str,
+            len=len,
+            callable=getattr(module, func) if func else None,
+        )
+        for name, len, str, func in lr_prods
+    )
     del pickle
 
     return LRParser(prods, lr_action, lr_goto, errorf=getattr(module, "p_error", None))

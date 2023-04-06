@@ -118,7 +118,7 @@ Source = "https://github.com/jnoortheen/xonsh-parser"
 
 [tool.black]
 # exclude extend to file "xonsh_parser/ply/yacc.py"
-extend-exclude = ".+ply/.+.py"
+extend-exclude = ".+ply/yacc.py"
 
 [tool.mypy]
 # mypy ignore file "xonsh_parser/ply/yacc.py"
