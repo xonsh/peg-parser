@@ -116,3 +116,8 @@ pdm.lock
 *.jsonl
 *.pickle
 *.sqlite3
+.local/
+
+# Added by cargo
+
+/target

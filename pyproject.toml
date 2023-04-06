@@ -58,6 +58,7 @@ profile = [
     "asv>=0.5.1",
     "virtualenv>=20.21.0",
     "pympler>=1.0.1",
+    "guppy3>=3.1.2",
 ]
 dev = [
     "monkeytype>=23.3.0",
