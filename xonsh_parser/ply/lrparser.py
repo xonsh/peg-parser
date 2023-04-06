@@ -20,7 +20,7 @@ error_count: Final = 3  # Number of symbols that must be shifted to leave recove
 
 # This class is used to hold non-terminal grammar symbols during parsing.
 # It normally has the following attributes set:
-@dataclass()
+@dataclass(slots=True)
 class YaccSymbol:
     type: str  # = Grammar symbol type
     value: Any = None  # = Symbol value
