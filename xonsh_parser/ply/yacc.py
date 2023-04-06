@@ -120,7 +120,7 @@ _is_identifier = re.compile(r'^[a-zA-Z0-9_-]+$')
 #       usyms     - Set of unique symbols found in the production
 # -----------------------------------------------------------------------------
 
-class Production(object):
+class Production:
     reduced = 0
     def __init__(self, number, name, prod: tuple[str, ...], precedence=('right', 0), func:str=None, file='', line=0):
         self.name     = name
@@ -148,7 +148,7 @@ class Production(object):
 
         # Create a string representation
         if self.prod:
-            self.str = '%s -> %s' % (self.name, ' '.join(self.prod))
+            self.str = '{} -> {}'.format(self.name, ' '.join(self.prod))
         else:
             self.str = '%s -> <empty>' % self.name
 
@@ -212,7 +212,7 @@ class Production(object):
 #       lr_before   - Grammar symbol immediately before
 # -----------------------------------------------------------------------------
 
-class LRItem(object):
+class LRItem:
     def __init__(self, p, n):
         self.name       = p.name
         self.prod       = list(p.prod)
@@ -226,7 +226,7 @@ class LRItem(object):
 
     def __str__(self):
         if self.prod:
-            s = '%s -> %s' % (self.name, ' '.join(self.prod))
+            s = '{} -> {}'.format(self.name, ' '.join(self.prod))
         else:
             s = '%s -> <empty>' % self.name
         return s
@@ -258,7 +258,7 @@ def rightmost_terminal(symbols, terminals):
 class GrammarError(YaccError):
     pass
 
-class Grammar(object):
+class Grammar:
     def __init__(self, terminals):
         self.Productions  = [None]  # A list of all of the productions.  The first
                                     # entry is always reserved for the purpose of
@@ -380,7 +380,7 @@ class Grammar(object):
             prodprec = self.Precedence.get(precname, ('right', 0))
 
         # See if the rule is already in the rulemap
-        map = '%s -> %s' % (prodname, syms)
+        map = f'{prodname} -> {syms}'
         if map in self.Prodmap:
             m = self.Prodmap[map]
             raise GrammarError('%s:%d: Duplicate rule %s. ' % (file, line, m) +
@@ -1483,7 +1483,7 @@ def parse_grammar(doc, file, line):
 # start symbol, error function, tokens, precedence list, action functions,
 # etc.
 # -----------------------------------------------------------------------------
-class ParserReflect(object):
+class ParserReflect:
     def __init__(self, pdict, log=None):
         self.pdict      = pdict
         self.start      = None
@@ -1551,7 +1551,7 @@ class ParserReflect(object):
         for module in self.modules:
             try:
                 lines, linen = inspect.getsourcelines(module)
-            except IOError:
+            except OSError:
                 continue
 
             counthash = {}
@@ -1794,8 +1794,8 @@ def yacc(module, output_path:str=None, *, debug=yaccdebug, start=None,
         if debug:
             try:
                 debuglog = PlyLogger(open(debugfile, 'w'))
-            except IOError as e:
-                errorlog.warning("Couldn't open %r. %s" % (debugfile, e))
+            except OSError as e:
+                errorlog.warning(f"Couldn't open {debugfile!r}. {e}")
                 debuglog = NullLogger()
         else:
             debuglog = NullLogger()
@@ -1963,24 +1963,30 @@ def yacc(module, output_path:str=None, *, debug=yaccdebug, start=None,
 
     return write_to_file(lr, output_path=output_path)
 
+def optimize_table(lr):
+    """return an optimized version of the LR table variables for pickling"""
+    productions = [(p.name, p.len, p.str, p.func) for p in lr.lr_productions]
+    actions= [0] * len(lr.lr_action)
+    gotos = [0] * len(lr.lr_goto)
+    for idx, vals in lr.lr_action.items():
+        actions[idx] = vals
+    for idx, vals in lr.lr_goto.items():
+        gotos[idx] = vals
+    return productions, actions, gotos
+
 def write_to_file(lr: LRTable, output_path:str=None):
     import json
     if not output_path:
         output_path = 'parser.out.jsonl'
 
-    productions = [(p.name, p.len, p.str, p.func) for p in lr.lr_productions]
-    if output_path.endswith('.jsonl'):
+    productions, actions, gotos = optimize_table(lr)
+    if output_path.endswith('.json'):
         with open(output_path, 'w') as fw:
-            fw.write(json.dumps({"productions": productions}))
-            fw.write("\n")
-            fw.write(json.dumps({"action": lr.lr_action}))
-            fw.write("\n")
-            fw.write(json.dumps({"goto": lr.lr_goto}))
-            fw.write("\n")
+            fw.write(json.dumps({"productions": productions, "action": actions, "goto": gotos}))
     else:
         # write to a pickle file
         import pickle
-        pickle.dump((productions, lr.lr_action, lr.lr_goto), open(output_path, 'wb'), protocol=5)
+        pickle.dump((productions, actions, gotos), open(output_path, 'wb'), protocol=5)
     # Build the parser
     # lr.bind_callables(pinfo.pdict)
 

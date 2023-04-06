@@ -11,13 +11,11 @@ import sys
 from ast import Expression
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, NamedTuple, Optional, Protocol
+from typing import Any, Callable, Final, NamedTuple, Optional, Protocol
 
 from .common import PlyLogger, format_result, format_stack_entry
 
-error_count = 3  # Number of symbols that must be shifted to leave recovery mode
-
-
+error_count: Final = 3  # Number of symbols that must be shifted to leave recovery mode
 
 
 # This class is used to hold non-terminal grammar symbols during parsing.
@@ -110,9 +108,9 @@ class LRParser:
     """The LR Parsing engine.  This is the core of the PLY parser generator."""
 
     def __init__(self,
-                 productions: list["Production"],
-                 action: dict[int, dict[str, int]],
-                 goto: dict[int, dict[str, int]],
+                 productions: tuple["Production", ...],
+                 action: tuple[dict[str, int]],
+                 goto: tuple[dict[str, int]],
                  errorf: Callable[[YaccSymbol | None], None] | None) -> None:
         self.productions = productions
         # the int keys and values are very small around -2k to +2k
@@ -142,7 +140,7 @@ class LRParser:
     #
     # See:  http://www.gnu.org/software/bison/manual/html_node/Default-Reductions.html#Default-Reductions
     def set_defaulted_states(self) -> None:
-        for state, actions in self.action.items():
+        for state, actions in enumerate(self.action):
             rules = list(actions.values())
             if len(rules) == 1 and rules[0] < 0:
                 self.defaulted_states[state] = rules[0]
@@ -473,13 +471,14 @@ class LRParser:
 def load_parser(parser_table: Path, module: ParserProtocol) -> LRParser:
     import pickle
 
-    lr_prods, lr_action, lr_goto = pickle.load(parser_table.open('rb') )
-    lr_prods = [Production(
+    with parser_table.open('rb') as fr:
+        lr_prods, lr_action, lr_goto = pickle.load(fr)
+    prods = tuple(Production(
         name=name,
         str=str,
         len=len,
         callable=getattr(module, func) if func else None
-    ) for name, len, str, func in lr_prods]
+    ) for name, len, str, func in lr_prods)
     del pickle
 
-    return LRParser(lr_prods, lr_action, lr_goto, errorf=getattr(module, "p_error", None))
+    return LRParser(prods, lr_action, lr_goto, errorf=getattr(module, "p_error", None))
