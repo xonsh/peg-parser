@@ -363,14 +363,13 @@ class Grammar:
         # Determine the precedence level
         if '%prec' in syms:
             if syms[-1] == '%prec':
-                raise GrammarError('%s:%d: Syntax error. Nothing follows %%prec' % (file, line))
+                raise GrammarError(f'{file}:{line}: Syntax error. Nothing follows %%prec')
             if syms[-2] != '%prec':
-                raise GrammarError('%s:%d: Syntax error. %%prec can only appear at the end of a grammar rule' %
-                                   (file, line))
+                raise GrammarError(f'{file}:{line}: Syntax error. %prec can only appear at the end of a grammar rule')
             precname = syms[-1]
             prodprec = self.Precedence.get(precname)
             if not prodprec:
-                raise GrammarError('%s:%d: Nothing known about the precedence of %r' % (file, line, precname))
+                raise GrammarError(f'{file}:{line}: Nothing known about the precedence of {precname!r}')
             else:
                 self.UsedPrecedence.add(precname)
             del syms[-2:]     # Drop %prec from the rule
@@ -383,8 +382,8 @@ class Grammar:
         map = f'{prodname} -> {syms}'
         if map in self.Prodmap:
             m = self.Prodmap[map]
-            raise GrammarError('%s:%d: Duplicate rule %s. ' % (file, line, m) +
-                               'Previous definition at %s:%d' % (m.file, m.line))
+            raise GrammarError(f'{file}:{line}: Duplicate rule {m}. ' +
+                               f'Previous definition at {m.file}:{m.line}')
 
         # From this point on, everything is valid.  Create a new Production instance
         pnumber  = len(self.Productions)
@@ -422,7 +421,7 @@ class Grammar:
         if not start:
             start = self.Productions[1].name
         if start not in self.Nonterminals:
-            raise GrammarError('start symbol %s undefined' % start)
+            raise GrammarError(f'start symbol {start} undefined')
         self.Productions[0] = Production(0, "S'", [start])
         self.Nonterminals[start].append(0)
         self.Start = start
