@@ -1,4 +1,7 @@
 - [x] `lrparser.py` compile with mypyc - it is converted to mypyc compiled. Even then there is no improvement in the memory usage
-- [ ] Try pickling LRParser ext. instance directly and see whether loading it back improves the memory usage
-- [ ] Try cython
-- [ ] rewrite the particular module in rust
+- [x] Try pickling LRParser ext. instance directly and see whether loading it back improves the memory usage. -- The generated table is simply large.
+- [x] rewrite the particular module in rust -- Even the table represented in rust is fairly above 5MB
+- [x] Lark's LALR implementation is as fast as ply but uses small cache. we can try to port it to ply
+- [ ] check pegen implementation and test a small xonsh grammar addition to it
+- [ ] post Lark's SPPF implementation to ply - cehckout https://github.com/lark-parser/lark_cython/
+- [ ] check LALRPOP's lane table implementation and see if we can port it to ply-yacc
