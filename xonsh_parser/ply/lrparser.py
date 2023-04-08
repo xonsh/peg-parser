@@ -8,7 +8,7 @@
 #-----------------------------------------------------------------------------
 """
 import sys
-from ast import Expression
+from ast import AST
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Final, NamedTuple, Optional, Protocol
@@ -166,7 +166,7 @@ class LRParser:
         lexer: Any = None,
         debug: int = 0,
         tracking: bool = False,
-    ) -> Expression:
+    ) -> AST | None:
         # If debugging has been specified as a flag, turn it into a logging object
         logger: None | PlyLogger = None
         if isinstance(debug, int) and debug:
@@ -394,7 +394,7 @@ class LRParser:
                         logger.info("Done   : Returning %s", format_result(result))
                         logger.info("PLY: PARSE DEBUG END")
 
-                    if isinstance(result, Expression):
+                    if isinstance(result, AST):
                         return result
                     raise TypeError("Parser state did not return an Expression object.")
 
@@ -456,7 +456,7 @@ class LRParser:
                                 )
                         else:
                             sys.stderr.write("yacc: Parse error in input. EOF\n")
-                            return Expression("EOF")
+                            return None
 
                 else:
                     errorcount = error_count
@@ -479,7 +479,7 @@ class LRParser:
                 # Start nuking entries on the stack
                 if lookahead and lookahead.type == "$end":
                     # Whoa. We're really hosed here. Bail out
-                    return Expression("EOF")
+                    return None
 
                 if lookahead and lookahead.type != "error":
                     sym = symstack[-1]
