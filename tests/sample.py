@@ -22,4 +22,7 @@ if __name__ == "__main__":
 
     from xonsh_parser.parser import write_parser_table
 
-    write_parser_table(output_path=Path("/tmp/bytes-2.pickle"))
+    path = Path("/tmp/bytes-2.pickle")
+    if path.exists():
+        path.unlink()
+    write_parser_table(output_path=path, yacc_debug=True)

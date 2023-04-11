@@ -121,3 +121,6 @@ pdm.lock
 # Added by cargo
 
 /target
+
+# ply parser debug logs
+*.out

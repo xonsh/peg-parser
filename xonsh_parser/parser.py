@@ -17,7 +17,9 @@ def get_parser_cls():
     return p
 
 
-def write_parser_table(yacc_debug=False, output_path: None | Path = None) -> Path:
+def write_parser_table(
+    yacc_debug=False, output_path: None | Path = None, **kwargs
+) -> Path:
     from .ply import yacc
 
     cls = get_parser_cls()
@@ -28,7 +30,7 @@ def write_parser_table(yacc_debug=False, output_path: None | Path = None) -> Pat
         return output_path
 
     yacc_kwargs = dict(
-        module=cls(is_write_table=True),
+        module=cls(is_write_table=True, **kwargs),
         debug=yacc_debug,
         start="start_symbols",
         output_path=str(output_path),
