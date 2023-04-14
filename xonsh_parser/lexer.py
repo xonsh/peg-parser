@@ -399,7 +399,7 @@ def get_tokens(s, tolerant):
 
 
 # synthesize a new PLY token
-def _new_token(type: str, value: str, pos):
+def _new_token(type: str, value: str, pos) -> LexToken:
     linn, col = pos
     return LexToken(type, value, linn, col)
 
@@ -470,7 +470,7 @@ class Lexer:
         self.beforelast, self.last = self.last, next(self._token_stream, None)
         return self.last
 
-    def __iter__(self):
+    def __iter__(self) -> tp.Iterator[LexToken]:
         t = self.token()
         while t is not None:
             yield t
