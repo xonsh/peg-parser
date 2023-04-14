@@ -17,6 +17,7 @@ Original file credits:
 import builtins
 import codecs
 import collections
+import functools
 import io
 import itertools
 import re
@@ -26,7 +27,9 @@ import typing as tp
 from token import (
     AMPER,
     AMPEREQUAL,
+    ASYNC,
     AT,
+    AWAIT,
     CIRCUMFLEX,
     CIRCUMFLEXEQUAL,
     COLON,
@@ -117,13 +120,7 @@ __all__ = token.__all__ + [  # type:ignore
     "MATCH",
     "CASE",
 ]
-HAS_ASYNC = PYTHON_VERSION_INFO < (3, 7, 0)
-if HAS_ASYNC:
-    ASYNC = token.ASYNC  # type:ignore
-    AWAIT = token.AWAIT  # type:ignore
-    ADDSPACE_TOKS = (NAME, NUMBER, ASYNC, AWAIT)
-else:
-    ADDSPACE_TOKS = (NAME, NUMBER)  # type:ignore
+ADDSPACE_TOKS = (NAME, NUMBER, ASYNC, AWAIT)
 del token  # must clean up token
 
 if HAS_WALRUS:
@@ -187,7 +184,7 @@ for v in _xonsh_tokens.values():
     __all__.append(v)
 del _glbs, v
 
-EXACT_TOKEN_TYPES: tp.Dict[str, tp.Union[str, int]] = {
+EXACT_TOKEN_TYPES: dict[str, tp.Union[str, int]] = {
     "(": LPAR,
     ")": RPAR,
     "[": LSQB,
@@ -385,6 +382,7 @@ PseudoToken = Whitespace + group(
 )
 
 
+@functools.lru_cache
 def _compile(expr):
     return re.compile(expr, re.UNICODE)
 
@@ -1081,14 +1079,8 @@ def _tokenize(readline, encoding, tolerant=False):
                         stashed = tok
                         continue
 
-                    if (
-                        HAS_ASYNC
-                        and token == "def"
-                        and (
-                            stashed
-                            and stashed.type == NAME
-                            and stashed.string == "async"
-                        )
+                    if token == "def" and (
+                        stashed and stashed.type == NAME and stashed.string == "async"
                     ):
                         async_def = True
                         async_def_indent = indents[-1]
