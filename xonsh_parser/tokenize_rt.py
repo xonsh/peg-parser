@@ -5,19 +5,11 @@ https://github.com/asottile/tokenize-rt/blob/c2bb6f32371408c0490e817b6dd48285d80
 import io
 import keyword
 import re
-import sys
-import tokenize
 from collections.abc import Generator, Iterable, Sequence
 from re import Pattern
 from typing import NamedTuple
 
-# this is a performance hack.  see https://bugs.python.org/issue43014
-if sys.version_info < (3, 10) and callable(  # pragma: no branch
-    getattr(tokenize, "_compile", None)
-):  # pragma: <3.10 cover
-    from functools import lru_cache
-
-    tokenize._compile = lru_cache()(tokenize._compile)
+from xonsh_parser import tokenize
 
 ESCAPED_NL = "ESCAPED_NL"
 UNIMPORTANT_WS = "UNIMPORTANT_WS"
