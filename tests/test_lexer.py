@@ -7,8 +7,8 @@ from collections.abc import Sequence
 from pprint import pformat
 
 import pytest
-
-from xonsh_parser.lexer import Lexer, LexToken
+from xonsh.lexer import Lexer
+from xonsh.ply.ply.lex import LexToken
 
 LEXER_ARGS = {"lextab": "lexer_test_table", "debug": 0}
 
