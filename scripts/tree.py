@@ -1,19 +1,33 @@
-import sys
+import subprocess as sp
 
 
-def main():
+def main(repo: str, path: str, dest: str, branch: str = "main"):
     """Add a folder/file from a repo using sub-tree"""
-    "git remote add tmp https://github.com/RustPython/RustPython.git"
-    "git fetch tmp"
-    "git branch tmp tmp/main"
-    "git checkout tmp"
-    "git subtree split --prefix native -b tmptree"
-    "git checkout main"
+    current_branch = (
+        sp.check_output("git branch --show-current", shell=True).decode().strip()
+    )
+    sp.check_call(
+        f"git remote add tmp {repo} && git fetch tmp && git branch tmp tmp/{branch}",
+        shell=True,
+    )
+    sp.check_call("git checkout tmp", shell=True)
+    sp.check_call(f"git subtree split --prefix {path} -b tmptree", shell=True)
+    sp.check_call(f"git checkout {current_branch}", shell=True)
 
-    "git subtree add --prefix=src tmptree"
+    sp.check_call(f"git subtree add --prefix={dest} tmptree", shell=True)
 
-    "git branch -D tmp tmptree"
-    "git remote remove tmp"
 
-    print(sys.argv)
+def clean():
+    sp.call("git branch -D tmp tmptree", shell=True)
+    sp.call("git remote remove tmp", shell=True)
 
+
+if __name__ == "__main__":
+    try:
+        main(
+            repo="https://github.com/RustPython/RustPython.git",
+            path="compiler/parser",
+            dest="rust_parser",
+        )
+    finally:
+        clean()
