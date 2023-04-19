@@ -1,4 +1,5 @@
 """Instead of using a custom parser, we preprocess the input and then use the standard Python parser."""
+import ast
 from collections.abc import Iterable
 
 from xonsh_parser import tokenize_rt
@@ -41,3 +42,26 @@ def _translex(src: str) -> Iterable[str]:
 def translex(src: str) -> str:
     """Translates xonsh source code into Python source code"""
     return "".join(_translex(src))
+
+
+class Parser:
+    def parse(self, src: str, filename="<code>", mode="exec", **_):
+        """Returns an abstract syntax tree of xonsh code.
+
+        Parameters
+        ----------
+        s : str
+            The xonsh code.
+        filename : str, optional
+            Name of the file.
+        mode : str, optional
+            Execution mode, one of: exec, eval, or single.
+        debug_level : str, optional
+            Debugging level passed down to yacc.
+
+        Returns
+        -------
+        tree : AST
+        """
+        src = translex(src)
+        return ast.parse(src, filename, mode)
