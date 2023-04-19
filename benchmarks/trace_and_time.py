@@ -38,7 +38,7 @@ def display_top(snapshot, key_type="lineno", limit=10):
     other = top_stats[limit:]
     if other:
         size = sum(stat.size for stat in other)
-        print("%s other: %.1f KiB" % (len(other), size / 1024))
+        print(f"{len(other)} other: {size / 1024:.1f} KiB")
     total = sum(stat.size for stat in top_stats) / 1024
     print("Total allocated size: %.1f KiB" % (total))
 
@@ -66,7 +66,7 @@ def trace(limit=10, show_tb=False):
     yield
     snap = tracemalloc.take_snapshot()
 
-    current, peak = [size / 1024 for size in tracemalloc.get_traced_memory()]
+    current, peak = (size / 1024 for size in tracemalloc.get_traced_memory())
     print(f"{current=:.1f}KiB,  {peak=:.1f}KiB")
 
     if show_tb:
@@ -77,11 +77,12 @@ def trace(limit=10, show_tb=False):
     tracemalloc.stop()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from xonsh_parser.parser import get_parser_cls, write_parser_table
 
     with timeit(), trace():
         import tempfile
+
         path = Path(tempfile.gettempdir()) / "parser_table.py"
         if path.exists():
             path.unlink()
@@ -91,7 +92,6 @@ if __name__ == '__main__':
         # Total allocated size: 5991.8 KiB
         # Took:  6.25s
 
-
     with timeit(), trace():
         parser = get_parser_cls()(parser_table=result)
         parser.parse("ls -alh")
@@ -99,7 +99,3 @@ if __name__ == '__main__':
         # current=7457.5KiB,  peak=7531.1KiB
         # Total allocated size: 7470.4 KiB
         # Took:  1.47s
-
-
-
-

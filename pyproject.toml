@@ -56,33 +56,32 @@ dev = [
     "setuptools-rust>=1.5.2",
 ]
 
-[tool.hatch.envs.default.scripts]
+[tool.pdm.scripts]
 test = "pytest"
 test-cov-xml = "pytest --cov=xonsh_parser/ --cov-report=term-missing --cov-report=xml"
-lint = [
-  "black .",
-  "ruff --fix .",
-  "mypy xonsh_parser/",
-]
-lint-check = [
-  "black --check .",
-  "ruff .",
-  "mypy xonsh_parser/",
-]
-bench = [
-    "asv run --python=same --show-stderr", # quickly run benchmarks
-]
-bench-view = [
+lint = { composite = [
+    "black .",
+    "ruff --fix .",
+    "mypy xonsh_parser/",
+] }
+lint-check = { composite = [
+    "black --check .",
+    "ruff .",
+    "mypy xonsh_parser/",
+] }
+bench = "asv run --python=same --show-stderr" # quickly run benchmarks
+bench-view = { composite = [
     "asv publish",
     "asv preview",
-]
-type = [
+] }
+type = { composite = [
     "monkeytype run tests/sample.py",
     "monkeytype list-modules",
     'echo "monkeytype apply xonsh_parser"',
-]
+] }
 docs-serve = "mkdocs serve"
 docs-build = "mkdocs build"
+post_install = "pre-commit install"
 
 [build-system]
 requires = ["setuptools", "wheel", "versioningit"]

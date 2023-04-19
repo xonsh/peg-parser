@@ -10,8 +10,8 @@ class TimeSuite:
 
     def setup(self):
         from xonsh_parser.parser import write_parser_table
-        write_parser_table()
 
+        write_parser_table()
 
     def time_parser_init(self):
         from xonsh_parser.parser import get_parser_cls
@@ -23,6 +23,7 @@ class TimeSuite:
 class MemSuite:
     def setup(self):
         from xonsh_parser.parser import write_parser_table
+
         write_parser_table()
 
     def mem_parser_init(self):
@@ -35,6 +36,7 @@ class MemSuite:
 class PeakMemSuite:
     def setup(self):
         from xonsh_parser.parser import write_parser_table
+
         write_parser_table()
 
     def peakmem_parser_init(self):
@@ -49,6 +51,7 @@ class TrackLrParserSize:
 
     def setup(self):
         from xonsh_parser.parser import write_parser_table
+
         write_parser_table()
 
     def track_lr_parser_size(self):
