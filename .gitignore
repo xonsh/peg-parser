@@ -124,3 +124,10 @@ pdm.lock
 
 # ply parser debug logs
 *.out
+
+
+# Added by cargo
+#
+# already existing elements were commented out
+
+#/target
