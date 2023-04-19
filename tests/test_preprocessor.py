@@ -17,6 +17,26 @@ def test_env(src, expected):
 @pytest.mark.parametrize(
     "src, expected",
     [
+        ('f"{$HOME}"', '''f"{__xonsh__.env['ENV_NAME']}"'''),
+    ],
+)
+def test_fstring(src, expected):
+    assert translex(src) == expected
+
+
+@pytest.mark.parametrize(
+    "src, expected",
+    [
+        ('p"/tmp"', 'Path("/tmp")'),
+    ],
+)
+def test_path_string(src, expected):
+    assert translex(src) == expected
+
+
+@pytest.mark.parametrize(
+    "src, expected",
+    [
         (
             "$(cmd sub-cmd --opt)",
             "__xonsh__.subproc_captured_stdout(cmd sub-cmd --opt)",

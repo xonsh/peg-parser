@@ -4,166 +4,14 @@ import itertools
 import textwrap
 
 import pytest
-from xonsh.ast import AST, Call, Pass, Str, With
-from xonsh.parser import Parser
-from xonsh.parsers.fstring_adaptor import FStringAdaptor
-from xonsh.pytest.tools import (
-    VER_MAJOR_MINOR,
-    nodes_equal,
-    skip_if_pre_3_8,
-    skip_if_pre_3_10,
-)
 
-
-@pytest.fixture
-def xsh(xession, monkeypatch, parser):
-    monkeypatch.setattr(xession.execer, "parser", parser)
-    return xession
-
-
-@pytest.fixture(scope="module")
-def parser():
-    return Parser(yacc_optimize=False, yacc_debug=True)
-
-
-@pytest.fixture
-def check_ast(parser, xsh):
-    def factory(inp, run=True, mode="eval", debug_level=0):
-        __tracebackhide__ = True
-        # expect a Python AST
-        exp = ast.parse(inp, mode=mode)
-        # observe something from xonsh
-        obs = parser.parse(inp, debug_level=debug_level)
-        # Check that they are equal
-        assert nodes_equal(exp, obs)
-        # round trip by running xonsh AST via Python
-        if run:
-            exec(compile(obs, "<test-ast>", mode))
-
-    return factory
-
-
-@pytest.fixture
-def check_stmts(check_ast):
-    def factory(inp, run=True, mode="exec", debug_level=0):
-        __tracebackhide__ = True
-        if not inp.endswith("\n"):
-            inp += "\n"
-        check_ast(inp, run=run, mode=mode, debug_level=debug_level)
-
-    return factory
-
-
-@pytest.fixture
-def check_xonsh_ast(xsh, parser):
-    def factory(
-        xenv,
-        inp,
-        run=True,
-        mode="eval",
-        debug_level=0,
-        return_obs=False,
-        globals=None,
-        locals=None,
-    ):
-        xsh.env.update(xenv)
-        obs = parser.parse(inp, debug_level=debug_level)
-        if obs is None:
-            return  # comment only
-        bytecode = compile(obs, "<test-xonsh-ast>", mode)
-        if run:
-            exec(bytecode, globals, locals)
-        return obs if return_obs else True
-
-    return factory
-
-
-@pytest.fixture
-def check_xonsh(check_xonsh_ast):
-    def factory(xenv, inp, run=True, mode="exec"):
-        __tracebackhide__ = True
-        if not inp.endswith("\n"):
-            inp += "\n"
-        check_xonsh_ast(xenv, inp, run=run, mode=mode)
-
-    return factory
-
-
-@pytest.fixture
-def eval_code(parser, xsh):
-    def factory(inp, mode="eval", **loc_vars):
-        obs = parser.parse(inp, debug_level=1)
-        bytecode = compile(obs, "<test-xonsh-ast>", mode)
-        return eval(bytecode, loc_vars)
-
-    return factory
-
+from xonsh_parser.parsers.fstring_adaptor import FStringAdaptor
+from xonsh_parser.platform import PYTHON_VERSION_INFO
+from xonsh_parser.xast import AST, Call, Pass, Str, With
 
 #
 # Tests
 #
-
-#
-# expressions
-#
-
-
-def test_int_literal(check_ast):
-    check_ast("42")
-
-
-def test_int_literal_underscore(check_ast):
-    check_ast("4_2")
-
-
-def test_float_literal(check_ast):
-    check_ast("42.0")
-
-
-def test_float_literal_underscore(check_ast):
-    check_ast("4_2.4_2")
-
-
-def test_imag_literal(check_ast):
-    check_ast("42j")
-
-
-def test_float_imag_literal(check_ast):
-    check_ast("42.0j")
-
-
-def test_complex(check_ast):
-    check_ast("42+84j")
-
-
-def test_str_literal(check_ast):
-    check_ast('"hello"')
-
-
-def test_bytes_literal(check_ast):
-    check_ast('b"hello"')
-    check_ast('B"hello"')
-    check_ast('b"hello" b"world"')
-
-
-def test_raw_literal(check_ast):
-    check_ast('r"hell\\o"')
-    check_ast('R"hell\\o"')
-
-
-def test_f_literal(check_ast):
-    check_ast('f"wakka{yo}yakka{42}"', run=False)
-    check_ast('F"{yo}"', run=False)
-
-
-@pytest.mark.parametrize(
-    "first_prefix, second_prefix",
-    itertools.product(["", "f", "r", "fr"], repeat=2),
-)
-def test_string_literal_concat(first_prefix, second_prefix, check_ast):
-    check_ast(
-        first_prefix + r"'11{a}22\n'" + " " + second_prefix + r"'33{b}44\n'", run=False
-    )
 
 
 def test_f_env_var(check_xonsh_ast):
@@ -201,7 +49,7 @@ bar"""''',
         "foo\n_/foo/bar_\nbar",
     ),
 ]
-if VER_MAJOR_MINOR >= (3, 8):
+if PYTHON_VERSION_INFO >= (3, 8):
     fstring_adaptor_parameters.append(("f'{$HOME=}'", "$HOME='/foo/bar'"))
 
 
@@ -1147,11 +995,6 @@ def test_lambda_x_star_y_kwargs(check_ast):
     check_ast("lambda x, *, y, **kwargs: 42")
 
 
-@skip_if_pre_3_8
-def test_lambda_x_divide_y_star_z_kwargs(check_ast):
-    check_ast("lambda x, /, y, *, z, **kwargs: 42")
-
-
 def test_call_range(check_ast):
     check_ast("range(6)")
 
@@ -1318,16 +1161,6 @@ def test_rshift_op_two(check_ast):
 
 def test_rshift_op_three(check_ast):
     check_ast("42 >> 65 >> 1 >> 7")
-
-
-@skip_if_pre_3_8
-def test_named_expr(check_ast):
-    check_ast("(x := 42)")
-
-
-@skip_if_pre_3_8
-def test_named_expr_list(check_ast):
-    check_ast("[x := 42, x + 1, x + 2]")
 
 
 #
@@ -1675,11 +1508,6 @@ def test_yield_x_y(check_stmts):
     check_stmts("yield x, y", False)
 
 
-@skip_if_pre_3_8
-def test_yield_x_starexpr(check_stmts):
-    check_stmts("yield x, *[y, z]", False)
-
-
 def test_yield_from_x(check_stmts):
     check_stmts("yield from x", False)
 
@@ -1698,11 +1526,6 @@ def test_return_x_comma(check_stmts):
 
 def test_return_x_y(check_stmts):
     check_stmts("return x, y", False)
-
-
-@skip_if_pre_3_8
-def test_return_x_starexpr(check_stmts):
-    check_stmts("return x, *[y, z]", False)
 
 
 def test_if_true(check_stmts):
@@ -2052,16 +1875,6 @@ def test_func_x_star_y_kwargs(check_stmts):
     check_stmts("def f(x, *, y, **kwargs):\n  return 42")
 
 
-@skip_if_pre_3_8
-def test_func_x_divide(check_stmts):
-    check_stmts("def f(x, /):\n  return 42")
-
-
-@skip_if_pre_3_8
-def test_func_x_divide_y_star_z_kwargs(check_stmts):
-    check_stmts("def f(x, /, y, *, z, **kwargs):\n  return 42")
-
-
 def test_func_tx(check_stmts):
     check_stmts("def f(x:int):\n  return x")
 
@@ -2166,26 +1979,6 @@ def test_async_decorator(check_stmts):
 
 def test_async_await(check_stmts):
     check_stmts("async def f():\n    await fut\n", False)
-
-
-@skip_if_pre_3_8
-def test_named_expr_args(check_stmts):
-    check_stmts("id(x := 42)")
-
-
-@skip_if_pre_3_8
-def test_named_expr_if(check_stmts):
-    check_stmts("if (x := 42) > 0:\n  x += 1")
-
-
-@skip_if_pre_3_8
-def test_named_expr_elif(check_stmts):
-    check_stmts("if False:\n  pass\nelif x := 42:\n  x += 1")
-
-
-@skip_if_pre_3_8
-def test_named_expr_while(check_stmts):
-    check_stmts("y = 42\nwhile (x := y) < 43:\n  y += 1")
 
 
 #
@@ -3249,38 +3042,14 @@ def test_syntax_error_bar_kwonlyargs(parser):
         parser.parse("def spam(*):\n   pass\n", mode="exec")
 
 
-@skip_if_pre_3_8
-def test_syntax_error_bar_posonlyargs(parser):
-    with pytest.raises(SyntaxError):
-        parser.parse("def spam(/):\n   pass\n", mode="exec")
-
-
-@skip_if_pre_3_8
-def test_syntax_error_bar_posonlyargs_no_comma(parser):
-    with pytest.raises(SyntaxError):
-        parser.parse("def spam(x /, y):\n   pass\n", mode="exec")
-
-
 def test_syntax_error_nondefault_follows_default(parser):
     with pytest.raises(SyntaxError):
         parser.parse("def spam(x=1, y):\n   pass\n", mode="exec")
 
 
-@skip_if_pre_3_8
-def test_syntax_error_posonly_nondefault_follows_default(parser):
-    with pytest.raises(SyntaxError):
-        parser.parse("def spam(x, y=1, /, z):\n   pass\n", mode="exec")
-
-
 def test_syntax_error_lambda_nondefault_follows_default(parser):
     with pytest.raises(SyntaxError):
         parser.parse("lambda x=1, y: x", mode="exec")
-
-
-@skip_if_pre_3_8
-def test_syntax_error_lambda_posonly_nondefault_follows_default(parser):
-    with pytest.raises(SyntaxError):
-        parser.parse("lambda x, y=1, /, z: x", mode="exec")
 
 
 @pytest.mark.parametrize(
@@ -3314,235 +3083,4 @@ def match():
 class case():
     pass
 """
-    )
-
-
-@skip_if_pre_3_10
-def test_match_literal_pattern(check_stmts):
-    check_stmts(
-        """match 1:
-    case 1j:
-        pass
-    case 2.718+3.141j:
-        pass
-    case -2.718-3.141j:
-        pass
-    case 2:
-        pass
-    case -2:
-        pass
-    case "One" 'Two':
-        pass
-    case None:
-        pass
-    case True:
-        pass
-    case False:
-        pass
-""",
-        run=False,
-    )
-
-
-@skip_if_pre_3_10
-def test_match_or_pattern(check_stmts):
-    check_stmts(
-        """match 1:
-    case 1j | 2 | "One" | 'Two' | None | True | False:
-        pass
-""",
-        run=False,
-    )
-
-
-@skip_if_pre_3_10
-def test_match_as_pattern(check_stmts):
-    check_stmts(
-        """match 1:
-    case 1j | 2 | "One" | 'Two' | None | True | False as target:
-        pass
-    case 2 as target:
-        pass
-""",
-        run=False,
-    )
-
-
-@skip_if_pre_3_10
-def test_match_group_pattern(check_stmts):
-    check_stmts(
-        """match 1:
-    case (None):
-        pass
-    case ((None)):
-        pass
-    case (1 | 2 as x) as x:
-        pass
-""",
-        run=False,
-    )
-
-
-@skip_if_pre_3_10
-def test_match_capture_and_wildcard_pattern(check_stmts):
-    check_stmts(
-        """match 1:
-    case _:
-        pass
-    case x:
-        pass
-""",
-        run=False,
-    )
-
-
-@skip_if_pre_3_10
-def test_match_value_pattern(check_stmts):
-    check_stmts(
-        """match 1:
-    case math.pi:
-        pass
-    case a.b.c.d:
-        pass
-""",
-        run=False,
-    )
-
-
-@skip_if_pre_3_10
-def test_match_mapping_pattern(check_stmts):
-    check_stmts(
-        """match _:
-    case {}:
-        pass
-    case {x.y:y}:
-        pass
-    case {x.y:y,}:
-        pass
-    case {x.y:y,"a":a}:
-        pass
-    case {x.y:y,"a":a,}:
-        pass
-    case {x.y:y,"a":a,**end}:
-        pass
-    case {x.y:y,"a":a,**end,}:
-        pass
-    case {**end}:
-        pass
-    case {**end,}:
-        pass
-    case {1:1, "two":two, three.three: {}, 4:None, **end}:
-        pass
-""",
-        run=False,
-    )
-
-
-@skip_if_pre_3_10
-def test_match_class_pattern(check_stmts):
-    check_stmts(
-        """match _:
-    case classs():
-        pass
-    case x.classs():
-        pass
-    case classs("subpattern"):
-        pass
-    case classs("subpattern",):
-        pass
-    case classs("subpattern",2):
-        pass
-    case classs("subpattern",2,):
-        pass
-    case classs(a = b):
-        pass
-    case classs(a = b,):
-        pass
-    case classs(a = b, b = c):
-        pass
-    case classs(a = b, b = c,):
-        pass
-    case classs(1,2,3,a = b):
-        pass
-    case classs(1,2,3,a = b,):
-        pass
-    case classs(1,2,3,a = b, b = c):
-        pass
-    case classs(1,2,3,a = b, b = c,):
-        pass
-""",
-        run=False,
-    )
-
-
-@skip_if_pre_3_10
-def test_match_sequence_pattern(check_stmts):
-    check_stmts(
-        """match 1:
-    case (): # empty sequence pattern
-        pass
-    case (1): # group pattern
-        pass
-    case (1,): # length one sequence
-        pass
-    case (1,2):
-        pass
-    case (1,2,):
-        pass
-    case (1,2,3):
-        pass
-    case (1,2,3,):
-        pass
-    case []:
-        pass
-    case [1]:
-        pass
-    case [1,]:
-        pass
-    case [1,2]:
-        pass
-    case [1,2,3]:
-        pass
-    case [1,2,3,]:
-        pass
-    case [*x, *_]: # star patterns
-        pass
-    case 1,: # top level sequence patterns
-        pass
-    case *x,:
-        pass
-    case *_,*_:
-        pass
-""",
-        run=False,
-    )
-
-
-@skip_if_pre_3_10
-def test_match_subject(check_stmts):
-    check_stmts(
-        """
-match 1:
-    case 1:
-        pass
-match 1,:
-    case 1:
-        pass
-match 1,2:
-    case 1:
-        pass
-match 1,2,:
-    case 1:
-        pass
-match (1,2):
-    case 1:
-        pass
-match *x,:
-    case 1:
-        pass
-match (...[...][...]):
-    case 1:
-        pass
-""",
-        run=False,
     )

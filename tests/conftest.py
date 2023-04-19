@@ -23,25 +23,6 @@ def parser(parser_table):
     inst.reset()
 
 
-@pytest.fixture(scope="session")
-def execer(parser_table):
-    """return Execer instance"""
-    from xonsh_parser.execer import Execer
-
-    return Execer()
-
-
-@pytest.fixture()
-def ctx_parse(execer):
-    """contextual parse"""
-
-    def parse(input: str, **ctx):
-        tree = execer.parse(input, ctx=set(ctx.keys()))
-        return tree
-
-    return parse
-
-
 @pytest.fixture
 def check_ast(parser):
     import ast
@@ -73,9 +54,9 @@ def check_stmts(check_ast):
 
 
 @pytest.fixture
-def check_xonsh_ast(parser):
+def check_xonsh_ast(xsh, parser):
     def factory(
-        xenv: dict,
+        xenv,
         inp,
         run=True,
         mode="eval",
@@ -84,7 +65,7 @@ def check_xonsh_ast(parser):
         globals=None,
         locals=None,
     ):
-        # xsh.env.update(xenv)
+        xsh.env.update(xenv)
         obs = parser.parse(inp, debug_level=debug_level)
         if obs is None:
             return  # comment only
@@ -92,22 +73,6 @@ def check_xonsh_ast(parser):
         if run:
             exec(bytecode, globals, locals)
         return obs if return_obs else True
-
-    return factory
-
-
-@pytest.fixture
-def unparse(parser):
-    def factory(
-        inp: str,
-        debug_level=0,
-    ):
-        import ast
-
-        tree = parser.parse(inp, debug_level=debug_level)
-        if tree is None:
-            return  # comment only
-        return ast.unparse(tree)
 
     return factory
 

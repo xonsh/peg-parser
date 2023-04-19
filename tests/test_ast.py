@@ -2,14 +2,9 @@
 import ast as pyast
 
 import pytest
-from xonsh import ast
-from xonsh.ast import BinOp, Call, Name, Store, Tuple, isexpression, min_line
-from xonsh.pytest.tools import nodes_equal
 
-
-@pytest.fixture(autouse=True)
-def xonsh_execer_autouse(xonsh_execer):
-    return xonsh_execer
+from xonsh_parser import xast as ast
+from xonsh_parser.xast import BinOp, Call, Name, Store, Tuple, min_line
 
 
 def test_gather_names_name():
@@ -111,6 +106,7 @@ def test_unmodified(inp, xonsh_execer_parse):
     # Context sensitive parsing should not modify AST
     exp = pyast.parse(inp)
     obs = xonsh_execer_parse(inp)
+    from tests.tools import nodes_equal
 
     assert nodes_equal(exp, obs)
 
@@ -121,21 +117,3 @@ def test_unmodified(inp, xonsh_execer_parse):
 )
 def test_whitespace_subproc(test_input, xonsh_execer_parse):
     assert xonsh_execer_parse(test_input)
-
-
-@pytest.mark.parametrize(
-    "inp,exp",
-    [
-        ("1+1", True),
-        ("1+1;", True),
-        ("1+1\n", True),
-        ("1+1; 2+2", False),
-        ("1+1; 2+2;", False),
-        ("1+1; 2+2\n", False),
-        ("1+1; 2+2;\n", False),
-        ("x = 42", False),
-    ],
-)
-def test_isexpression(xonsh_execer, inp, exp):
-    obs = isexpression(inp)
-    assert exp is obs
