@@ -1,3 +1,5 @@
+mod tokenizer;
+
 use rustpython_parser::parser::parse_expression;
 
 fn main() {
