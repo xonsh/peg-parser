@@ -6,5 +6,5 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-logos = "0.13.0"
+logos = { git = "https://github.com/maciejhirsz/logos", version = "0.13.0" }
 rustpython-parser = "0.2.0"

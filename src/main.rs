@@ -1,4 +1,5 @@
 mod tokenizer;
+mod montyc_tok;
 
 use rustpython_parser::parser::parse_expression;
 

@@ -2,78 +2,126 @@ use logos::Logos;
 
 // todo: add string interning
 
-
 // https://github.com/python/cpython/blob/main/Grammar/Tokens
 #[derive(Debug, Logos, PartialEq, Clone)]
 pub enum Token {
-
-    // -- Token literals
-    #[token("(")]LPAR,
-    #[token(")")]RPAR,
-    #[token("[")]LSQB,
-    #[token("]")]RSQB,
-    #[token(":")]COLON,
-    #[token(",")]COMMA,
-    #[token(";")]SEMI,
-    #[token("+")]PLUS,
-    #[token("-")]MINUS,
-    #[token("*")]STAR,
-    #[token("/")]SLASH,
-    #[token("|")]VBAR,
-    #[token("&")]AMPER,
-    #[token("<")]LESS,
-    #[token(">")]GREATER,
-    #[token("=")]EQUAL,
-    #[token(".")]DOT,
-    #[token("%")]PERCENT,
-    #[token("{")]LBRACE,
-    #[token("}")]RBRACE,
-    #[token("==")]EQEQUAL,
-    #[token("!=")]NOTEQUAL,
-    #[token("<=")]LESSEQUAL,
-    #[token(">=")]GREATEREQUAL,
-    #[token("~")]TILDE,
-    #[token("^")]CIRCUMFLEX,
-    #[token("<<")]LEFTSHIFT,
-    #[token(">>")]RIGHTSHIFT,
-    #[token("**")]DOUBLESTAR,
-    #[token("+=")]PLUSEQUAL,
-    #[token("-=")]MINEQUAL,
-    #[token("*=")]STAREQUAL,
-    #[token("/=")]SLASHEQUAL,
-    #[token("%=")]PERCENTEQUAL,
-    #[token("&=")]AMPEREQUAL,
-    #[token("|=")]VBAREQUAL,
-    #[token("^=")]CIRCUMFLEXEQUAL,
-    #[token("<<=")]LEFTSHIFTEQUAL,
-    #[token(">>=")]RIGHTSHIFTEQUAL,
-    #[token("**=")]DOUBLESTAREQUAL,
-    #[token("//")]DOUBLESLASH,
-    #[token("//=")]DOUBLESLASHEQUAL,
-    #[token("@")]AT,
-    #[token("@=")]ATEQUAL,
-    #[token("->")]RARROW,
-    #[token("...")]ELLIPSIS,
-    #[token(":=")]COLONEQUAL,
-    #[token("!")]EXCLAMATION,
-
     // special tokens
-    ENDMARKER,
+    // ENDMARKER,
     NAME,
     NUMBER,
     STRING,
     NEWLINE,
     INDENT,
     DEDENT,
+
+    // -- Token literals
+    #[token("(")]
+    LPAR,
+    #[token(")")]
+    RPAR,
+    #[token("[")]
+    LSQB,
+    #[token("]")]
+    RSQB,
+    #[token(":")]
+    COLON,
+    #[token(",")]
+    COMMA,
+    #[token(";")]
+    SEMI,
+    #[token("+")]
+    PLUS,
+    #[token("-")]
+    MINUS,
+    #[token("*")]
+    STAR,
+    #[token("/")]
+    SLASH,
+    #[token("|")]
+    VBAR,
+    #[token("&")]
+    AMPER,
+    #[token("<")]
+    LESS,
+    #[token(">")]
+    GREATER,
+    #[token("=")]
+    EQUAL,
+    #[token(".")]
+    DOT,
+    #[token("%")]
+    PERCENT,
+    #[token("{")]
+    LBRACE,
+    #[token("}")]
+    RBRACE,
+    #[token("==")]
+    EQEQUAL,
+    #[token("!=")]
+    NOTEQUAL,
+    #[token("<=")]
+    LESSEQUAL,
+    #[token(">=")]
+    GREATEREQUAL,
+    #[token("~")]
+    TILDE,
+    #[token("^")]
+    CIRCUMFLEX,
+    #[token("<<")]
+    LEFTSHIFT,
+    #[token(">>")]
+    RIGHTSHIFT,
+    #[token("**")]
+    DOUBLESTAR,
+    #[token("+=")]
+    PLUSEQUAL,
+    #[token("-=")]
+    MINEQUAL,
+    #[token("*=")]
+    STAREQUAL,
+    #[token("/=")]
+    SLASHEQUAL,
+    #[token("%=")]
+    PERCENTEQUAL,
+    #[token("&=")]
+    AMPEREQUAL,
+    #[token("|=")]
+    VBAREQUAL,
+    #[token("^=")]
+    CIRCUMFLEXEQUAL,
+    #[token("<<=")]
+    LEFTSHIFTEQUAL,
+    #[token(">>=")]
+    RIGHTSHIFTEQUAL,
+    #[token("**=")]
+    DOUBLESTAREQUAL,
+    #[token("//")]
+    DOUBLESLASH,
+    #[token("//=")]
+    DOUBLESLASHEQUAL,
+    #[token("@")]
+    AT,
+    #[token("@=")]
+    ATEQUAL,
+    #[token("->")]
+    RARROW,
+    #[token("...")]
+    ELLIPSIS,
+    #[token(":=")]
+    COLONEQUAL,
+    #[token("!")]
+    EXCLAMATION,
+
+    // other tokens
     OP,
     AWAIT,
     ASYNC,
-    TYPE_IGNORE,
-    TYPE_COMMENT,
-    SOFT_KEYWORD,
-    FSTRING_START,
-    FSTRING_MIDDLE,
-    FSTRING_END,
+    // TYPE_IGNORE,
+    // TYPE_COMMENT,
+    // SOFT_KEYWORD,
+    // FSTRING_START,
+    // FSTRING_MIDDLE,
+    // FSTRING_END,
     ERRORTOKEN,
     COMMENT,
     NL,
@@ -183,9 +231,13 @@ pub enum Token {
 
     // -- String regex's (thank god I managed to nerdsnipe Quirl to do this for me.)
     #[regex(r#"([rR]|[fF]|u|[rR][fF]|[fF][rR])?'((\\.)|[^'\\\r\n])*'"#)]
-    #[regex(r#"([rR]|[fF]|u|[rR][fF]|[fF][rR])?'''((\\.)|[^\\']|'((\\.)|[^\\'])|''((\\.)|[^\\']))*'''"#)]
+    #[regex(
+        r#"([rR]|[fF]|u|[rR][fF]|[fF][rR])?'''((\\.)|[^\\']|'((\\.)|[^\\'])|''((\\.)|[^\\']))*'''"#
+    )]
     #[regex(r#"([rR]|[fF]|u|[rR][fF]|[fF][rR])?"((\\.)|[^"\\\r\n])*""#)]
-    #[regex(r#"([rR]|[fF]|u|[rR][fF]|[fF][rR])?"""((\\.)|[^\\"]|"((\\.)|[^\\"])|""((\\.)|[^\\"]))*""""#)]
+    #[regex(
+        r#"([rR]|[fF]|u|[rR][fF]|[fF][rR])?"""((\\.)|[^\\"]|"((\\.)|[^\\"])|""((\\.)|[^\\"]))*""""#
+    )]
     StringLiteral,
 
     #[regex(r#"([bB]|[rR][bB]|[bB][rR])'((\\\p{ASCII})|[\p{ASCII}&&[^'\\\r\n]])*'"#)]
@@ -197,16 +249,17 @@ pub enum Token {
     RawIdent,
 }
 
-fn tokenize(source: &str) -> Vec<Token> {
-    Token::lexer(source).map(|x| x.unwrap()).collect::<Vec<_>>()
-}
+mod tests {
+    use super::*;
 
-// test the tokenizer
-#[test]
-fn test_tokens() {
-    let tokens = tokenize("a = b");
-    println!("{:?}", tokens);
-    // assert_eq!(lexer.next().unwrap().unwrap(), Token::RawIdent);
-    // assert_eq!(lexer.next().unwrap().unwrap(), PyToken::Period);
-    // assert_eq!(lexer.next().unwrap().unwrap(), PyToken::Text);
+    fn tokenize(source: &str) -> Vec<Token> {
+        Token::lexer(source).map(|x| x.unwrap()).collect::<Vec<_>>()
+    }
+
+    // test the tokenizer
+    #[test]
+    fn test_tokens() {
+        let tokens = tokenize("a = b");
+        println!("{:?}", tokens);
+    }
 }
