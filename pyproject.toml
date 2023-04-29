@@ -1,5 +1,6 @@
 [tool.ruff]
 extend-select = ["B", "I", "UP"]
+line-length = 110
 # ruff ignore file "xonsh_parser/ply/yacc.py"
 [tool.ruff.per-file-ignores]
 "xonsh_parser/ply/*.py" = [
@@ -29,7 +30,6 @@ extend-select = ["B", "I", "UP"]
 addopts = ""
 
 
-[tool.pdm]
 [project.optional-dependencies]
 lint = [
     "black",
