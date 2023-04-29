@@ -23,6 +23,25 @@ def parser(parser_table):
     inst.reset()
 
 
+@pytest.fixture(scope="session")
+def execer(parser_table):
+    """return Execer instance"""
+    from xonsh_parser.execer import Execer
+
+    return Execer()
+
+
+@pytest.fixture()
+def ctx_parse(execer):
+    """contextual parse"""
+
+    def parse(input: str, **ctx):
+        tree = execer.parse(input, ctx=set(ctx.keys()))
+        return tree
+
+    return parse
+
+
 @pytest.fixture
 def check_ast(parser):
     import ast
