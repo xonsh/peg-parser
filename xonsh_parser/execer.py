@@ -52,7 +52,7 @@ class Execer:
     def parse(
         self,
         input,
-        ctx,
+        ctx: None | set["str"] = None,
         mode="exec",
         filename=None,
         transform=True,

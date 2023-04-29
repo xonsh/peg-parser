@@ -399,9 +399,9 @@ def get_tokens(s, tolerant):
 
 
 # synthesize a new PLY token
-def _new_token(type: str, value: str, pos) -> LexToken:
+def _new_token(type: str, value: str, pos: tuple[int, int]) -> LexToken:
     linn, col = pos
-    return LexToken(type, value, linn, col)
+    return LexToken(type=type, value=value, lineno=linn, lexpos=col)
 
 
 BEG_TOK_SKIPS = LazyObject(
