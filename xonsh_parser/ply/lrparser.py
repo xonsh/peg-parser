@@ -7,16 +7,37 @@
 # table generation algorithm
 #-----------------------------------------------------------------------------
 """
+import ast
 import sys
 from ast import AST
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Final, NamedTuple, Optional, Protocol
+from typing import (
+    Any,
+    Callable,
+    Final,
+    NamedTuple,
+    Optional,
+    Protocol,
+    Union,
+)
 
 from .common import PlyLogger, format_result, format_stack_entry
 
 error_count: Final = 3  # Number of symbols that must be shifted to leave recovery mode
+
+
+@dataclass(slots=True)
+class LexToken:
+    """keep for backward compatibility and name distinction"""
+
+    type: str  # = Grammar symbol type
+    value: str  # = token value
+    lineno: int | None = None  # = Starting line number
+    endlineno: int | None = None  # = Ending line number (optional, set automatically)
+    lexpos: int | None = None  # = Starting lex position
+    endlexpos: int | None = None  # = Ending lex position (optional, set automatically)
 
 
 # This class is used to hold non-terminal grammar symbols during parsing.
@@ -24,15 +45,11 @@ error_count: Final = 3  # Number of symbols that must be shifted to leave recove
 @dataclass(slots=True)
 class YaccSymbol:
     type: str  # = Grammar symbol type
-    value: Any = None  # = Symbol value
+    value: Union[str, ast.AST, LexToken, None, "YaccSymbol"] = None  # = Symbol value
     lineno: int | None = None  # = Starting line number
     endlineno: int | None = None  # = Ending line number (optional, set automatically)
     lexpos: int | None = None  # = Starting lex position
     endlexpos: int | None = None  # = Ending lex position (optional, set automatically)
-
-
-class LexToken(YaccSymbol):
-    """keep for backward compatibility and name distinction"""
 
 
 # This class is a wrapper around the objects actually passed to each
@@ -53,6 +70,9 @@ class LexerProtocol(Protocol):
         ...
 
 
+SliceType = Union[int, slice]
+
+
 @dataclass(slots=True)
 class YaccProduction:
     """A production object."""
@@ -66,9 +86,9 @@ class YaccProduction:
     # The stack of input symbols that is covered by this production
     stack: list["YaccSymbol"] = field(default_factory=list)
 
-    def __getitem__(self, n: int) -> Any:
-        # if isinstance(n, slice):
-        #     return [s.value for s in self.slice[n]]
+    def __getitem__(self, n: SliceType) -> Any:
+        if isinstance(n, slice):
+            return [s.value for s in self.slice[n]]
         if n >= 0:
             return self.slice[n].value
         return self.stack[n].value
@@ -408,9 +428,7 @@ class LRParser:
                         logger.info("Done   : Returning %s", format_result(result))
                         logger.info("PLY: PARSE DEBUG END")
 
-                    if isinstance(result, AST):
-                        return result
-                    raise TypeError("Parser state did not return an Expression object.")
+                    return result
 
             if t is None:
                 if logger:
