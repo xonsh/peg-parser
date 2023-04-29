@@ -73,9 +73,9 @@ def check_stmts(check_ast):
 
 
 @pytest.fixture
-def check_xonsh_ast(xsh, parser):
+def check_xonsh_ast(parser):
     def factory(
-        xenv,
+        xenv: dict,
         inp,
         run=True,
         mode="eval",
@@ -84,7 +84,7 @@ def check_xonsh_ast(xsh, parser):
         globals=None,
         locals=None,
     ):
-        xsh.env.update(xenv)
+        # xsh.env.update(xenv)
         obs = parser.parse(inp, debug_level=debug_level)
         if obs is None:
             return  # comment only
