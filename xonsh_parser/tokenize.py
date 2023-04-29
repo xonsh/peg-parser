@@ -27,9 +27,7 @@ import typing as tp
 from token import (
     AMPER,
     AMPEREQUAL,
-    ASYNC,
     AT,
-    AWAIT,
     CIRCUMFLEX,
     CIRCUMFLEXEQUAL,
     COLON,
@@ -120,7 +118,7 @@ __all__ = token.__all__ + [  # type:ignore
     "MATCH",
     "CASE",
 ]
-ADDSPACE_TOKS = (NAME, NUMBER, ASYNC, AWAIT)
+ADDSPACE_TOKS = (NAME, NUMBER)
 del token  # must clean up token
 
 if HAS_WALRUS:
@@ -239,8 +237,9 @@ class TokenInfo(collections.namedtuple("TokenInfo", "type string start end line"
     def __repr__(self):
         annotated_type = "%d (%s)" % (self.type, tok_name[self.type])
         return (
-            "TokenInfo(type=%s, string=%r, start=%r, end=%r, line=%r)"
-            % self._replace(type=annotated_type)
+            "TokenInfo(type={}, string={!r}, start={!r}, end={!r}, line={!r})".format(
+                *self._replace(type=annotated_type)
+            )
         )
 
     @property
@@ -1063,36 +1062,10 @@ def _tokenize(readline, encoding, tolerant=False):
                 elif token.startswith("$") and token[1:].isidentifier():
                     yield TokenInfo(DOLLARNAME, token, spos, epos, line)
                 elif initial.isidentifier():  # ordinary name
-                    if token in ("async", "await"):
-                        if async_def:
-                            yield TokenInfo(
-                                ASYNC if token == "async" else AWAIT,
-                                token,
-                                spos,
-                                epos,
-                                line,
-                            )
-                            continue
-
                     tok = TokenInfo(NAME, token, spos, epos, line)
                     if token == "async" and not stashed:
                         stashed = tok
                         continue
-
-                    if token == "def" and (
-                        stashed and stashed.type == NAME and stashed.string == "async"
-                    ):
-                        async_def = True
-                        async_def_indent = indents[-1]
-
-                        yield TokenInfo(
-                            ASYNC,
-                            stashed.string,
-                            stashed.start,
-                            stashed.end,
-                            stashed.line,
-                        )
-                        stashed = None
 
                     if stashed:
                         yield stashed
