@@ -28,17 +28,16 @@ def display_top(snapshot, key_type="lineno", limit=10):
     for index, stat in enumerate(top_stats[:limit], 1):
         frame = stat.traceback[0]
         print(
-            "#%s: %s:%s: %.1f KiB"
-            % (index, frame.filename, frame.lineno, stat.size / 1024),
+            f"#{index}: {frame.filename}:{frame.lineno}: {stat.size / 1024:.1f} KiB",
         )
         line = linecache.getline(frame.filename, frame.lineno).strip()
         if line:
-            print("    %s" % line)
+            print("    %s" % line[:88])
 
     other = top_stats[limit:]
     if other:
         size = sum(stat.size for stat in other)
-        print("%s other: %.1f KiB" % (len(other), size / 1024))
+        print(f"{len(other)} other: {size / 1024:.1f} KiB")
     total = sum(stat.size for stat in top_stats) / 1024
     print("Total allocated size: %.1f KiB" % (total))
 
@@ -66,7 +65,7 @@ def trace(limit=10, show_tb=False):
     yield
     snap = tracemalloc.take_snapshot()
 
-    current, peak = [size / 1024 for size in tracemalloc.get_traced_memory()]
+    current, peak = (size / 1024 for size in tracemalloc.get_traced_memory())
     print(f"{current=:.1f}KiB,  {peak=:.1f}KiB")
 
     if show_tb:
@@ -99,7 +98,6 @@ if __name__ == '__main__':
         # current=7457.5KiB,  peak=7531.1KiB
         # Total allocated size: 7470.4 KiB
         # Took:  1.47s
-
 
 
 
