@@ -50,3 +50,6 @@ PosixPath('/tmp/v1-bytes.pickle')
 ```
 - since Python strings does interning (str with same content is allocated only once), bytes dont bring any improvement
 
+# tried using marshal
+
+- there was not much difference with pickle
