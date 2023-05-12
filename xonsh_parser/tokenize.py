@@ -31,6 +31,7 @@ from token import (
     CIRCUMFLEX,
     CIRCUMFLEXEQUAL,
     COLON,
+    COLONEQUAL,
     COMMA,
     DEDENT,
     DOT,
@@ -82,11 +83,6 @@ from token import (
 )
 
 from .lazyasd import LazyObject
-from .platform import PYTHON_VERSION_INFO
-
-HAS_WALRUS = PYTHON_VERSION_INFO > (3, 8)
-if HAS_WALRUS:
-    from token import COLONEQUAL  # type:ignore
 
 cookie_re = LazyObject(
     lambda: re.compile(r"^[ \t\f]*#.*coding[:=][ \t]*([-\w.]+)", re.ASCII),
@@ -121,11 +117,7 @@ __all__ = token.__all__ + [  # type:ignore
 ADDSPACE_TOKS = (NAME, NUMBER)
 del token  # must clean up token
 
-if HAS_WALRUS:
-    AUGASSIGN_OPS = r"[+\-*/%&@|^=<>:]=?"
-else:
-    AUGASSIGN_OPS = r"[+\-*/%&@|^=<>]=?"
-
+AUGASSIGN_OPS = r"[+\-*/%&@|^=<>:]=?"
 COMMENT = N_TOKENS
 tok_name[COMMENT] = "COMMENT"
 NL = N_TOKENS + 1
@@ -226,9 +218,8 @@ EXACT_TOKEN_TYPES: dict[str, tp.Union[str, int]] = {
     "//": DOUBLESLASH,
     "//=": DOUBLESLASHEQUAL,
     "@": AT,
+    ":=": COLONEQUAL,
 }
-if HAS_WALRUS:
-    EXACT_TOKEN_TYPES[":="] = COLONEQUAL
 
 EXACT_TOKEN_TYPES.update(_xonsh_tokens)
 

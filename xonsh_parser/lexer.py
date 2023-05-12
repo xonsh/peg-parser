@@ -21,7 +21,6 @@ from .tokenize import (
     ENDMARKER,
     ERRORTOKEN,
     GREATER,
-    HAS_WALRUS,
     INDENT,
     IOREDIRECT,
     LESS,
@@ -109,8 +108,7 @@ def token_map():
     tm[NEWLINE] = "NEWLINE"
     tm[INDENT] = "INDENT"
     tm[DEDENT] = "DEDENT"
-    if HAS_WALRUS:
-        tm[(OP, ":=")] = "COLONEQUAL"
+    tm[(OP, ":=")] = "COLONEQUAL"
     # python 3.10 (backwards and name token compatible) tokens
     tm[MATCH] = "MATCH"
     tm[CASE] = "CASE"
