@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 logos = { git = "https://github.com/maciejhirsz/logos", version = "0.13.0" }
 rustpython-parser = "0.2.0"
+sysinfo = "0.29.0"

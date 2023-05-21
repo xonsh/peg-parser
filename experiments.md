@@ -53,3 +53,7 @@ PosixPath('/tmp/v1-bytes.pickle')
 # tried using marshal
 
 - there was not much difference with pickle
+
+# used RustPython's parser
+
+- memory usage is around:
