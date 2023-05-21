@@ -7,15 +7,37 @@
 # table generation algorithm
 #-----------------------------------------------------------------------------
 """
+import ast
 import sys
 from ast import AST
-from dataclasses import dataclass
+from collections.abc import Iterator
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Final, NamedTuple, Optional, Protocol
+from typing import (
+    Any,
+    Callable,
+    Final,
+    NamedTuple,
+    Optional,
+    Protocol,
+    Union,
+)
 
 from .common import PlyLogger, format_result, format_stack_entry
 
 error_count: Final = 3  # Number of symbols that must be shifted to leave recovery mode
+
+
+@dataclass(slots=True)
+class LexToken:
+    """keep for backward compatibility and name distinction"""
+
+    type: str  # = Grammar symbol type
+    value: str  # = token value
+    lineno: int | None = None  # = Starting line number
+    endlineno: int | None = None  # = Ending line number (optional, set automatically)
+    lexpos: int | None = None  # = Starting lex position
+    endlexpos: int | None = None  # = Ending lex position (optional, set automatically)
 
 
 # This class is used to hold non-terminal grammar symbols during parsing.
@@ -23,14 +45,12 @@ error_count: Final = 3  # Number of symbols that must be shifted to leave recove
 @dataclass(slots=True)
 class YaccSymbol:
     type: str  # = Grammar symbol type
-    value: Any = None  # = Symbol value
+    value: Union[str, ast.AST, LexToken, None, "YaccSymbol"] = None  # = Symbol value
     lineno: int | None = None  # = Starting line number
     endlineno: int | None = None  # = Ending line number (optional, set automatically)
     lexpos: int | None = None  # = Starting lex position
     endlexpos: int | None = None  # = Ending lex position (optional, set automatically)
 
-
-LexToken = YaccSymbol  # For backwards compatibility
 
 # This class is a wrapper around the objects actually passed to each
 # grammar rule.   Index lookup and assignment actually assign the
@@ -42,16 +62,33 @@ LexToken = YaccSymbol  # For backwards compatibility
 # representing the range of positional information for a symbol.
 
 
-class YaccProduction:
-    def __init__(self, s: list["YaccSymbol"] | None = None, stack: Any = None) -> None:
-        self.slice = s or []
-        self.stack: list["YaccSymbol"] = stack or []
-        self.lexer: Any = None
-        self.parser: None | "LRParser" = None
+class LexerProtocol(Protocol):
+    def input(self, s: str) -> None:
+        ...
 
-    def __getitem__(self, n: int) -> Any:
-        # if isinstance(n, slice):
-        #     return [s.value for s in self.slice[n]]
+    def __iter__(self) -> Iterator[LexToken]:
+        ...
+
+
+SliceType = Union[int, slice]
+
+
+@dataclass(slots=True)
+class YaccProduction:
+    """A production object."""
+
+    # The lexer that produced the token stream
+    lexer: "LexerProtocol"
+    # The parser that is running this production
+    parser: "LRParser"
+    # The slice of the input stream that is covered by this production
+    slice: list["YaccSymbol"] = field(default_factory=list)
+    # The stack of input symbols that is covered by this production
+    stack: list["YaccSymbol"] = field(default_factory=list)
+
+    def __getitem__(self, n: SliceType) -> Any:
+        if isinstance(n, slice):
+            return [s.value for s in self.slice[n]]
         if n >= 0:
             return self.slice[n].value
         return self.stack[n].value
@@ -182,15 +219,12 @@ class LRParser:
             self.productions
         )  # Local reference to production list (to avoid lookup on self.)
         defaulted_states = self.defaulted_states  # Local reference to defaulted states
-        pslice = YaccProduction(None)  # Production object passed to grammar rules
+        # Production object passed to grammar rules
+        pslice = YaccProduction(lexer, self)
         errorcount = 0  # Used during error recovery
 
         if logger:
             logger.info("PLY: PARSE DEBUG START")
-
-        # Set up the lexer and parser objects on pslice
-        pslice.lexer = lexer
-        pslice.parser = self
 
         # If input was supplied, pass to lexer
         if input is not None:
@@ -394,9 +428,7 @@ class LRParser:
                         logger.info("Done   : Returning %s", format_result(result))
                         logger.info("PLY: PARSE DEBUG END")
 
-                    if isinstance(result, AST):
-                        return result
-                    raise TypeError("Parser state did not return an Expression object.")
+                    return result
 
             if t is None:
                 if logger:

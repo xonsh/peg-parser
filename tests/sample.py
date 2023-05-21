@@ -16,13 +16,18 @@ def main():
         pass
 
 
-if __name__ == "__main__":
-    # main()
+def _write_tmp(name: str):
     from pathlib import Path
 
     from xonsh_parser.parser import write_parser_table
 
-    path = Path("/tmp/bytes-2.pickle")
+    path = Path(f"/tmp/{name}")
     if path.exists():
         path.unlink()
     write_parser_table(output_path=path, yacc_debug=True)
+
+
+if __name__ == "__main__":
+    # main()
+    # _write_tmp("bytes-2.pickle")
+    _write_tmp("bytes-2.py")

@@ -21,7 +21,6 @@ from .tokenize import (
     ENDMARKER,
     ERRORTOKEN,
     GREATER,
-    HAS_WALRUS,
     INDENT,
     IOREDIRECT,
     LESS,
@@ -109,8 +108,7 @@ def token_map():
     tm[NEWLINE] = "NEWLINE"
     tm[INDENT] = "INDENT"
     tm[DEDENT] = "DEDENT"
-    if HAS_WALRUS:
-        tm[(OP, ":=")] = "COLONEQUAL"
+    tm[(OP, ":=")] = "COLONEQUAL"
     # python 3.10 (backwards and name token compatible) tokens
     tm[MATCH] = "MATCH"
     tm[CASE] = "CASE"
@@ -399,9 +397,9 @@ def get_tokens(s, tolerant):
 
 
 # synthesize a new PLY token
-def _new_token(type: str, value: str, pos):
+def _new_token(type: str, value: str, pos: tuple[int, int]) -> LexToken:
     linn, col = pos
-    return LexToken(type, value, linn, col)
+    return LexToken(type=type, value=value, lineno=linn, lexpos=col)
 
 
 BEG_TOK_SKIPS = LazyObject(
@@ -461,7 +459,7 @@ class Lexer:
         self.last = None
         self.beforelast = None
 
-    def input(self, s):
+    def input(self, s: str) -> None:
         """Calls the lexer on the string s."""
         self._token_stream = get_tokens(s, self._tolerant)
 
@@ -470,7 +468,7 @@ class Lexer:
         self.beforelast, self.last = self.last, next(self._token_stream, None)
         return self.last
 
-    def __iter__(self):
+    def __iter__(self) -> tp.Iterator[LexToken]:
         t = self.token()
         while t is not None:
             yield t
@@ -664,6 +662,28 @@ class Lexer:
         if returnline:
             rtn = line[:beg] + rtn + line[end:]
         return rtn
+
+    def balanced_parens(self, line: str, mincol=0, maxcol=None):
+        """Determines if parentheses are balanced in an expression."""
+        line = line[mincol:maxcol]
+        if "(" not in line and ")" not in line:
+            return True
+        cnt = 0
+        self.input(line)
+        for tok in self:
+            if tok.type in LPARENS:
+                cnt += 1
+            elif tok.type == "RPAREN":
+                cnt -= 1
+            elif tok.type == "ERRORTOKEN" and ")" in tok.value:
+                cnt -= 1
+        return cnt == 0
+
+    def ends_with_colon_token(self, line: str):
+        """Determines whether a line ends with a colon token, ignoring comments."""
+        self.input(line)
+        toks = list(self)
+        return len(toks) > 0 and toks[-1].type == "COLON"
 
 
 def _is_not_lparen_and_rparen(lparens, rtok):

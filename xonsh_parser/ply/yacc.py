@@ -1979,9 +1979,11 @@ def write_to_file(lr: LRTable, output_path:str=None):
         output_path = 'parser.out.jsonl'
 
     productions, actions, gotos = optimize_table(lr)
-    if output_path.endswith('.json'):
+    if output_path.endswith('.jsonl'):
         with open(output_path, 'w') as fw:
-            fw.write(json.dumps({"productions": productions, "action": actions, "goto": gotos}))
+            fw.write(json.dumps(productions) + '\n')
+            fw.write(json.dumps(actions) + '\n')
+            fw.write(json.dumps(gotos) + '\n')
     else:
         # write to a pickle file
         import pickle

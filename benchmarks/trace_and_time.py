@@ -28,12 +28,11 @@ def display_top(snapshot, key_type="lineno", limit=10):
     for index, stat in enumerate(top_stats[:limit], 1):
         frame = stat.traceback[0]
         print(
-            "#%s: %s:%s: %.1f KiB"
-            % (index, frame.filename, frame.lineno, stat.size / 1024),
+            f"#{index}: {frame.filename}:{frame.lineno}: {stat.size / 1024:.1f} KiB",
         )
         line = linecache.getline(frame.filename, frame.lineno).strip()
         if line:
-            print("    %s" % line)
+            print("    %s" % line[:88])
 
     other = top_stats[limit:]
     if other:
@@ -99,3 +98,6 @@ if __name__ == "__main__":
         # current=7457.5KiB,  peak=7531.1KiB
         # Total allocated size: 7470.4 KiB
         # Took:  1.47s
+
+
+

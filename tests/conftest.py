@@ -1,6 +1,6 @@
-import sys
-
 import pytest
+
+from .tools import nodes_equal
 
 
 @pytest.fixture(scope="session")
@@ -23,42 +23,95 @@ def parser(parser_table):
     inst.reset()
 
 
-def get_type(obj):
-    def name(obj):
-        return type(obj).__name__
+@pytest.fixture(scope="session")
+def execer(parser_table):
+    """return Execer instance"""
+    from xonsh_parser.execer import Execer
 
-    if isinstance(obj, (list, tuple)):
-        inner = set(get_type(i) for i in obj)
-        container = name(obj)
-        return f"{container}[{'|'.join(inner)}]"
-    elif isinstance(obj, dict):
-        inner = set(f"{k}: {get_type(v)}" for k, v in obj.items())
-        container = name(obj)
-        return f"{container}[{'|'.join(inner)}]"
-    return name(obj)
+    return Execer()
 
 
-def get_size(obj, seen=None):
-    """Recursively finds size of objects"""
+@pytest.fixture()
+def ctx_parse(execer):
+    """contextual parse"""
 
-    size = sys.getsizeof(obj)
-    if seen is None:
-        seen = set()
+    def parse(input: str, **ctx):
+        tree = execer.parse(input, ctx=set(ctx.keys()))
+        return tree
 
-    obj_id = id(obj)
-    if obj_id in seen:
-        return 0
+    return parse
 
-    # Important mark as seen *before* entering recursion to gracefully handle
-    # self-referential objects
-    seen.add(obj_id)
 
-    if isinstance(obj, dict):
-        size += sum([get_size(v, seen) for v in obj.values()])
-        size += sum([get_size(k, seen) for k in obj.keys()])
-    elif hasattr(obj, "__dict__"):
-        size += get_size(obj.__dict__, seen)
-    elif hasattr(obj, "__iter__") and not isinstance(obj, (str, bytes, bytearray)):
-        size += sum([get_size(i, seen) for i in obj])
+@pytest.fixture
+def check_ast(parser):
+    import ast
 
-    return size
+    def factory(inp: str, run=True, mode="eval", debug_level=0):
+        # __tracebackhide__ = True
+        # expect a Python AST
+        exp = ast.parse(inp, mode=mode)
+        # observe something from xonsh
+        obs = parser.parse(inp, debug_level=debug_level)
+        # Check that they are equal
+        assert nodes_equal(exp, obs)
+        # round trip by running xonsh AST via Python
+        if run:
+            exec(compile(obs, "<test-ast>", mode))
+
+    return factory
+
+
+@pytest.fixture
+def check_stmts(check_ast):
+    def factory(inp, run=True, mode="exec", debug_level=0):
+        __tracebackhide__ = True
+        if not inp.endswith("\n"):
+            inp += "\n"
+        check_ast(inp, run=run, mode=mode, debug_level=debug_level)
+
+    return factory
+
+
+@pytest.fixture
+def check_xonsh_ast(parser):
+    def factory(
+        xenv: dict,
+        inp,
+        run=True,
+        mode="eval",
+        debug_level=0,
+        return_obs=False,
+        globals=None,
+        locals=None,
+    ):
+        # xsh.env.update(xenv)
+        obs = parser.parse(inp, debug_level=debug_level)
+        if obs is None:
+            return  # comment only
+        bytecode = compile(obs, "<test-xonsh-ast>", mode)
+        if run:
+            exec(bytecode, globals, locals)
+        return obs if return_obs else True
+
+    return factory
+
+
+@pytest.fixture
+def check_xonsh(check_xonsh_ast):
+    def factory(xenv, inp, run=True, mode="exec"):
+        __tracebackhide__ = True
+        if not inp.endswith("\n"):
+            inp += "\n"
+        check_xonsh_ast(xenv, inp, run=run, mode=mode)
+
+    return factory
+
+
+@pytest.fixture
+def eval_code(parser):
+    def factory(inp, mode="eval", **loc_vars):
+        obs = parser.parse(inp, debug_level=1)
+        bytecode = compile(obs, "<test-xonsh-ast>", mode)
+        return eval(bytecode, loc_vars)
+
+    return factory

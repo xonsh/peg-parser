@@ -1,3 +1,4 @@
+import functools
 import re
 
 from .lazyasd import LazyDict, LazyObject, lazyobject
@@ -56,15 +57,13 @@ def RE_COMPLETE_STRING():
     return re.compile(ptrn, re.DOTALL)
 
 
-def get_line_continuation(xsh):
+def get_line_continuation(is_interactive=False):
     """The line continuation characters used in subproc mode. In interactive
     mode on Windows the backslash must be preceded by a space. This is because
     paths on Windows may end in a backslash.
     """
-    if ON_WINDOWS:
-        env = getattr(xsh, "env", None) or {}
-        if env.get("XONSH_INTERACTIVE", False):
-            return " \\"
+    if ON_WINDOWS and is_interactive:
+        return " \\"
 
     return "\\"
 
@@ -196,3 +195,36 @@ def check_for_partial_string(x):
         return (string_indices[-1], None, starting_quote[-1])
     else:
         return (string_indices[-2], string_indices[-1], starting_quote[-1])
+
+
+@functools.lru_cache
+def STARTING_WHITESPACE_RE():
+    return re.compile(r"^(\s*)")
+
+
+def starting_whitespace(s):
+    """Returns the whitespace at the start of a string"""
+    return STARTING_WHITESPACE_RE().match(s).group(1)
+
+
+def replace_logical_line(lines, logical, idx, n, is_interactive=False) -> None:
+    """Replaces lines at idx that may end in line continuation with a logical
+    line that spans n lines.
+    """
+    linecont = get_line_continuation(is_interactive)
+    if n == 1:
+        lines[idx] = logical
+        return
+    space = " "
+    for i in range(idx, idx + n - 1):
+        a = len(lines[i])
+        b = logical.find(space, a - 1)
+        if b < 0:
+            # no space found
+            lines[i] = logical
+            logical = ""
+        else:
+            # found space to split on
+            lines[i] = logical[:b] + linecont
+            logical = logical[b:]
+    lines[idx + n - 1] = logical
