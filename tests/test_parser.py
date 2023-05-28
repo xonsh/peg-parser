@@ -2014,14 +2014,13 @@ def test_path_literal_concat(first_prefix, second_prefix, check_xonsh_ast):
     )
 
 
-@pytest.mark.xfail
-def test_dollar_name(check_xonsh_ast):
-    check_xonsh_ast({"WAKKA": 42}, "$WAKKA")
+def test_dollar_name(unparse):
+    assert unparse("$WAKKA") == "__xonsh__.env['WAKKA']"
 
 
 @pytest.mark.xfail
-def test_dollar_py(check_xonsh):
-    check_xonsh({"WAKKA": 42}, 'x = "WAKKA"; y = ${x}')
+def test_dollar_py(unparse):
+    assert unparse('x = "WAKKA"; y = ${x}') == ""
 
 
 @pytest.mark.xfail

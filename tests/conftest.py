@@ -97,6 +97,22 @@ def check_xonsh_ast(parser):
 
 
 @pytest.fixture
+def unparse(parser):
+    def factory(
+        inp: str,
+        debug_level=0,
+    ):
+        import ast
+
+        tree = parser.parse(inp, debug_level=debug_level)
+        if tree is None:
+            return  # comment only
+        return ast.unparse(tree)
+
+    return factory
+
+
+@pytest.fixture
 def check_xonsh(check_xonsh_ast):
     def factory(xenv, inp, run=True, mode="exec"):
         __tracebackhide__ = True
