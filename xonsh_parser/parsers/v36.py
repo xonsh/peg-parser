@@ -6,15 +6,8 @@ from .base import BaseParser, lopen_loc, store_ctx
 class Parser(BaseParser):
     """A Python v3.6 compliant parser for the xonsh language."""
 
-    def __init__(self, *args, **kwargs):
-        # Rule creation and modification *must* take place before super()
-        tok_rules = ["await", "async"]
-        for rule in tok_rules:
-            self._tok_rule(rule)
-        super().__init__(
-            *args,
-            **kwargs,
-        )
+    def _get_tok_rules(self):
+        return super()._get_tok_rules() + ["await", "async"]
 
     def p_classdef_or_funcdef(self, p):
         """

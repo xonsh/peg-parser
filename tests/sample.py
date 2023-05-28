@@ -29,5 +29,5 @@ def _write_tmp(name: str):
 
 if __name__ == "__main__":
     # main()
-    # _write_tmp("bytes-2.pickle")
-    _write_tmp("bytes-2.py")
+    _write_tmp("bytes-3.pickle")
+    # _write_tmp("bytes-2.py")

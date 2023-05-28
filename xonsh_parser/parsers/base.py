@@ -220,6 +220,40 @@ def raise_parse_error(
     raise err
 
 
+class OptionalRules:
+    def __init__(self, rules: tp.Iterable[str]):
+        self.__doc__ = "\n".join(f"{r}_opt : empty\n        | {r}" for r in rules)
+
+    def __call__(self, p):
+        p[0] = p[1]
+
+
+class ListRules:
+    def __init__(self, rules: tp.Iterable[str]):
+        self.__doc__ = "\n".join(
+            f"{r}_list : {r}\n         | {r}_list {r}" for r in rules
+        )
+
+    def __call__(self, p):
+        p[0] = p[1] if len(p) == 2 else p[1] + p[2]
+
+
+class TokenRules:
+    def __init__(self, rules: tp.Iterable[str], parser):
+        self.__doc__ = "\n".join(f"{r}_tok : {r.upper()}" for r in rules)
+        self.parser = parser
+
+    def __call__(self, p):
+        s, t = self.parser._yacc_lookahead_token()
+        uprule = p.slice[1].type
+        if s is not None and s.type == uprule:
+            p[0] = s
+        elif t is not None and t.type == uprule:
+            p[0] = t
+        else:
+            raise TypeError(f"token for {uprule!r} not found.")
+
+
 class BaseParser:
     """A base class that parses the xonsh language."""
 
@@ -242,7 +276,26 @@ class BaseParser:
         self._attach_nonewline_base_rules()
         self._attach_subproc_arg_part_rules()
 
-        opt_rules = [
+        self.p_optionals = OptionalRules(self._get_optionals())
+        self.p_list_rules = ListRules(self._get_list_rules())
+        self.p_tok_rules = TokenRules(self._get_tok_rules(), self)
+
+        parser_table = parser_table or self.default_table_name()
+
+        if not is_write_table:
+            # create parser on main thread
+            self.parser: None | lrparser.LRParser = lrparser.load_parser(
+                parser_table, module=self
+            )
+        else:
+            self.parser = None
+
+        # Keeps track of the last token given to yacc (the lookahead token)
+        self._last_yielded_token = None
+        self._error = None
+
+    def _get_optionals(self):
+        return [
             "newlines",
             "arglist",
             "func_call",
@@ -287,10 +340,9 @@ class BaseParser:
             "macroarglist",
             "any_raw_toks",
         ]
-        for rule in opt_rules:
-            self._opt_rule(rule)
 
-        list_rules = [
+    def _get_list_rules(self):
+        return [
             "comma_tfpdef",
             "comma_vfpdef",
             "semi_small_stmt",
@@ -323,10 +375,9 @@ class BaseParser:
             "equals_yield_expr_or_testlist",
             "comma_nocomma",
         ]
-        for rule in list_rules:
-            self._list_rule(rule)
 
-        tok_rules = [
+    def _get_tok_rules(self):
+        return [
             "def",
             "class",
             "return",
@@ -422,27 +473,11 @@ class BaseParser:
             "match",
             "case",
         ]
-        for rule in tok_rules:
-            self._tok_rule(rule)
-
-        parser_table = parser_table or self.default_table_name()
-
-        if not is_write_table:
-            # create parser on main thread
-            self.parser: None | lrparser.LRParser = lrparser.load_parser(
-                parser_table, module=self
-            )
-        else:
-            self.parser = None
-
-        # Keeps track of the last token given to yacc (the lookahead token)
-        self._last_yielded_token = None
-        self._error = None
 
     @classmethod
     def default_table_name(cls) -> Path:
         py_version = ".".join(str(x) for x in PYTHON_VERSION_INFO[:2])
-        format = "v1"
+        format = "v2"
         filename = f"{cls.__name__}.table.{py_version}.{format}.pickle"
         return Path(__file__).parent / filename
 
@@ -494,51 +529,6 @@ class BaseParser:
     def _yacc_lookahead_token(self):
         """Gets the next-to-last and last token seen by the lexer."""
         return self.lexer.beforelast, self.lexer.last
-
-    def _opt_rule(self, rulename):
-        """For a rule name, creates an associated optional rule.
-        '_opt' is appended to the rule name.
-        """
-
-        def optfunc(self, p):
-            p[0] = p[1]
-
-        optfunc.__doc__ = ("{0}_opt : empty\n" "        | {0}").format(rulename)
-        optfunc.__name__ = "p_" + rulename + "_opt"
-        setattr(self.__class__, optfunc.__name__, optfunc)
-
-    def _list_rule(self, rulename):
-        """For a rule name, creates an associated list rule.
-        '_list' is appended to the rule name.
-        """
-
-        def listfunc(self, p):
-            p[0] = p[1] if len(p) == 2 else p[1] + p[2]
-
-        listfunc.__doc__ = ("{0}_list : {0}\n" "         | {0}_list {0}").format(
-            rulename
-        )
-        listfunc.__name__ = "p_" + rulename + "_list"
-        setattr(self.__class__, listfunc.__name__, listfunc)
-
-    def _tok_rule(self, rulename):
-        """For a rule name, creates a rule that returns the corresponding token.
-        '_tok' is appended to the rule name.
-        """
-
-        def tokfunc(self, p):
-            s, t = self._yacc_lookahead_token()
-            uprule = rulename.upper()
-            if s is not None and s.type == uprule:
-                p[0] = s
-            elif t is not None and t.type == uprule:
-                p[0] = t
-            else:
-                raise TypeError(f"token for {rulename!r} not found.")
-
-        tokfunc.__doc__ = f"{rulename}_tok : {rulename.upper()}"
-        tokfunc.__name__ = "p_" + rulename + "_tok"
-        setattr(self.__class__, tokfunc.__name__, tokfunc)
 
     def currloc(self, lineno, column=None):
         """Returns the current location."""
@@ -678,10 +668,7 @@ class BaseParser:
 
     def p_file_input(self, p):
         """file_input : file_stmts"""
-        if PYTHON_VERSION_INFO < (3, 8, 0):
-            p[0] = ast.Module(body=p[1])
-        else:
-            p[0] = ast.Module(body=p[1], type_ignores=[])
+        p[0] = ast.Module(body=p[1], type_ignores=[])
 
     def p_file_stmts_nl(self, p):
         """file_stmts : newline_or_stmt"""

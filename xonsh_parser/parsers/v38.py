@@ -8,25 +8,14 @@ from .v36 import Parser as ThreeSixParser
 class Parser(ThreeSixParser):
     """A Python v3.8 compliant parser for the xonsh language."""
 
-    def __init__(
-        self,
-        *args,
-        **kwargs,
-    ):
-        # Rule creation and modification *must* take place before super()
-        opt_rules = ["testlist_star_expr"]
-        for rule in opt_rules:
-            self._opt_rule(rule)
-        list_rules = ["comma_namedexpr_test_or_star_expr"]
-        for rule in list_rules:
-            self._list_rule(rule)
-        tok_rules = ["colonequal"]
-        for rule in tok_rules:
-            self._tok_rule(rule)
-        super().__init__(
-            *args,
-            **kwargs,
-        )
+    def _get_optionals(self):
+        return super()._get_optionals() + ["testlist_star_expr"]
+
+    def _get_list_rules(self):
+        return super()._get_list_rules() + ["comma_namedexpr_test_or_star_expr"]
+
+    def _get_tok_rules(self):
+        return super()._get_tok_rules() + ["colonequal"]
 
     def _set_posonly_args_def(self, argmts, vals):
         for v in vals:
