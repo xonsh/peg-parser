@@ -1974,15 +1974,26 @@ def optimize_table(lr):
     return productions, actions, gotos
 
 
-def human_file_size(path: str, decimal_places=2):
+def _humanize_bytes(num, precision=2):
+    for unit in ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB']:
+        if num < 1024.0 or unit == 'PiB':
+            break
+        num /= 1024.0
+    return f"{num:.{precision}f} {unit}"
+
+
+def _file_size(path: str, decimal_places=2):
     """ Returns a human readable string representation of bytes """
     import os
     size = os.path.getsize(path)
-    for unit in ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB']:
-        if size < 1024.0 or unit == 'PiB':
-            break
-        size /= 1024.0
-    return f"{size:.{decimal_places}f} {unit}"
+    return _humanize_bytes(size, decimal_places)
+
+
+def _object_size(data, decimal_places=2):
+    """ Returns a human readable string representation of python objects """
+    from pympler import asizeof
+    size = asizeof.asizeof(data)
+    return _humanize_bytes(len(size), decimal_places)
 
 def write_to_file(lr: LRTable, output_path:str=None):
     import json
@@ -1990,6 +2001,8 @@ def write_to_file(lr: LRTable, output_path:str=None):
         output_path = 'parser.out.jsonl'
 
     productions, actions, gotos = optimize_table(lr)
+    print(f'data:\n{_object_size(productions)=}\n{_object_size(actions)=}\n{_object_size(gotos)=}')
+
     if output_path.endswith('.jsonl'):
         with open(output_path, 'w') as fw:
             fw.write(json.dumps(productions) + '\n')
@@ -2004,13 +2017,11 @@ def write_to_file(lr: LRTable, output_path:str=None):
         # write to a pickle file
         import pickle
         data = (productions, actions, gotos)
-        from pympler import asizeof
-        print(f'pickle size: {asizeof.asizeof(data)=}')
         pickle.dump(data, open(output_path, 'wb'), protocol=5)
     # Build the parser
     # lr.bind_callables(pinfo.pdict)
 
     # return parser
     # this should write to output file
-    print("Wrote to", output_path, "; size: ", human_file_size(output_path))
+    print("Wrote to", output_path, "; size: ", _file_size(output_path))
     return output_path
