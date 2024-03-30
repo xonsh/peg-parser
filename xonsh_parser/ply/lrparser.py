@@ -149,8 +149,8 @@ class LRParser:
     def __init__(
         self,
         productions: tuple["Production", ...],
-        action: tuple[dict[str, int]],
-        goto: tuple[dict[str, int]],
+        action: tuple[dict[str, int], ...],
+        goto: tuple[dict[str, int], ...],
         errorf: Callable[[YaccSymbol | None], None] | None,
     ) -> None:
         self.productions = productions
@@ -559,12 +559,11 @@ def load_parser(parser_table: Path, module: ParserProtocol) -> LRParser:
             lr_action = ns["actions"]
             lr_goto = ns["gotos"]
 
-    elif parser_table.suffix == ".pickle":
-        import pickle
+    elif parser_table.suffix == ".cpickle":
+        from . import save_table
 
-        with parser_table.open("rb") as fr:
-            lr_prods, lr_action, lr_goto = pickle.load(fr)
-        del pickle
+        lr_prods, lr_action, lr_goto = save_table.load(str(parser_table))
+        del save_table
     elif parser_table.suffix == ".jsonl":
         import json
 
@@ -573,6 +572,12 @@ def load_parser(parser_table: Path, module: ParserProtocol) -> LRParser:
             lr_action = json.loads(fr.readline())
             lr_goto = json.loads(fr.readline())
         del json
+    else:
+        import pickle
+
+        with parser_table.open("rb") as fr:
+            lr_prods, lr_action, lr_goto = pickle.load(fr)
+        del pickle
     prods = tuple(
         Production(
             name=name,
