@@ -1993,7 +1993,7 @@ def _object_size(data, decimal_places=2):
     """ Returns a human readable string representation of python objects """
     from pympler import asizeof
     size = asizeof.asizeof(data)
-    return _humanize_bytes(len(size), decimal_places)
+    return _humanize_bytes(size, decimal_places)
 
 def write_to_file(lr: LRTable, output_path:str=None):
     import json

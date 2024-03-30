@@ -472,6 +472,8 @@ class BaseParser:
             "xorequal",
             "match",
             "case",
+            "await",
+            "async",
         ]
 
     @classmethod
@@ -797,10 +799,6 @@ class BaseParser:
         p1, p2 = p[1], p[2]
         targ = p2[0]
         targ.decorator_list = p1
-        # this is silly, CPython. This claims a func or class starts on
-        # the line of the first decorator, rather than the 'def' or 'class'
-        # line.  However, it retains the original col_offset.
-        targ.lineno = p1[0].lineno
         # async functions take the col number of the 'def', unless they are
         # decorated, in which case they have the col of the 'async'. WAT?
         if hasattr(targ, "_async_tok"):
@@ -830,6 +828,7 @@ class BaseParser:
         p2 = p[2]
         if p2 is None:
             p2 = ast.arguments(
+                posonlyargs=[],
                 args=[],
                 vararg=None,
                 kwonlyargs=[],
@@ -846,14 +845,26 @@ class BaseParser:
     def p_typedargslist_kwarg(self, p):
         """typedargslist : POW tfpdef"""
         p[0] = ast.arguments(
-            args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=p[2], defaults=[]
+            posonlyargs=[],
+            args=[],
+            vararg=None,
+            kwonlyargs=[],
+            kw_defaults=[],
+            kwarg=p[2],
+            defaults=[],
         )
 
     def p_typedargslist_times4_tfpdef(self, p):
         """typedargslist : TIMES tfpdef comma_pow_tfpdef_opt"""
         # *args, **kwargs
         p0 = ast.arguments(
-            args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=p[3], defaults=[]
+            posonlyargs=[],
+            args=[],
+            vararg=None,
+            kwonlyargs=[],
+            kw_defaults=[],
+            kwarg=p[3],
+            defaults=[],
         )
         self._set_var_args(p0, p[2], None)
         p[0] = p0
@@ -862,7 +873,13 @@ class BaseParser:
         """typedargslist : TIMES comma_pow_tfpdef"""
         # *, **kwargs
         p0 = ast.arguments(
-            args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=p[2], defaults=[]
+            posonlyargs=[],
+            args=[],
+            vararg=None,
+            kwonlyargs=[],
+            kw_defaults=[],
+            kwarg=p[2],
+            defaults=[],
         )
         p[0] = p0
 
@@ -870,7 +887,13 @@ class BaseParser:
         """typedargslist : TIMES tfpdef comma_tfpdef_list comma_pow_tfpdef_opt"""
         # *args, x, **kwargs
         p0 = ast.arguments(
-            args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=p[4], defaults=[]
+            posonlyargs=[],
+            args=[],
+            vararg=None,
+            kwonlyargs=[],
+            kw_defaults=[],
+            kwarg=p[4],
+            defaults=[],
         )
         self._set_var_args(p0, p[2], p[3])  # *args
         p[0] = p0
@@ -879,7 +902,13 @@ class BaseParser:
         """typedargslist : TIMES comma_tfpdef_list comma_pow_tfpdef_opt"""
         # *, x, **kwargs
         p0 = ast.arguments(
-            args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=p[3], defaults=[]
+            posonlyargs=[],
+            args=[],
+            vararg=None,
+            kwonlyargs=[],
+            kw_defaults=[],
+            kwarg=p[3],
+            defaults=[],
         )
         self._set_var_args(p0, None, p[2])  # *args
         p[0] = p0
@@ -888,7 +917,13 @@ class BaseParser:
         """typedargslist : tfpdef equals_test_opt comma_tfpdef_list_opt comma_opt"""
         # x
         p0 = ast.arguments(
-            args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[]
+            posonlyargs=[],
+            args=[],
+            vararg=None,
+            kwonlyargs=[],
+            kw_defaults=[],
+            kwarg=None,
+            defaults=[],
         )
         self._set_regular_args(p0, p[1], p[2], p[3], p[4])
         p[0] = p0
@@ -897,7 +932,13 @@ class BaseParser:
         """typedargslist : tfpdef equals_test_opt comma_tfpdef_list_opt comma_opt POW tfpdef"""
         # x, **kwargs
         p0 = ast.arguments(
-            args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=p[6], defaults=[]
+            posonlyargs=[],
+            args=[],
+            vararg=None,
+            kwonlyargs=[],
+            kw_defaults=[],
+            kwarg=p[6],
+            defaults=[],
         )
         self._set_regular_args(p0, p[1], p[2], p[3], p[4])
         p[0] = p0
@@ -905,7 +946,13 @@ class BaseParser:
     def p_typedargslist_t8(self, p):
         """typedargslist : tfpdef equals_test_opt comma_tfpdef_list_opt comma_opt TIMES tfpdef_opt comma_tfpdef_list_opt"""
         p0 = ast.arguments(
-            args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[]
+            posonlyargs=[],
+            args=[],
+            vararg=None,
+            kwonlyargs=[],
+            kw_defaults=[],
+            kwarg=None,
+            defaults=[],
         )
         self._set_regular_args(p0, p[1], p[2], p[3], p[4])
         self._set_var_args(p0, p[6], p[7])
@@ -915,7 +962,13 @@ class BaseParser:
         """typedargslist : tfpdef equals_test_opt comma_tfpdef_list_opt comma_opt TIMES tfpdef_opt COMMA POW vfpdef"""
         # x, *args, **kwargs
         p0 = ast.arguments(
-            args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=p[9], defaults=[]
+            posonlyargs=[],
+            args=[],
+            vararg=None,
+            kwonlyargs=[],
+            kw_defaults=[],
+            kwarg=p[9],
+            defaults=[],
         )
         self._set_regular_args(p0, p[1], p[2], p[3], p[4])
         self._set_var_args(p0, p[6], None)
@@ -925,6 +978,7 @@ class BaseParser:
         """typedargslist : tfpdef equals_test_opt comma_tfpdef_list_opt comma_opt TIMES tfpdef_opt comma_tfpdef_list COMMA POW tfpdef"""
         # x, *args, **kwargs
         p0 = ast.arguments(
+            posonlyargs=[],
             args=[],
             vararg=None,
             kwonlyargs=[],
@@ -934,6 +988,21 @@ class BaseParser:
         )
         self._set_regular_args(p0, p[1], p[2], p[3], p[4])
         self._set_var_args(p0, p[6], p[7])
+        p[0] = p0
+
+    def p_typedargslist_t12(self, p):
+        """
+        typedargslist : posonlyargslist comma_opt
+                      | posonlyargslist COMMA typedargslist
+        """
+        if len(p) == 4:
+            p0 = p[3]
+            p0.posonlyargs = p[1].posonlyargs
+            # If posonlyargs contain default arguments, all following arguments must have defaults.
+            if p[1].defaults and (len(p[3].defaults) != len(p[3].args)):
+                self._set_error("non-default argument follows default argument")
+        else:
+            p0 = p[1]
         p[0] = p0
 
     def p_colon_test(self, p):
@@ -1014,13 +1083,25 @@ class BaseParser:
     def p_varargslist_kwargs(self, p):
         """varargslist : POW vfpdef"""
         p[0] = ast.arguments(
-            args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=p[2], defaults=[]
+            posonlyargs=[],
+            args=[],
+            vararg=None,
+            kwonlyargs=[],
+            kw_defaults=[],
+            kwarg=p[2],
+            defaults=[],
         )
 
     def p_varargslist_times4(self, p):
         """varargslist : TIMES vfpdef_opt comma_pow_vfpdef_opt"""
         p0 = ast.arguments(
-            args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=p[3], defaults=[]
+            posonlyargs=[],
+            args=[],
+            vararg=None,
+            kwonlyargs=[],
+            kw_defaults=[],
+            kwarg=p[3],
+            defaults=[],
         )
         self._set_var_args(p0, p[2], None)
         p[0] = p0
@@ -1029,7 +1110,13 @@ class BaseParser:
         """varargslist : TIMES vfpdef_opt comma_vfpdef_list comma_pow_vfpdef_opt"""
         # *args, x, **kwargs
         p0 = ast.arguments(
-            args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=p[4], defaults=[]
+            posonlyargs=[],
+            args=[],
+            vararg=None,
+            kwonlyargs=[],
+            kw_defaults=[],
+            kwarg=p[4],
+            defaults=[],
         )
         self._set_var_args(p0, p[2], p[3])  # *args
         p[0] = p0
@@ -1038,7 +1125,13 @@ class BaseParser:
         """varargslist : vfpdef equals_test_opt comma_vfpdef_list_opt comma_opt"""
         # x
         p0 = ast.arguments(
-            args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[]
+            posonlyargs=[],
+            args=[],
+            vararg=None,
+            kwonlyargs=[],
+            kw_defaults=[],
+            kwarg=None,
+            defaults=[],
         )
         self._set_regular_args(p0, p[1], p[2], p[3], p[4])
         p[0] = p0
@@ -1047,7 +1140,13 @@ class BaseParser:
         """varargslist : vfpdef equals_test_opt comma_vfpdef_list_opt comma_opt POW vfpdef"""
         # x, **kwargs
         p0 = ast.arguments(
-            args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=p[6], defaults=[]
+            posonlyargs=[],
+            args=[],
+            vararg=None,
+            kwonlyargs=[],
+            kw_defaults=[],
+            kwarg=p[6],
+            defaults=[],
         )
         self._set_regular_args(p0, p[1], p[2], p[3], p[4])
         p[0] = p0
@@ -1056,7 +1155,13 @@ class BaseParser:
         """varargslist : vfpdef equals_test_opt comma_vfpdef_list_opt comma_opt TIMES vfpdef_opt comma_vfpdef_list_opt"""
         # x, *args
         p0 = ast.arguments(
-            args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[]
+            posonlyargs=[],
+            args=[],
+            vararg=None,
+            kwonlyargs=[],
+            kw_defaults=[],
+            kwarg=None,
+            defaults=[],
         )
         self._set_regular_args(p0, p[1], p[2], p[3], p[4])
         self._set_var_args(p0, p[6], p[7])
@@ -1066,15 +1171,22 @@ class BaseParser:
         """varargslist : vfpdef equals_test_opt comma_vfpdef_list_opt comma_opt TIMES vfpdef_opt COMMA POW vfpdef"""
         # x, *args, **kwargs
         p0 = ast.arguments(
-            args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=p[9], defaults=[]
+            posonlyargs=[],
+            args=[],
+            vararg=None,
+            kwonlyargs=[],
+            kw_defaults=[],
+            kwarg=p[9],
+            defaults=[],
         )
-        self._set_regular_args(p0, p[1], p[2], p[3], p[4])
+        self._set_regular_args(p0, *p[1:5])
         self._set_var_args(p0, p[6], None)
         p[0] = p0
 
     def p_varargslist_v11(self, p):
         """varargslist : vfpdef equals_test_opt comma_vfpdef_list_opt comma_opt TIMES vfpdef_opt comma_vfpdef_list COMMA POW vfpdef"""
         p0 = ast.arguments(
+            posonlyargs=[],
             args=[],
             vararg=None,
             kwonlyargs=[],
@@ -1210,6 +1322,27 @@ class BaseParser:
             )
         p[0] = ast.AugAssign(
             target=p1, op=op(), value=p[3], lineno=p1.lineno, col_offset=p1.col_offset
+        )
+
+    def p_expr_stmt_annassign(self, p):
+        """expr_stmt : testlist_star_expr COLON test EQUALS test
+        | testlist_star_expr COLON test
+        """
+        p1 = p[1][0]
+        lineno, col = lopen_loc(p1)
+        if len(p[1]) > 1 or not isinstance(
+            p1, (ast.Name, ast.Attribute, ast.Subscript)
+        ):
+            loc = self.currloc(lineno, col)
+            self._set_error("only single target can be annotated", loc)
+        store_ctx(p1)
+        p[0] = ast.AnnAssign(
+            target=p1,
+            annotation=p[3],
+            value=p[5] if len(p) >= 6 else None,
+            simple=1,
+            lineno=lineno,
+            col_offset=col,
         )
 
     def store_star_expr(self, p1, p2, targs, rhs):
@@ -1365,9 +1498,13 @@ class BaseParser:
         p[0] = ast.Continue(lineno=self.lineno, col_offset=self.col)
 
     def p_return_stmt(self, p):
-        """return_stmt : return_tok testlist_opt"""
+        """return_stmt : return_tok testlist_star_expr_opt"""
         p1 = p[1]
-        p[0] = ast.Return(value=p[2], lineno=p1.lineno, col_offset=p1.lexpos)
+        p[0] = ast.Return(
+            value=p[2][0] if p[2] is not None else None,
+            lineno=p1.lineno,
+            col_offset=p1.lexpos,
+        )
 
     def p_yield_stmt(self, p):
         """yield_stmt : yield_expr"""
@@ -1541,7 +1678,7 @@ class BaseParser:
         p[0] = p[1]
 
     def p_elif_part(self, p):
-        """elif_part : ELIF test COLON suite"""
+        """elif_part : ELIF namedexpr_test COLON suite"""
         p2 = p[2]
         p[0] = [
             ast.If(
@@ -1559,8 +1696,8 @@ class BaseParser:
 
     def p_if_stmt(self, p):
         """
-        if_stmt : if_tok test COLON suite elif_part_list_opt
-                | if_tok test COLON suite elif_part_list_opt else_part
+        if_stmt : if_tok namedexpr_test COLON suite elif_part_list_opt
+                | if_tok namedexpr_test COLON suite elif_part_list_opt else_part
         """
         p1 = p[1]
         lastif = ast.If(
@@ -1578,8 +1715,8 @@ class BaseParser:
 
     def p_while_stmt(self, p):
         """
-        while_stmt : WHILE test COLON suite
-                   | WHILE test COLON suite else_part
+        while_stmt : WHILE namedexpr_test COLON suite
+                   | WHILE namedexpr_test COLON suite else_part
         """
         p5 = p[5] if len(p) > 5 else []
         p[0] = [
@@ -1864,6 +2001,7 @@ class BaseParser:
         p1, p2, p4 = p[1], p[2], p[4]
         if p2 is None:
             args = ast.arguments(
+                posonlyargs=[],
                 args=[],
                 vararg=None,
                 kwonlyargs=[],
@@ -2619,14 +2757,14 @@ class BaseParser:
         )
 
     def p_testlist_comp_comp(self, p):
-        """testlist_comp : test_or_star_expr comp_for"""
+        """testlist_comp : namedexpr_test_or_star_expr comp_for"""
         p1, p2 = p[1], p[2]
         p[0] = ast.GeneratorExp(
             elt=p1, generators=p2["comps"], lineno=p1.lineno, col_offset=p1.col_offset
         )
 
     def p_testlist_comp_comma(self, p):
-        """testlist_comp : test_or_star_expr comma_opt"""
+        """testlist_comp : namedexpr_test_or_star_expr comma_opt"""
         p1, p2 = p[1], p[2]
         if p2 is None:  # split out grouping parentheses.
             p[0] = p1
@@ -2636,7 +2774,7 @@ class BaseParser:
             )
 
     def p_testlist_comp_many(self, p):
-        """testlist_comp : test_or_star_expr comma_test_or_star_expr_list comma_opt"""
+        """testlist_comp : namedexpr_test_or_star_expr comma_namedexpr_test_or_star_expr_list comma_opt"""
         p1, p2 = p[1], p[2]
         p[0] = ast.Tuple(
             elts=[p1] + p2, ctx=ast.Load(), lineno=p1.lineno, col_offset=p1.col_offset
@@ -3018,6 +3156,7 @@ class BaseParser:
             comps += p5.get("comps", [])
             comp.ifs += p5.get("if", [])
         p[0] = p0
+        p[0]["comps"][0].is_async = 0
 
     def p_comp_if(self, p):
         """comp_if : IF test_nocond comp_iter_opt"""
@@ -3042,10 +3181,6 @@ class BaseParser:
     def p_yield_arg_from(self, p):
         """yield_arg : FROM test"""
         p[0] = {"from": True, "val": p[2]}
-
-    def p_yield_arg_testlist(self, p):
-        """yield_arg : testlist"""
-        p[0] = {"from": False, "val": p[1]}
 
     #
     # subprocess
