@@ -4,20 +4,26 @@
         "name": "benchmarks.MemSuite.mem_parser_init",
         "param_names": [],
         "params": [],
-        "timeout": 60.0,
         "type": "memory",
         "unit": "bytes",
         "version": "fef8294dd8f9528bab51728ace954f992f353699e8c20ddba9cb190744896302"
     },
-    "benchmarks.PeakMemSuite.peakmem_parser_init": {
-        "code": "class PeakMemSuite:\n    def peakmem_parser_init(self):\n        from xonsh_parser.parser import get_parser_cls\n    \n        parser = get_parser_cls()()\n        parser.parse(\"ls -alh\")\n\n    def setup(self):\n        from xonsh_parser.parser import write_parser_table\n        write_parser_table()",
-        "name": "benchmarks.PeakMemSuite.peakmem_parser_init",
-        "param_names": [],
-        "params": [],
-        "timeout": 60.0,
+    "benchmarks.PeakMemSuite.peakmem_parser_init_": {
+        "code": "class PeakMemSuite:\n    def peakmem_parser_init_(self, f):\n        from xonsh_parser.parser import get_parser_cls\n        from pathlib import Path\n    \n        parser = get_parser_cls()(parser_table=Path(f))\n        parser.parse(\"ls -alh\")\n\n    def setup(self, f):\n        from xonsh_parser.parser import write_parser_table\n        write_parser_table(output_path=f)",
+        "name": "benchmarks.PeakMemSuite.peakmem_parser_init_",
+        "param_names": [
+            "param1"
+        ],
+        "params": [
+            [
+                "'/tmp/xonsh-lr-table.pickle'",
+                "'/tmp/xonsh-lr-table.py'",
+                "'/tmp/xonsh-lr-table.jsonl'"
+            ]
+        ],
         "type": "peakmemory",
         "unit": "bytes",
-        "version": "5395f5577f2ddc095088b4765b106fbc215e28fda9ae9433dcb13f718c8e3272"
+        "version": "83f35d3e396e60b2f6ae1c87e2424b5824c64b2d48176736e63dd39692f64cdc"
     },
     "benchmarks.TimeSuite.time_parser_init": {
         "code": "class TimeSuite:\n    def time_parser_init(self):\n        from xonsh_parser.parser import get_parser_cls\n    \n        parser = get_parser_cls()()\n        parser.parse(\"ls -alh\")\n\n    def setup(self):\n        from xonsh_parser.parser import write_parser_table\n        write_parser_table()",
@@ -29,7 +35,6 @@
         "repeat": 0,
         "rounds": 2,
         "sample_time": 0.01,
-        "timeout": 60.0,
         "type": "time",
         "unit": "seconds",
         "version": "e35e8735a755146c49df0237cdf07c88a943702d6e364e50d29f2aa842bb1990",
@@ -40,7 +45,6 @@
         "name": "benchmarks.TrackLrParserSize.track_lr_parser_size",
         "param_names": [],
         "params": [],
-        "timeout": 60.0,
         "type": "track",
         "unit": "bytes",
         "version": "5c2ee1d6c02c954f783f168723747a697bd1226feb95ad3c24dfa9eed58372e7"
