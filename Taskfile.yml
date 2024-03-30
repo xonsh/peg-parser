@@ -5,6 +5,14 @@ version: '3'
 vars:
   GREETING: Hello, World!
 
-includes:
-  ply: ./Taskfile.ply.yml # will look for ./documentation/Taskfile.yml
+tasks:
+  add-ply-subtree:
+    cmds:
+      - git subtree add --prefix=ply --squash https://github.com/dabeaz/ply.git master
+  add-pegen-subtree:
+    cmds:
+      - git subtree add --prefix=pegen --squash
 
+  asv:
+    cmds:
+      - asv run
