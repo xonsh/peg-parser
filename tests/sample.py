@@ -16,12 +16,12 @@ def main():
         pass
 
 
-def _write_tmp(name: str):
+def _write_tmp(name: str = "xonsh-lr-table", ext="py"):
     from pathlib import Path
 
     from xonsh_parser.parser import write_parser_table
 
-    path = Path(f"/tmp/{name}")
+    path = Path(f"/tmp/{name}.{ext}")
     if path.exists():
         path.unlink()
     write_parser_table(output_path=path, yacc_debug=True)
@@ -29,6 +29,6 @@ def _write_tmp(name: str):
 
 if __name__ == "__main__":
     # main()
-    _write_tmp("bytes-3.pickle")
-    _write_tmp("bytes-2.py")
-    _write_tmp("bytes-2.jsonl")
+    _write_tmp(ext="pickle")
+    _write_tmp(ext="jsonl")
+    _write_tmp(ext="py")
