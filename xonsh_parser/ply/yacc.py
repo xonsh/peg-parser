@@ -1964,14 +1964,16 @@ def yacc(module, output_path:str=None, *, debug=yaccdebug, start=None,
 
 def optimize_table(lr):
     """return an optimized version of the LR table variables for pickling"""
-    productions = [(p.name, p.len, p.str, p.func) for p in lr.lr_productions]
+    productions = tuple((p.name, p.len, p.str, p.func) for p in lr.lr_productions)
     actions = [0] * len(lr.lr_action)
     gotos = [0] * len(lr.lr_goto)
     for idx, vals in lr.lr_action.items():
+        assert not actions[idx]
         actions[idx] = vals
     for idx, vals in lr.lr_goto.items():
+        assert not gotos[idx]
         gotos[idx] = vals
-    return productions, actions, gotos
+    return productions, tuple(actions), tuple(gotos)
 
 
 def _humanize_bytes(num, precision=2):
@@ -2010,9 +2012,10 @@ def write_to_file(lr: LRTable, output_path:str=None):
             fw.write(json.dumps(gotos) + '\n')
     elif output_path.endswith('.py'):
         with open(output_path, 'w') as fw:
-            fw.write(f'productions = {productions!r}\n')
-            fw.write(f'actions = {actions!r}\n')
-            fw.write(f'gotos = {gotos!r}\n')
+            fw.write("from typing import Final\n")
+            fw.write(f'productions : Final = {productions!r}\n')
+            fw.write(f'actions : Final = {actions!r}\n')
+            fw.write(f'gotos : Final = {gotos!r}\n')
     else:
         # write to a pickle file
         import pickle
