@@ -1965,8 +1965,8 @@ def yacc(module, output_path:str=None, *, debug=yaccdebug, start=None,
 def optimize_table(lr):
     """return an optimized version of the LR table variables for pickling"""
     productions = tuple((p.name, p.len, p.str, p.func) for p in lr.lr_productions)
-    actions = [0] * len(lr.lr_action)
-    gotos = [0] * len(lr.lr_goto)
+    actions = [None] * len(lr.lr_action)
+    gotos = [None] * len(lr.lr_goto)
     for idx, vals in lr.lr_action.items():
         assert not actions[idx]
         actions[idx] = vals
@@ -2016,11 +2016,15 @@ def write_to_file(lr: LRTable, output_path:str=None):
             fw.write(f'productions : Final = {productions!r}\n')
             fw.write(f'actions : Final = {actions!r}\n')
             fw.write(f'gotos : Final = {gotos!r}\n')
+    elif output_path.endswith(".cpickle"):
+        from .save_table import write
+        write(productions, actions, gotos, output_path)
     else:
         # write to a pickle file
         import pickle
         data = (productions, actions, gotos)
-        pickle.dump(data, open(output_path, 'wb'), protocol=5)
+        with open(output_path, 'wb') as fw:
+            pickle.dump(data, fw, protocol=5)
     # Build the parser
     # lr.bind_callables(pinfo.pdict)
 
