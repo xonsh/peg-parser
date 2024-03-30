@@ -9,7 +9,7 @@
         "version": "fef8294dd8f9528bab51728ace954f992f353699e8c20ddba9cb190744896302"
     },
     "benchmarks.PeakMemSuite.peakmem_parser_init_": {
-        "code": "class PeakMemSuite:\n    def peakmem_parser_init_(self, f):\n        from xonsh_parser.parser import get_parser_cls\n        from pathlib import Path\n    \n        parser = get_parser_cls()(parser_table=Path(f))\n        parser.parse(\"ls -alh\")\n\n    def setup(self, f):\n        from xonsh_parser.parser import write_parser_table\n        write_parser_table(output_path=f)",
+        "code": "class PeakMemSuite:\n    def peakmem_parser_init_(self, f):\n    \n        from xonsh_parser.parser import get_parser_cls\n    \n        parser = get_parser_cls()(parser_table=Path(f))\n        parser.parse(\"ls -alh\")\n\n    def setup(self, f):\n        from xonsh_parser.parser import write_parser_table\n        write_parser_table(output_path=f)",
         "name": "benchmarks.PeakMemSuite.peakmem_parser_init_",
         "param_names": [
             "param1"
@@ -23,7 +23,7 @@
         ],
         "type": "peakmemory",
         "unit": "bytes",
-        "version": "83f35d3e396e60b2f6ae1c87e2424b5824c64b2d48176736e63dd39692f64cdc"
+        "version": "d76e635d01b229185dffca78bc73e779e1a383322bf2cb3d30fbe427bc289db4"
     },
     "benchmarks.TimeSuite.time_parser_init": {
         "code": "class TimeSuite:\n    def time_parser_init(self):\n        from xonsh_parser.parser import get_parser_cls\n    \n        parser = get_parser_cls()()\n        parser.parse(\"ls -alh\")\n\n    def setup(self):\n        from xonsh_parser.parser import write_parser_table\n        write_parser_table()",
@@ -41,13 +41,22 @@
         "warmup_time": -1
     },
     "benchmarks.TrackLrParserSize.track_lr_parser_size": {
-        "code": "class TrackLrParserSize:\n    def track_lr_parser_size(self):\n        from pympler import asizeof\n    \n        from xonsh_parser.parser import get_parser_cls\n    \n        parser = get_parser_cls()()\n        return asizeof.asizeof(parser.parser)\n\n    def setup(self):\n        from xonsh_parser.parser import write_parser_table\n        write_parser_table()",
+        "code": "class TrackLrParserSize:\n    def track_lr_parser_size(self, f):\n        from pympler import asizeof\n    \n        from xonsh_parser.parser import get_parser_cls\n    \n        parser = get_parser_cls()(parser_table=Path(f))\n        return asizeof.asizeof(parser.parser)\n\n    def setup(self, f):\n        from xonsh_parser.parser import write_parser_table\n        write_parser_table(output_path=f)",
         "name": "benchmarks.TrackLrParserSize.track_lr_parser_size",
-        "param_names": [],
-        "params": [],
+        "param_names": [
+            "param1"
+        ],
+        "params": [
+            [
+                "'/tmp/xonsh-lr-table.pickle'",
+                "'/tmp/xonsh-lr-table.py'",
+                "'/tmp/xonsh-lr-table.jsonl'",
+                "'/tmp/xonsh-lr-table.cpickle'"
+            ]
+        ],
         "type": "track",
         "unit": "bytes",
-        "version": "5c2ee1d6c02c954f783f168723747a697bd1226feb95ad3c24dfa9eed58372e7"
+        "version": "dcdc63d51d9781e39b68aaff072ff921d29bcf2b78281dccc3826b520ca78a2d"
     },
     "version": 2
 }

@@ -30,5 +30,6 @@ def _write_tmp(name: str = "xonsh-lr-table", ext="py"):
 if __name__ == "__main__":
     # main()
     _write_tmp(ext="pickle")
+    _write_tmp(ext="cpickle")
     _write_tmp(ext="jsonl")
     _write_tmp(ext="py")

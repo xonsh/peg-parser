@@ -88,3 +88,11 @@ benchmarks.PeakMemSuite.peakmem_parser_init_                                    
                 /tmp/xonsh-lr-table.py      215M
               /tmp/xonsh-lr-table.jsonl    33.5M
              ============================ =======
+ benchmarks.TrackLrParserSize.track_lr_parser_size                                                                    1/4 failed
+[100.00%] ··· ============================= ========
+                          param1
+              ----------------------------- --------
+                /tmp/xonsh-lr-table.pickle   7.54M
+                  /tmp/xonsh-lr-table.py      4.8M
+                /tmp/xonsh-lr-table.jsonl    7.53M
+               /tmp/xonsh-lr-table.cpickle   7.54M
