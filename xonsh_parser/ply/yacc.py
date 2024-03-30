@@ -2003,7 +2003,7 @@ def write_to_file(lr: LRTable, output_path:str=None):
         output_path = 'parser.out.jsonl'
 
     productions, actions, gotos = optimize_table(lr)
-    print(f'data:\n{_object_size(productions)=}\n{_object_size(actions)=}\n{_object_size(gotos)=}')
+    print(f'data:\n{_object_size(productions)=}\n{_object_size(actions)=} {len(actions)=}\n{_object_size(gotos)=}')
 
     if output_path.endswith('.jsonl'):
         with open(output_path, 'w') as fw:
