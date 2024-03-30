@@ -3,11 +3,6 @@
 
 
 class TimeSuite:
-    """
-    An example benchmark that times the performance of various kinds
-    of iterating over dictionaries in Python.
-    """
-
     def setup(self):
         from xonsh_parser.parser import write_parser_table
         write_parser_table()
