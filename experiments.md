@@ -59,9 +59,9 @@ PosixPath('/tmp/v1-bytes.pickle')
 1. initial sizes
 
 ```
-asizeof.asizeof(productions)=267224
-asizeof.asizeof(actions)=6480584
-asizeof.asizeof(gotos)=574432
+asizeof.asizeof(productions)=260KiB
+asizeof.asizeof(actions)=6.18MiB
+asizeof.asizeof(gotos)=560KiB
 ```
 
 | type   | file-size |
@@ -69,3 +69,11 @@ asizeof.asizeof(gotos)=574432
 | pickle | 975.55KiB |
 | py     | 1.61 MiB  |
 | jsonl  | 1.61 MiB  |
+
+2. merge overridden actions to base class - no change in sizes
+
+```
+_object_size(productions)='260.96 KiB'
+_object_size(actions)='6.18 MiB'
+_object_size(gotos)='560.97 KiB'
+```

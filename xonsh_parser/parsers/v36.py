@@ -1,13 +1,10 @@
 """Implements the xonsh parser for Python v3.6."""
 from .. import xast as ast
-from .base import BaseParser, lopen_loc, store_ctx
+from .base import BaseParser
 
 
 class Parser(BaseParser):
     """A Python v3.6 compliant parser for the xonsh language."""
-
-    def _get_tok_rules(self):
-        return super()._get_tok_rules() + ["await", "async"]
 
     def p_classdef_or_funcdef(self, p):
         """
@@ -117,31 +114,4 @@ class Parser(BaseParser):
         p3 = p[3]
         p[0] = ast.keyword(
             arg=p[1].id, value=p3, lineno=p3.lineno, col_offset=p3.col_offset
-        )
-
-    def p_comp_for(self, p):
-        """comp_for : FOR exprlist IN or_test comp_iter_opt"""
-        super().p_comp_for(p)
-        # only difference with base should be the is_async=0
-        p[0]["comps"][0].is_async = 0
-
-    def p_expr_stmt_annassign(self, p):
-        """expr_stmt : testlist_star_expr COLON test EQUALS test
-        | testlist_star_expr COLON test
-        """
-        p1 = p[1][0]
-        lineno, col = lopen_loc(p1)
-        if len(p[1]) > 1 or not isinstance(
-            p1, (ast.Name, ast.Attribute, ast.Subscript)
-        ):
-            loc = self.currloc(lineno, col)
-            self._set_error("only single target can be annotated", loc)
-        store_ctx(p1)
-        p[0] = ast.AnnAssign(
-            target=p1,
-            annotation=p[3],
-            value=p[5] if len(p) >= 6 else None,
-            simple=1,
-            lineno=lineno,
-            col_offset=col,
         )
