@@ -53,3 +53,19 @@ PosixPath('/tmp/v1-bytes.pickle')
 # tried using marshal
 
 - there was not much difference with pickle
+
+# fixing reduce/reduce conflicts
+
+1. initial sizes
+
+```
+asizeof.asizeof(productions)=267224
+asizeof.asizeof(actions)=6480584
+asizeof.asizeof(gotos)=574432
+```
+
+| type   | file-size |
+|--------|-----------|
+| pickle | 975.55KiB |
+| py     | 1.61 MiB  |
+| jsonl  | 1.61 MiB  |
