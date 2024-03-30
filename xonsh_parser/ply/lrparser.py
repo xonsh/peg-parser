@@ -549,10 +549,30 @@ class LRParser:
 
 
 def load_parser(parser_table: Path, module: ParserProtocol) -> LRParser:
-    import pickle
+    if parser_table.suffix == ".py":
+        # Load the parser table
+        with parser_table.open("r") as fr:
+            code = compile(fr.read(), str(parser_table), "exec")
+            ns: dict[str, Any] = {}
+            exec(code, module.__dict__, ns)
+            lr_prods = ns["productions"]
+            lr_action = ns["actions"]
+            lr_goto = ns["gotos"]
 
-    with parser_table.open("rb") as fr:
-        lr_prods, lr_action, lr_goto = pickle.load(fr)
+    elif parser_table.suffix == ".pickle":
+        import pickle
+
+        with parser_table.open("rb") as fr:
+            lr_prods, lr_action, lr_goto = pickle.load(fr)
+        del pickle
+    elif parser_table.suffix == ".jsonl":
+        import json
+
+        with parser_table.open("r") as fr:
+            lr_prods = json.loads(fr.readline())
+            lr_action = json.loads(fr.readline())
+            lr_goto = json.loads(fr.readline())
+        del json
     prods = tuple(
         Production(
             name=name,
@@ -562,6 +582,5 @@ def load_parser(parser_table: Path, module: ParserProtocol) -> LRParser:
         )
         for name, len, str, func in lr_prods
     )
-    del pickle
-
+    del lr_prods
     return LRParser(prods, lr_action, lr_goto, errorf=getattr(module, "p_error", None))
