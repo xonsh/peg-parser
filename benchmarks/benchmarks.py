@@ -28,14 +28,17 @@ class MemSuite:
 
 
 class PeakMemSuite:
-    def setup(self):
+    params = ["/tmp/xonsh-lr-table.pickle", "/tmp/xonsh-lr-table.py", "/tmp/xonsh-lr-table.jsonl"]
+    def setup(self, f):
         from xonsh_parser.parser import write_parser_table
-        write_parser_table()
+        write_parser_table(output_path=f)
 
-    def peakmem_parser_init(self):
+    def peakmem_parser_init_(self, f):
+        from pathlib import Path
+
         from xonsh_parser.parser import get_parser_cls
 
-        parser = get_parser_cls()()
+        parser = get_parser_cls()(parser_table=Path(f))
         parser.parse("ls -alh")
 
 

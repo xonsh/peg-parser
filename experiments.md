@@ -77,3 +77,14 @@ _object_size(productions)='260.96 KiB'
 _object_size(actions)='6.18 MiB'
 _object_size(gotos)='560.97 KiB'
 ```
+
+3. peak memory usage using lr-table.py type
+
+benchmarks.PeakMemSuite.peakmem_parser_init_                                                                                 ok
+[75.00%] ··· ============================ =======
+                        param1
+             ---------------------------- -------
+              /tmp/xonsh-lr-table.pickle   31.5M
+                /tmp/xonsh-lr-table.py      215M
+              /tmp/xonsh-lr-table.jsonl    33.5M
+             ============================ =======
