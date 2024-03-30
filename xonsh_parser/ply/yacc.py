@@ -1973,6 +1973,17 @@ def optimize_table(lr):
         gotos[idx] = vals
     return productions, actions, gotos
 
+
+def human_file_size(path: str, decimal_places=2):
+    """ Returns a human readable string representation of bytes """
+    import os
+    size = os.path.getsize(path)
+    for unit in ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB']:
+        if size < 1024.0 or unit == 'PiB':
+            break
+        size /= 1024.0
+    return f"{size:.{decimal_places}f} {unit}"
+
 def write_to_file(lr: LRTable, output_path:str=None):
     import json
     if not output_path:
@@ -1984,6 +1995,11 @@ def write_to_file(lr: LRTable, output_path:str=None):
             fw.write(json.dumps(productions) + '\n')
             fw.write(json.dumps(actions) + '\n')
             fw.write(json.dumps(gotos) + '\n')
+    elif output_path.endswith('.py'):
+        with open(output_path, 'w') as fw:
+            fw.write(f'productions = {productions!r}\n')
+            fw.write(f'actions = {actions!r}\n')
+            fw.write(f'gotos = {gotos!r}\n')
     else:
         # write to a pickle file
         import pickle
@@ -1993,4 +2009,5 @@ def write_to_file(lr: LRTable, output_path:str=None):
 
     # return parser
     # this should write to output file
+    print("Wrote to", output_path, "; size: ", human_file_size(output_path))
     return output_path

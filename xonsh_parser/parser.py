@@ -22,13 +22,16 @@ def get_parser_cls(version: tuple[int, ...] | None = None) -> type["BaseParser"]
 
 
 def write_parser_table(
-    yacc_debug=False, output_path: None | Path = None, **kwargs
+    yacc_debug=False, output_path: None | Path | str = None, **kwargs
 ) -> Path:
     from .ply import yacc
 
     cls = get_parser_cls()
 
-    output_path = output_path or cls.default_table_name()
+    if output_path is None:
+        output_path = cls.default_table_name()
+    elif isinstance(output_path, str):
+        output_path = Path(output_path)
 
     if output_path.exists():
         return output_path
