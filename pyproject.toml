@@ -1,6 +1,7 @@
 [tool.ruff]
 extend-select = ["B", "I", "UP"]
 line-length = 110
+extend-exclude = ["tests/line-items"]
 # ruff ignore file "xonsh_parser/ply/yacc.py"
 [tool.ruff.per-file-ignores]
 "xonsh_parser/ply/*.py" = [

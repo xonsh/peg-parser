@@ -1,56 +1,31 @@
+from pathlib import Path
+
 import pytest
 
 from xonsh_parser.parsers.preprocessor import translex
 
 
-@pytest.mark.parametrize(
-    "src, expected",
-    [
-        ("$ENV_NAME", "__xonsh__.env['ENV_NAME']"),
-        ("$ENV_NAME = 1", "__xonsh__.env['ENV_NAME'] = 1"),
-    ],
-)
-def test_env(src, expected):
-    assert translex(src) == expected
+def get_pairs(dir_name: str):
+    directory = Path(__file__).parent / dir_name
+    for file in directory.iterdir():
+        if file.suffix == ".py":
+            with file.open() as f:
+                case_count = 1
+                while True:
+                    left, right = f.readline().strip("# "), f.readline()
+                    if not left or not right:
+                        break
+
+                    yield pytest.param(left, right, id=f"{file.stem}-{case_count}")
+                    f.readline()  # advance to next case
+                    case_count += 1
 
 
-@pytest.mark.parametrize(
-    "src, expected",
-    [
-        ('f"{$HOME}"', '''f"{__xonsh__.env['ENV_NAME']}"'''),
-    ],
-)
-def test_fstring(src, expected):
-    assert translex(src) == expected
+def pytest_generate_tests(metafunc):
+    """load src and expected from fixtures directory"""
+    if metafunc.definition.name == "test_line_items":
+        metafunc.parametrize("src, expected", list(get_pairs("line-items")))
 
 
-@pytest.mark.parametrize(
-    "src, expected",
-    [
-        ('p"/tmp"', 'Path("/tmp")'),
-    ],
-)
-def test_path_string(src, expected):
-    assert translex(src) == expected
-
-
-@pytest.mark.parametrize(
-    "src, expected",
-    [
-        (
-            "$(cmd sub-cmd --opt)",
-            "__xonsh__.subproc_captured_stdout(cmd sub-cmd --opt)",
-        ),
-        ("$[cmd sub-cmd --opt]", "__xonsh__.subproc_uncaptured(cmd sub-cmd --opt)"),
-        (
-            "![cmd sub-cmd --opt]",
-            "__xonsh__.subproc_uncaptured_object(cmd sub-cmd --opt)",
-        ),
-        (
-            "!(cmd sub-cmd --opt)",
-            "__xonsh__.subproc_captured_object(cmd sub-cmd --opt)",
-        ),
-    ],
-)
-def test_subproc(src, expected):
+def test_line_items(src, expected):
     assert translex(src) == expected
