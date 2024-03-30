@@ -548,13 +548,15 @@ class LRParser:
             raise RuntimeError("yacc: internal parser error!!!\n")
 
 
-def load_parser(parser_table: Path, module: ParserProtocol) -> LRParser:
+def load_parser(parser_table: Path | str, module: ParserProtocol) -> LRParser:
+    if isinstance(parser_table, str):
+        parser_table = Path(parser_table)
     if parser_table.suffix == ".py":
         # Load the parser table
         with parser_table.open("r") as fr:
             code = compile(fr.read(), str(parser_table), "exec")
             ns: dict[str, Any] = {}
-            exec(code, module.__dict__, ns)
+            exec(code, {}, ns)
             lr_prods = ns["productions"]
             lr_action = ns["actions"]
             lr_goto = ns["gotos"]
