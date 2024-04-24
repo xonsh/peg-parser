@@ -1,7 +1,4 @@
-# <!-- inserted by pegen
 import ast
-
-# -->
 import sys
 import tokenize
 from typing import Any, Optional, TypeVar, Union
@@ -110,10 +107,10 @@ class Parser(PParser):
 
         try:
             return EXPR_NAME_MAPPING[node_t]
-        except KeyError:
+        except KeyError as e:
             raise ValueError(
                 f"unexpected expression in assignment {type(node).__name__} " f"(line {node.lineno})."
-            )
+            ) from e
 
     def set_expr_context(self, node, context):
         """Set the context (Load, Store, Del) of an ast node."""
@@ -122,13 +119,13 @@ class Parser(PParser):
 
     def ensure_real(self, number_str: str):
         number = ast.literal_eval(number_str)
-        if type(number) is complex:
+        if isinstance(number, complex):
             self.raise_syntax_error("real number required in complex literal")
         return number
 
     def ensure_imaginary(self, number_str: str):
         number = ast.literal_eval(number_str)
-        if type(number) is not complex:
+        if not isinstance(number, complex):
             self.raise_syntax_error("imaginary number required in complex literal")
         return number
 
