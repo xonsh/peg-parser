@@ -58,8 +58,7 @@ def test_parser(python_parse_file, python_parse_str, filename):
         original = ast.parse(part)
 
         kwargs = dict(include_attributes=True)
-        if sys.version_info >= (3, 9):
-            kwargs["indent"] = "  "
+        kwargs["indent"] = "  "
 
         try:
             pp_ast = python_parse_str(part, "exec")

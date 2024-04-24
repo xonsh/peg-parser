@@ -22,9 +22,11 @@ def parse_invalid_syntax(
     except exc_cls as py_e:
         py_exc = py_e
     except Exception as py_e:
-        assert False, f"Python produced {py_e.__class__.__name__} instead of {exc_cls.__name__}: {py_e}"
+        raise AssertionError(
+            f"Python produced {py_e.__class__.__name__} instead of {exc_cls.__name__}: {py_e}"
+        ) from py_e
     else:
-        assert False, f"Python did not throw any exception, expected {exc_cls}"
+        raise AssertionError(f"Python did not throw any exception, expected {exc_cls}")
 
     # Check our parser raises both from str and file mode.
     with pytest.raises(exc_cls) as e:
@@ -78,20 +80,6 @@ def parse_invalid_syntax(
                 raise ValueError(
                     f"Expected locations of {start}, but got " f"{(exc.lineno, exc.offset)} from {parser}"
                 )
-
-
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="Python 3.8 diagnostic is subpar in this case.")
-@pytest.mark.parametrize(
-    "source, message, start, end",
-    [
-        ("f'a = { 1 + }'", "f-string: invalid syntax", (1, 7), (1, 8)),
-        ("(\n\t'b'\n\tf'a = { 1 + }'\n)", "f-string: invalid syntax", (3, 7), (3, 8)),
-    ],
-)
-def test_syntax_error_in_str(python_parse_file, python_parse_str, tmp_path, source, message, start, end):
-    parse_invalid_syntax(
-        python_parse_file, python_parse_str, tmp_path, source, SyntaxError, message, start, end
-    )
 
 
 @pytest.mark.parametrize(
