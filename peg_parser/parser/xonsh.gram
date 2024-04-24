@@ -28,7 +28,7 @@ def parse_file(
             token_stream_factory(f.readline) if token_stream_factory else tokenize.generate_tokens(f.readline)
         )
         tokenizer = Tokenizer(tok_stream, verbose=verbose, path=path)
-        parser = Parser(
+        parser = XonshParser(
             tokenizer,
             verbose=verbose,
             filename=os.path.basename(path),
@@ -51,7 +51,7 @@ def parse_string(
         else tokenize.generate_tokens(io.StringIO(source).readline)
     )
     tokenizer = Tokenizer(tok_stream, verbose=verbose)
-    parser = Parser(tokenizer, verbose=verbose, py_version=py_version)
+    parser = XonshParser(tokenizer, verbose=verbose, py_version=py_version)
     return parser.parse(mode if mode == "eval" else "file")
 '''
 
