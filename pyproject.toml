@@ -1,6 +1,6 @@
 [tool.ruff]
 line-length = 110
-extend-exclude = ["tests/line-items"]
+extend-exclude = ["tests/line-items", "peg_parser/tests/data", "pegen"]
 
 [tool.ruff.lint]
 extend-select = ["B", "I", "UP"]
