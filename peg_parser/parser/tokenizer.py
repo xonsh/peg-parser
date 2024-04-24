@@ -1,8 +1,9 @@
-import token
-import tokenize
 from collections.abc import Iterator
+from typing import NewType
 
-Mark = int  # NewType('Mark', int)
+from peg_parser.parser import token, tokenize
+
+Mark = NewType("Mark", int)
 
 exact_token_types = token.EXACT_TOKEN_TYPES
 
