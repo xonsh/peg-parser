@@ -68,7 +68,22 @@ ERRORTOKEN = 60
 COMMENT = 61
 NL = 62
 ENCODING = 63
-N_TOKENS = 64
+
+# xonsh specific tokens
+ATDOLLAR = 64
+DOUBLEPIPE = 65
+DOUBLEAMPER = 66
+ATLPAREN = 67
+BANGLPAREN = 68
+BANGLBRACKET = 69
+DOLLARLPAREN = 70
+DOLLARLBRACKET = 71
+DOLLARLBRACE = 72
+DOUBLEQUESTION = 73
+ATDOLLARLPAREN = 74
+QUESTION = 75
+
+N_TOKENS = 76
 # Special definitions for cooperation with parser
 NT_OFFSET = 256
 
@@ -125,6 +140,19 @@ EXACT_TOKEN_TYPES = {
     "|=": VBAREQUAL,
     "}": RBRACE,
     "~": TILDE,
+    # xonsh tokens
+    "?": QUESTION,
+    "@$": ATDOLLAR,
+    "||": DOUBLEPIPE,
+    "&&": DOUBLEAMPER,
+    "@(": ATLPAREN,
+    "!(": BANGLPAREN,
+    "![": BANGLBRACKET,
+    "$(": DOLLARLPAREN,
+    "$[": DOLLARLBRACKET,
+    "${": DOLLARLBRACE,
+    "??": DOUBLEQUESTION,
+    "@$(": ATDOLLARLPAREN,
 }
 
 
