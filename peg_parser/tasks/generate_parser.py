@@ -9,7 +9,7 @@ def main():
     tmpl = string.Template(grammar_path.read_text())
     gram_content = tmpl.substitute(
         subheader=grammar_path.with_name("subheader.py").read_text(),
-        trailer=grammar_path.with_name("trailer.py").read_text(),
+        # trailer=grammar_path.with_name("trailer.py").read_text(),
     )
     with grammar_path.with_name("full.gram").open(mode="w") as fw:
         skip = False
@@ -23,7 +23,7 @@ def main():
                 continue
             fw.write(lin)
 
-    output = "xonsh_parser.py"
+    output = str(grammar_path.with_name("parser.py"))
 
     grammar, parser, tokenizer, gen = build_python_parser_and_generator(fw.name, output)
 
