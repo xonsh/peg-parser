@@ -1,6 +1,7 @@
 import token
-import tokenize
 from typing import Dict, Iterator, List
+
+from peg_parser.parser import tokenize
 
 Mark = int  # NewType('Mark', int)
 
