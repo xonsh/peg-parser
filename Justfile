@@ -8,3 +8,9 @@ profile:
 
 ply-add:
     git subtree add --prefix=ply --squash https://github.com/dabeaz/ply.git master
+
+test:
+    pytest peg_parser/tests
+
+watch:
+    watchexec -e py,gram --watch peg_parser/parser -- just generate
