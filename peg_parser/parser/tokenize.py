@@ -21,7 +21,6 @@ import io
 import itertools
 import re
 import sys
-import typing as tp
 
 from peg_parser.parser.token import *  # noqa
 
@@ -46,126 +45,32 @@ __all__ = [
     "ENCODING",
     "TokenInfo",
     "TokenError",
-    "SEARCHPATH",
-    "ATDOLLAR",
-    "ATEQUAL",
-    "DOLLARNAME",
-    "IOREDIRECT1",
-    "IOREDIRECT2",
-    "MATCH",
-    "CASE",
 ]
 ADDSPACE_TOKS = (NAME, NUMBER)  # type:ignore
 
 AUGASSIGN_OPS = r"[+\-*/%&@|^=<>:]=?"
 
-COMMENT = N_TOKENS
-tok_name[COMMENT] = "COMMENT"
-NL = N_TOKENS + 1
-tok_name[NL] = "NL"
-ENCODING = N_TOKENS + 2
-tok_name[ENCODING] = "ENCODING"
-N_TOKENS += 3
-SEARCHPATH = N_TOKENS
-tok_name[N_TOKENS] = "SEARCHPATH"
-N_TOKENS += 1
-IOREDIRECT1 = N_TOKENS
-tok_name[N_TOKENS] = "IOREDIRECT1"
-N_TOKENS += 1
-IOREDIRECT2 = N_TOKENS
-tok_name[N_TOKENS] = "IOREDIRECT2"
-N_TOKENS += 1
-DOLLARNAME = N_TOKENS
-tok_name[N_TOKENS] = "DOLLARNAME"
-N_TOKENS += 1
-ATDOLLAR = N_TOKENS
-tok_name[N_TOKENS] = "ATDOLLAR"
-N_TOKENS += 1
-ATEQUAL = N_TOKENS
-tok_name[N_TOKENS] = "ATEQUAL"
-N_TOKENS += 1
-MATCH = N_TOKENS
-tok_name[N_TOKENS] = "MATCH"
-N_TOKENS += 1
-CASE = N_TOKENS
-tok_name[N_TOKENS] = "CASE"
-N_TOKENS += 1
-_xonsh_tokens = {
-    "?": "QUESTION",
-    "@=": "ATEQUAL",
-    "@$": "ATDOLLAR",
-    "||": "DOUBLEPIPE",
-    "&&": "DOUBLEAMPER",
-    "@(": "ATLPAREN",
-    "!(": "BANGLPAREN",
-    "![": "BANGLBRACKET",
-    "$(": "DOLLARLPAREN",
-    "$[": "DOLLARLBRACKET",
-    "${": "DOLLARLBRACE",
-    "??": "DOUBLEQUESTION",
-    "@$(": "ATDOLLARLPAREN",
-    "match": "MATCH",
-    "case": "CASE",
-}
-
+# COMMENT = N_TOKENS
+# tok_name[COMMENT] = "COMMENT"
+# ENCODING = N_TOKENS + 2
+# tok_name[ENCODING] = "ENCODING"
+# N_TOKENS += 3
+# SEARCHPATH = N_TOKENS
+# tok_name[N_TOKENS] = "SEARCHPATH"
+# N_TOKENS += 1
+# IOREDIRECT1 = N_TOKENS
+# tok_name[N_TOKENS] = "IOREDIRECT1"
+# N_TOKENS += 1
+# IOREDIRECT2 = N_TOKENS
+# tok_name[N_TOKENS] = "IOREDIRECT2"
+# N_TOKENS += 1
+# DOLLARNAME = N_TOKENS
+# tok_name[N_TOKENS] = "DOLLARNAME"
+# N_TOKENS += 1
+# ATEQUAL = N_TOKENS
+# tok_name[N_TOKENS] = "ATEQUAL"
+# N_TOKENS += 1
 additional_parenlevs = frozenset({"@(", "!(", "![", "$(", "$[", "${", "@$("})
-
-_glbs = globals()
-for v in _xonsh_tokens.values():
-    _glbs[v] = N_TOKENS
-    tok_name[N_TOKENS] = v
-    N_TOKENS += 1
-    __all__.append(v)
-del _glbs, v
-
-EXACT_TOKEN_TYPES: dict[str, tp.Union[str, int]] = {
-    "(": LPAR,
-    ")": RPAR,
-    "[": LSQB,
-    "]": RSQB,
-    ":": COLON,
-    ",": COMMA,
-    ";": SEMI,
-    "+": PLUS,
-    "-": MINUS,
-    "*": STAR,
-    "/": SLASH,
-    "|": VBAR,
-    "&": AMPER,
-    "<": LESS,
-    ">": GREATER,
-    "=": EQUAL,
-    ".": DOT,
-    "%": PERCENT,
-    "{": LBRACE,
-    "}": RBRACE,
-    "==": EQEQUAL,
-    "!=": NOTEQUAL,
-    "<=": LESSEQUAL,
-    ">=": GREATEREQUAL,
-    "~": TILDE,
-    "^": CIRCUMFLEX,
-    "<<": LEFTSHIFT,
-    ">>": RIGHTSHIFT,
-    "**": DOUBLESTAR,
-    "+=": PLUSEQUAL,
-    "-=": MINEQUAL,
-    "*=": STAREQUAL,
-    "/=": SLASHEQUAL,
-    "%=": PERCENTEQUAL,
-    "&=": AMPEREQUAL,
-    "|=": VBAREQUAL,
-    "^=": CIRCUMFLEXEQUAL,
-    "<<=": LEFTSHIFTEQUAL,
-    ">>=": RIGHTSHIFTEQUAL,
-    "**=": DOUBLESTAREQUAL,
-    "//": DOUBLESLASH,
-    "//=": DOUBLESLASHEQUAL,
-    "@": AT,
-    ":=": COLONEQUAL,
-}
-
-EXACT_TOKEN_TYPES.update(_xonsh_tokens)
 
 
 class TokenInfo(collections.namedtuple("TokenInfo", "type string start end line")):
