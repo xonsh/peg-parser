@@ -4,6 +4,7 @@ extend-exclude = ["tests/line-items", "peg_parser/tests/data", "pegen"]
 
 [tool.ruff.lint]
 extend-select = ["B", "I", "UP"]
+fixable = ["ALL"]
 
 # ruff ignore file "xonsh_parser/ply/yacc.py"
 [tool.ruff.lint.per-file-ignores]

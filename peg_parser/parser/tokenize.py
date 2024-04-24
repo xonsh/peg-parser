@@ -48,6 +48,10 @@ class TokenInfo(NamedTuple):
     end: tuple[int, int]
     line: str
 
+    def __repr__(self):
+        annotated_type = "%d (%s)" % (self.type, tok_name[self.type])
+        return f"TokenInfo(type={annotated_type}, string={self.string!r}, start={self.start!r}, end={self.end!r}, line={self.line!r})"
+
     @property
     def exact_type(self):
         if self.type == OP and self.string in EXACT_TOKEN_TYPES:
