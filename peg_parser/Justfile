@@ -1,7 +1,0 @@
-set dotenv-load := true
-
-generate:
-    python3 tasks/generate_parser.py
-
-profile:
-    python tasks/profile_mem.py | tee "logs/xonsh-parser-$(date "+%Y%m%d-%H%M%S").log"
