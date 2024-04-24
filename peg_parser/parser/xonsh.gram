@@ -3,16 +3,14 @@
 @class XonshParser
 
 @header'''\
+import ast
 import io
 import itertools
 import os
-from typing import Callable, Iterator, Literal, List, Tuple, NoReturn
+import sys
+from typing import *
 
-from pegen.parser import memoize, memoize_left_rec, logger
-'''
-
-@subheader'''
-$subheader
+from peg_parser.parser.subheader import memoize, memoize_left_rec, logger, Parser, Load, Store, Del, tokenize, Tokenizer
 '''
 
 @trailer'''
