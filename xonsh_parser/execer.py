@@ -1,4 +1,5 @@
 """Implements the xonsh executer."""
+
 import builtins
 import collections.abc as cabc
 import inspect
@@ -10,6 +11,7 @@ from xonsh_parser.tools import (
     get_logical_line,
     replace_logical_line,
     starting_whitespace,
+    subproc_toks,
 )
 from xonsh_parser.xast import CtxAwareTransformer
 
@@ -65,9 +67,7 @@ class Execer:
         if filename is None:
             filename = self.filename
         if not transform:
-            return self.parser.parse(
-                input, filename=filename, mode=mode, debug_level=(self.debug_level >= 2)
-            )
+            return self.parser.parse(input, filename=filename, mode=mode, debug_level=(self.debug_level >= 2))
 
         # [Phase 1]
         # Parsing actually happens in a couple of phases. The first is a
@@ -87,9 +87,7 @@ class Execer:
         # parse operation, we will have a tree which contains *some* subproc
         # nodes, and some subproc-as-Python nodes. We now need a context-
         # aware phase to disambiguate the two.
-        tree, input = self._parse_ctx_free(
-            input, mode=mode, filename=filename, is_interactive=is_interactive
-        )
+        tree, input = self._parse_ctx_free(input, mode=mode, filename=filename, is_interactive=is_interactive)
         if tree is None:
             return None
 
@@ -104,9 +102,7 @@ class Execer:
             ctx = set()
         elif isinstance(ctx, cabc.Mapping):
             ctx = set(ctx.keys())
-        tree = self.ctxtransformer.ctxvisit(
-            tree, input, ctx, mode=mode, debug_level=self.debug_level
-        )
+        tree = self.ctxtransformer.ctxvisit(tree, input, ctx, mode=mode, debug_level=self.debug_level)
         return tree
 
     def compile(
@@ -154,9 +150,7 @@ class Execer:
 
         return code
 
-    def eval(
-        self, input, glbs=None, locs=None, stacklevel=2, filename=None, transform=True
-    ):
+    def eval(self, input, glbs=None, locs=None, stacklevel=2, filename=None, transform=True):
         """Evaluates (and returns) xonsh code."""
         if glbs is None:
             glbs = {}
@@ -212,16 +206,12 @@ class Execer:
                 return None  # handles comment only input
         return exec(code, glbs, locs)
 
-    def _print_debug_wrapping(
-        self, line, sbpline, last_error_line, last_error_col, maxcol=None
-    ):
+    def _print_debug_wrapping(self, line, sbpline, last_error_line, last_error_col, maxcol=None):
         """print some debugging info if asked for."""
         if self.debug_level >= 1:
             msg = "{0}:{1}:{2}{3} - {4}\n" "{0}:{1}:{2}{3} + {5}"
             mstr = "" if maxcol is None else ":" + str(maxcol)
-            msg = msg.format(
-                self.filename, last_error_line, last_error_col, mstr, line, sbpline
-            )
+            msg = msg.format(self.filename, last_error_line, last_error_col, mstr, line, sbpline)
             print(msg, file=sys.stderr)
 
     def _parse_ctx_free(
@@ -255,13 +245,12 @@ class Execer:
                     if original_error is None:
                         raise e
                     else:
-                        raise original_error
+                        raise original_error from e
                 except SyntaxError as e:
                     if original_error is None:
                         original_error = e
                     if (e.loc is None) or (
-                        last_error_line == e.loc.lineno
-                        and last_error_col in (e.loc.column + 1, e.loc.column)
+                        last_error_line == e.loc.lineno and last_error_col in (e.loc.column + 1, e.loc.column)
                     ):
                         raise original_error from None
                     elif last_error_line != e.loc.lineno:
@@ -280,9 +269,7 @@ class Execer:
                         self._print_debug_wrapping(
                             line, sbpline, last_error_line, last_error_col, maxcol=None
                         )
-                        replace_logical_line(
-                            lines, sbpline, idx, nlogical, is_interactive=is_interactive
-                        )
+                        replace_logical_line(lines, sbpline, idx, nlogical, is_interactive=is_interactive)
                         last_error_col += 3
                         input = "\n".join(lines)
                         continue
@@ -296,20 +283,14 @@ class Execer:
                         input = "\n".join(lines)
                         continue
 
-                    if last_error_line > 1 and self.parser.lexer.ends_with_colon_token(
-                        lines[idx - 1]
-                    ):
+                    if last_error_line > 1 and self.parser.lexer.ends_with_colon_token(lines[idx - 1]):
                         # catch non-indented blocks and raise error.
                         prev_indent = len(lines[idx - 1]) - len(lines[idx - 1].lstrip())
                         curr_indent = len(lines[idx]) - len(lines[idx].lstrip())
                         if prev_indent == curr_indent:
-                            raise original_error
+                            raise original_error from e
                     maxcol = (
-                        None
-                        if greedy
-                        else self.parser.lexer.find_next_break(
-                            line, mincol=last_error_col
-                        )
+                        None if greedy else self.parser.lexer.find_next_break(line, mincol=last_error_col)
                     )
                     if not greedy and maxcol in (e.loc.column + 1, e.loc.column):
                         # go greedy the first time if the syntax error was because
@@ -318,8 +299,8 @@ class Execer:
                         if not self.parser.lexer.balanced_parens(line, maxcol=maxcol):
                             greedy = True
                             maxcol = None
-                    sbpline = self.parser.lexer.subproc_toks(
-                        line, returnline=True, greedy=greedy, maxcol=maxcol
+                    sbpline = subproc_toks(
+                        self.parser.lexer, line, returnline=True, greedy=greedy, maxcol=maxcol
                     )
                     if sbpline is None:
                         # subprocess line had no valid tokens,
@@ -334,10 +315,8 @@ class Execer:
                             continue
                         else:
                             # or for some other syntax error
-                            raise original_error
-                    elif sbpline[last_error_col:].startswith(
-                        "![!["
-                    ) or sbpline.lstrip().startswith("![!["):
+                            raise original_error from e
+                    elif sbpline[last_error_col:].startswith("![![") or sbpline.lstrip().startswith("![!["):
                         # if we have already wrapped this in subproc tokens
                         # and it still doesn't work, adding more won't help
                         # anything
@@ -345,11 +324,9 @@ class Execer:
                             greedy = True
                             continue
                         else:
-                            raise original_error
+                            raise original_error from e
                     # replace the line
-                    self._print_debug_wrapping(
-                        line, sbpline, last_error_line, last_error_col, maxcol=maxcol
-                    )
+                    self._print_debug_wrapping(line, sbpline, last_error_line, last_error_col, maxcol=maxcol)
                     replace_logical_line(lines, sbpline, idx, nlogical)
                     last_error_col += 3
                     input = "\n".join(lines)

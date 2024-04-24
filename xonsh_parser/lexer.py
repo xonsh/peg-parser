@@ -2,6 +2,7 @@
 
 Written using a hybrid of ``tokenize`` and PLY.
 """
+
 import io
 
 # 'keyword' interferes with ast.keyword
@@ -9,7 +10,7 @@ import keyword as kwmod
 import re
 import typing as tp
 
-from .lazyasd import LazyObject, lazyobject
+from .lazyasd import lazyobject
 from .platform import PYTHON_VERSION_INFO
 from .ply.lrparser import LexToken
 from .tokenize import (
@@ -22,7 +23,8 @@ from .tokenize import (
     ERRORTOKEN,
     GREATER,
     INDENT,
-    IOREDIRECT,
+    IOREDIRECT1,
+    IOREDIRECT2,
     LESS,
     MATCH,
     NAME,
@@ -36,7 +38,7 @@ from .tokenize import (
     TokenError,
     tokenize,
 )
-from .tools import check_bad_str_token
+from .tools import LPARENS
 
 
 @lazyobject
@@ -97,10 +99,12 @@ def token_map():
         "??": "DOUBLE_QUESTION",
         "@$": "ATDOLLAR",
         "&": "AMPERSAND",
+        ":=": "COLONEQUAL",
     }
     for op, typ in _op_map.items():
         tm[(OP, op)] = typ
-    tm[IOREDIRECT] = "IOREDIRECT"
+    tm[IOREDIRECT1] = "IOREDIRECT1"
+    tm[IOREDIRECT2] = "IOREDIRECT2"
     tm[STRING] = "STRING"
     tm[DOLLARNAME] = "DOLLAR_NAME"
     tm[NUMBER] = "NUMBER"
@@ -108,7 +112,6 @@ def token_map():
     tm[NEWLINE] = "NEWLINE"
     tm[INDENT] = "INDENT"
     tm[DEDENT] = "DEDENT"
-    tm[(OP, ":=")] = "COLONEQUAL"
     # python 3.10 (backwards and name token compatible) tokens
     tm[MATCH] = "MATCH"
     tm[CASE] = "CASE"
@@ -129,9 +132,7 @@ def handle_name(state, token):
     typ = "NAME"
     state["last"] = token
     needs_whitespace = token.string in NEED_WHITESPACE
-    has_whitespace = needs_whitespace and RE_NEED_WHITESPACE.match(
-        token.line[max(0, token.start[1] - 1) :]
-    )
+    has_whitespace = needs_whitespace and RE_NEED_WHITESPACE.match(token.line[max(0, token.start[1] - 1) :])
     if state["pymode"][-1][0]:
         if needs_whitespace and not has_whitespace:
             pass
@@ -253,9 +254,23 @@ def handle_redirect(state, token):
     typ = token.type
     st = token.string
     key = (typ, st) if (typ, st) in token_map else typ
-    yield _new_token(token_map[key], st, token.start)
+    new_tok = _new_token(token_map[key], st, token.start)
     if state["pymode"][-1][0]:
+        if typ in (IOREDIRECT1, IOREDIRECT2):
+            # Fix Python mode code that was incorrectly recognized as an
+            # IOREDIRECT by the tokenizer (see issue #4994).
+            # The tokenizer does not know when the code should be tokenized in
+            # Python mode. By default, when it sees code like `2>`, it produces
+            # an IOREDIRECT token. This call to `get_tokens` makes the
+            # tokenizer run over the code again, knowing that it is *not* an
+            # IOREDIRECT token.
+            lineno, lexpos = token.start
+            for tok in get_tokens(token.string, state["tolerant"], tokenize_ioredirects=False):
+                yield _new_token(tok.type, tok.value, (lineno, lexpos + tok.lexpos))
+        else:
+            yield new_tok
         return
+    yield new_tok
     # add a whitespace token after a redirection, if we need to
     next_tok = next(state["stream"])
     if next_tok.start == token.end:
@@ -264,15 +279,7 @@ def handle_redirect(state, token):
 
 
 def _make_matcher_handler(tok, typ, pymode, ender, handlers):
-    matcher = (
-        ")"
-        if tok.endswith("(")
-        else "}"
-        if tok.endswith("{")
-        else "]"
-        if tok.endswith("[")
-        else None
-    )
+    matcher = ")" if tok.endswith("(") else "}" if tok.endswith("{") else "]" if tok.endswith("[") else None
 
     def _inner_handler(state, token):
         state["pymode"].append((pymode, tok, matcher, token.start))
@@ -298,7 +305,8 @@ def special_handlers():
         LESS: handle_redirect,
         GREATER: handle_redirect,
         RIGHTSHIFT: handle_redirect,
-        IOREDIRECT: handle_redirect,
+        IOREDIRECT1: handle_redirect,
+        IOREDIRECT2: handle_redirect,
         (OP, "<"): handle_redirect,
         (OP, ">"): handle_redirect,
         (OP, ">>"): handle_redirect,
@@ -362,7 +370,7 @@ def handle_token(state, token):
         yield _new_token("ERRORTOKEN", m, token.start)
 
 
-def get_tokens(s, tolerant):
+def get_tokens(s, tolerant, pymode=True, tokenize_ioredirects=True):
     """
     Given a string containing xonsh code, generates a stream of relevant PLY
     tokens using ``handle_token``.
@@ -370,8 +378,8 @@ def get_tokens(s, tolerant):
     state = {
         "indents": [0],
         "last": None,
-        "pymode": [(True, "", "", (0, 0))],
-        "stream": tokenize(io.BytesIO(s.encode("utf-8")).readline, tolerant),
+        "pymode": [(pymode, "", "", (0, 0))],
+        "stream": tokenize(io.BytesIO(s.encode("utf-8")).readline, tolerant, tokenize_ioredirects),
         "tolerant": tolerant,
     }
     while True:
@@ -397,27 +405,12 @@ def get_tokens(s, tolerant):
 
 
 # synthesize a new PLY token
-def _new_token(type: str, value: str, pos: tuple[int, int]) -> LexToken:
-    linn, col = pos
-    return LexToken(type=type, value=value, lineno=linn, lexpos=col)
-
-
-BEG_TOK_SKIPS = LazyObject(
-    lambda: frozenset(["WS", "INDENT", "NOT", "LPAREN"]), globals(), "BEG_TOK_SKIPS"
-)
-END_TOK_TYPES = LazyObject(
-    lambda: frozenset(["SEMI", "AND", "OR", "RPAREN"]), globals(), "END_TOK_TYPES"
-)
-RE_END_TOKS = LazyObject(
-    lambda: re.compile(r"(;|and|\&\&|or|\|\||\))"), globals(), "RE_END_TOKS"
-)
-LPARENS = LazyObject(
-    lambda: frozenset(
-        ["LPAREN", "AT_LPAREN", "BANG_LPAREN", "DOLLAR_LPAREN", "ATDOLLAR_LPAREN"]
-    ),
-    globals(),
-    "LPARENS",
-)
+def _new_token(type, value, pos):
+    o = LexToken()
+    o.type = type
+    o.value = value
+    o.lineno, o.lexpos = pos
+    return o
 
 
 class Lexer:
@@ -425,7 +418,7 @@ class Lexer:
 
     _tokens: tp.Optional[tuple[str, ...]] = None
 
-    def __init__(self, tolerant=False):
+    def __init__(self, tolerant=False, pymode=True):
         """
         Attributes
         ----------
@@ -438,12 +431,15 @@ class Lexer:
         tolerant : bool
             Tokenize without extra checks (e.g. paren matching).
             When True, ERRORTOKEN contains the erroneous string instead of an error msg.
+        pymode : bool
+            Start the lexer in Python mode.
 
         """
         self.fname = ""
         self.last = None
         self.beforelast = None
         self._tolerant = tolerant
+        self._pymode = pymode
         self._token_stream = iter(())
 
     @property
@@ -459,16 +455,16 @@ class Lexer:
         self.last = None
         self.beforelast = None
 
-    def input(self, s: str) -> None:
+    def input(self, s):
         """Calls the lexer on the string s."""
-        self._token_stream = get_tokens(s, self._tolerant)
+        self._token_stream = get_tokens(s, self._tolerant, self._pymode)
 
     def token(self):
         """Retrieves the next token."""
         self.beforelast, self.last = self.last, next(self._token_stream, None)
         return self.last
 
-    def __iter__(self) -> tp.Iterator[LexToken]:
+    def __iter__(self):
         t = self.token()
         while t is not None:
             yield t
@@ -536,133 +532,6 @@ class Lexer:
             self._tokens = t
         return self._tokens
 
-    def find_next_break(self, line, mincol=0):
-        """Returns the column number of the next logical break in subproc mode.
-        This function may be useful in finding the maxcol argument of
-        subproc_toks().
-        """
-        if mincol >= 1:
-            line = line[mincol:]
-        if RE_END_TOKS.search(line) is None:
-            return None
-        maxcol = None
-        lparens = []
-        self.input(line)
-        for tok in self:
-            if tok.type in LPARENS:
-                lparens.append(tok.type)
-            elif tok.type in END_TOK_TYPES:
-                if _is_not_lparen_and_rparen(lparens, tok):
-                    lparens.pop()
-                else:
-                    maxcol = tok.lexpos + mincol + 1
-                    break
-            elif tok.type == "ERRORTOKEN" and ")" in tok.value:
-                maxcol = tok.lexpos + mincol + 1
-                break
-            elif tok.type == "BANG":
-                maxcol = mincol + len(line) + 1
-                break
-        return maxcol
-
-    def subproc_toks(
-        self, line, mincol=-1, maxcol=None, returnline=False, greedy=False
-    ):
-        """Encapsulates tokens in a source code line in a uncaptured
-        subprocess ![] starting at a minimum column. If there are no tokens
-        (ie in a comment line) this returns None. If greedy is True, it will encapsulate
-        normal parentheses. Greedy is False by default.
-        """
-        if maxcol is None:
-            maxcol = len(line) + 1
-        self.reset()
-        self.input(line)
-        toks = []
-        lparens = []
-        saw_macro = False
-        end_offset = 0
-        for tok in self:
-            pos = tok.lexpos
-            if tok.type not in END_TOK_TYPES and pos >= maxcol:
-                break
-            if tok.type == "BANG":
-                saw_macro = True
-            if saw_macro and tok.type not in ("NEWLINE", "DEDENT"):
-                toks.append(tok)
-                continue
-            if tok.type in LPARENS:
-                lparens.append(tok.type)
-            if greedy and len(lparens) > 0 and "LPAREN" in lparens:
-                toks.append(tok)
-                if tok.type == "RPAREN":
-                    lparens.pop()
-                continue
-            if len(toks) == 0 and tok.type in BEG_TOK_SKIPS:
-                continue  # handle indentation
-            elif len(toks) > 0 and toks[-1].type in END_TOK_TYPES:
-                if _is_not_lparen_and_rparen(lparens, toks[-1]):
-                    lparens.pop()  # don't continue or break
-                elif pos < maxcol and tok.type not in ("NEWLINE", "DEDENT", "WS"):
-                    if not greedy:
-                        toks.clear()
-                    if tok.type in BEG_TOK_SKIPS:
-                        continue
-                else:
-                    break
-            if pos < mincol:
-                continue
-            toks.append(tok)
-            if tok.type == "WS" and tok.value == "\\":
-                pass  # line continuation
-            elif tok.type == "NEWLINE":
-                break
-            elif tok.type == "DEDENT":
-                # fake a newline when dedenting without a newline
-                tok.type = "NEWLINE"
-                tok.value = "\n"
-                tok.lineno -= 1
-                if len(toks) >= 2:
-                    prev_tok_end = toks[-2].lexpos + len(toks[-2].value)
-                else:
-                    prev_tok_end = len(line)
-                if "#" in line[prev_tok_end:]:
-                    tok.lexpos = prev_tok_end  # prevents wrapping comments
-                else:
-                    tok.lexpos = len(line)
-                break
-            elif check_bad_str_token(tok):
-                return
-        else:
-            if len(toks) > 0 and toks[-1].type in END_TOK_TYPES:
-                if _is_not_lparen_and_rparen(lparens, toks[-1]):
-                    pass
-                elif greedy and toks[-1].type == "RPAREN":
-                    pass
-                else:
-                    toks.pop()
-            if len(toks) == 0:
-                return  # handle comment lines
-            tok = toks[-1]
-            pos = tok.lexpos
-            if isinstance(tok.value, str):
-                end_offset = len(tok.value.rstrip())
-            else:
-                el = line[pos:].split("#")[0].rstrip()
-                end_offset = len(el)
-        if len(toks) == 0:
-            return  # handle comment lines
-        elif saw_macro or greedy:
-            end_offset = len(toks[-1].value.rstrip()) + 1
-        if toks[0].lineno != toks[-1].lineno:
-            # handle multiline cases
-            end_offset += _offset_from_prev_lines(line, toks[-1].lineno)
-        beg, end = toks[0].lexpos, (toks[-1].lexpos + end_offset)
-        end = len(line[:end].rstrip())
-        rtn = "![" + line[beg:end] + "]"
-        if returnline:
-            rtn = line[:beg] + rtn + line[end:]
-        return rtn
-
     def balanced_parens(self, line: str, mincol=0, maxcol=None):
         """Determines if parentheses are balanced in an expression."""
         line = line[mincol:maxcol]
@@ -684,16 +553,3 @@ class Lexer:
         self.input(line)
         toks = list(self)
         return len(toks) > 0 and toks[-1].type == "COLON"
-
-
-def _is_not_lparen_and_rparen(lparens, rtok):
-    """Tests if an RPAREN token is matched with something other than a plain old
-    LPAREN type.
-    """
-    # note that any([]) is False, so this covers len(lparens) == 0
-    return rtok.type == "RPAREN" and any(x != "LPAREN" for x in lparens)
-
-
-def _offset_from_prev_lines(line, last):
-    lines = line.splitlines(keepends=True)[:last]
-    return sum(map(len, lines))
