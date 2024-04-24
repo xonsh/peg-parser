@@ -1,9 +1,8 @@
 import ast
 import sys
-import token
-import tokenize
 from typing import Any, Callable, ClassVar, Optional, TypeVar, Union, cast
 
+from peg_parser.parser import token, tokenize
 from peg_parser.parser.tokenizer import Mark, Tokenizer, exact_token_types
 
 # Singleton ast nodes, created once for efficiency
