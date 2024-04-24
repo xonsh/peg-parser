@@ -17,7 +17,6 @@ Original file credits:
 import builtins
 import codecs
 import collections
-import functools
 import io
 import itertools
 import re
@@ -89,9 +88,7 @@ cookie_re = LazyObject(
     globals(),
     "cookie_re",
 )
-blank_re = LazyObject(
-    lambda: re.compile(rb"^[ \t\f]*(?:[#\r\n]|$)", re.ASCII), globals(), "blank_re"
-)
+blank_re = LazyObject(lambda: re.compile(rb"^[ \t\f]*(?:[#\r\n]|$)", re.ASCII), globals(), "blank_re")
 
 #
 # token modifications
@@ -110,14 +107,16 @@ __all__ = token.__all__ + [  # type:ignore
     "ATDOLLAR",
     "ATEQUAL",
     "DOLLARNAME",
-    "IOREDIRECT",
+    "IOREDIRECT1",
+    "IOREDIRECT2",
     "MATCH",
     "CASE",
 ]
-ADDSPACE_TOKS = (NAME, NUMBER)
+ADDSPACE_TOKS = (NAME, NUMBER)  # type:ignore
 del token  # must clean up token
 
 AUGASSIGN_OPS = r"[+\-*/%&@|^=<>:]=?"
+
 COMMENT = N_TOKENS
 tok_name[COMMENT] = "COMMENT"
 NL = N_TOKENS + 1
@@ -128,8 +127,11 @@ N_TOKENS += 3
 SEARCHPATH = N_TOKENS
 tok_name[N_TOKENS] = "SEARCHPATH"
 N_TOKENS += 1
-IOREDIRECT = N_TOKENS
-tok_name[N_TOKENS] = "IOREDIRECT"
+IOREDIRECT1 = N_TOKENS
+tok_name[N_TOKENS] = "IOREDIRECT1"
+N_TOKENS += 1
+IOREDIRECT2 = N_TOKENS
+tok_name[N_TOKENS] = "IOREDIRECT2"
 N_TOKENS += 1
 DOLLARNAME = N_TOKENS
 tok_name[N_TOKENS] = "DOLLARNAME"
@@ -227,10 +229,8 @@ EXACT_TOKEN_TYPES.update(_xonsh_tokens)
 class TokenInfo(collections.namedtuple("TokenInfo", "type string start end line")):
     def __repr__(self):
         annotated_type = "%d (%s)" % (self.type, tok_name[self.type])
-        return (
-            "TokenInfo(type={}, string={!r}, start={!r}, end={!r}, line={!r})".format(
-                *self._replace(type=annotated_type)
-            )
+        return "TokenInfo(type={}, string={!r}, start={!r}, end={!r}, line={!r})".format(
+            *self._replace(type=annotated_type)
         )
 
     @property
@@ -241,15 +241,15 @@ class TokenInfo(collections.namedtuple("TokenInfo", "type string start end line"
             return self.type
 
 
-def group(*choices):
+def group(*choices) -> str:
     return "(" + "|".join(choices) + ")"
 
 
-def tokany(*choices):
+def tokany(*choices) -> str:
     return group(*choices) + "*"
 
 
-def maybe(*choices):
+def maybe(*choices) -> str:
     return group(*choices) + "?"
 
 
@@ -266,9 +266,7 @@ Octnumber = r"0[oO](?:_?[0-7])+"
 Decnumber = r"(?:0(?:_?0)*|[1-9](?:_?[0-9])*)"
 Intnumber = group(Hexnumber, Binnumber, Octnumber, Decnumber)
 Exponent = r"[eE][-+]?[0-9](?:_?[0-9])*"
-Pointfloat = group(
-    r"[0-9](?:_?[0-9])*\.(?:[0-9](?:_?[0-9])*)?", r"\.[0-9](?:_?[0-9])*"
-) + maybe(Exponent)
+Pointfloat = group(r"[0-9](?:_?[0-9])*\.(?:[0-9](?:_?[0-9])*)?", r"\.[0-9](?:_?[0-9])*") + maybe(Exponent)
 Expfloat = r"[0-9](?:_?[0-9])*" + Exponent
 Floatnumber = group(Pointfloat, Expfloat)
 Imagnumber = group(r"[0-9](?:_?[0-9])*[jJ]", Floatnumber + r"[jJ]")
@@ -328,10 +326,11 @@ _redir_map = (
 )
 IORedirect = group(group(*_redir_map), f"{group(*_redir_names)}>>?")
 
-_redir_check_0 = set(_redir_map)
-_redir_check_1 = {f"{i}>" for i in _redir_names}.union(_redir_check_0)
+_redir_check_map = frozenset(_redir_map)
+
+_redir_check_1 = {f"{i}>" for i in _redir_names}
 _redir_check_2 = {f"{i}>>" for i in _redir_names}.union(_redir_check_1)
-_redir_check = frozenset(_redir_check_2)
+_redir_check_single = frozenset(_redir_check_2)
 
 Operator = group(
     r"\*\*=?",
@@ -367,12 +366,10 @@ ContStr = group(
     StringPrefix + r'"[^\n"\\]*(?:\\.[^\n"\\]*)*' + group('"', r"\\\r?\n"),
 )
 PseudoExtras = group(r"\\\r?\n|\Z", Comment, Triple, SearchPath)
-PseudoToken = Whitespace + group(
-    PseudoExtras, IORedirect, Number, Funny, ContStr, Name_RE
-)
+PseudoTokenWithoutIO = Whitespace + group(PseudoExtras, Number, Funny, ContStr, Name_RE)
+PseudoToken = Whitespace + group(PseudoExtras, IORedirect, Number, Funny, ContStr, Name_RE)
 
 
-@functools.lru_cache
 def _compile(expr):
     return re.compile(expr, re.UNICODE)
 
@@ -619,11 +616,7 @@ class Untokenizer:
     def add_whitespace(self, start):
         row, col = start
         if row < self.prev_row or row == self.prev_row and col < self.prev_col:
-            raise ValueError(
-                "start ({},{}) precedes previous end ({},{})".format(
-                    row, col, self.prev_row, self.prev_col
-                )
-            )
+            raise ValueError(f"start ({row},{col}) precedes previous end ({self.prev_row},{self.prev_col})")
         row_offset = row - self.prev_row
         if row_offset:
             self.tokens.append("\\\n" * row_offset)
@@ -855,7 +848,7 @@ def tokopen(filename):
         raise
 
 
-def _tokenize(readline, encoding, tolerant=False):
+def _tokenize(readline, encoding, tolerant=False, tokenize_ioredirects=True):
     lnum = parenlev = continued = 0
     numchars = "0123456789"
     contstr, needcont = "", 0
@@ -888,24 +881,18 @@ def _tokenize(readline, encoding, tolerant=False):
             if not line:
                 if tolerant:
                     # return the partial string
-                    yield TokenInfo(
-                        ERRORTOKEN, contstr, strstart, (lnum, end), contline + line
-                    )
+                    yield TokenInfo(ERRORTOKEN, contstr, strstart, (lnum, end), contline + line)
                     break
                 else:
                     raise TokenError("EOF in multi-line string", strstart)
             endmatch = endprog.match(line)
             if endmatch:
                 pos = end = endmatch.end(0)
-                yield TokenInfo(
-                    STRING, contstr + line[:end], strstart, (lnum, end), contline + line
-                )
+                yield TokenInfo(STRING, contstr + line[:end], strstart, (lnum, end), contline + line)
                 contstr, needcont = "", 0
                 contline = None
             elif needcont and line[-2:] != "\\\n" and line[-3:] != "\\\r\n":
-                yield TokenInfo(
-                    ERRORTOKEN, contstr + line, strstart, (lnum, len(line)), contline
-                )
+                yield TokenInfo(ERRORTOKEN, contstr + line, strstart, (lnum, len(line)), contline)
                 contstr = ""
                 contline = None
                 continue
@@ -942,9 +929,7 @@ def _tokenize(readline, encoding, tolerant=False):
                         (lnum, pos + len(comment_token)),
                         line,
                     )
-                    yield TokenInfo(
-                        NL, line[nl_pos:], (lnum, nl_pos), (lnum, len(line)), line
-                    )
+                    yield TokenInfo(NL, line[nl_pos:], (lnum, nl_pos), (lnum, len(line)), line)
                 else:
                     yield TokenInfo(
                         (NL, COMMENT)[line[pos] == "#"],
@@ -959,9 +944,7 @@ def _tokenize(readline, encoding, tolerant=False):
                 indents.append(column)
                 yield TokenInfo(INDENT, line[:pos], (lnum, 0), (lnum, pos), line)
             while column < indents[-1]:
-                if (
-                    column not in indents and not tolerant
-                ):  # if tolerant, just ignore the error
+                if column not in indents and not tolerant:  # if tolerant, just ignore the error
                     raise IndentationError(
                         "unindent does not match any outer indentation level",
                         ("<tokenize>", lnum, pos, line),
@@ -989,7 +972,9 @@ def _tokenize(readline, encoding, tolerant=False):
             continued = 0
 
         while pos < max:
-            pseudomatch = _compile(PseudoToken).match(line, pos)
+            pseudomatch = _compile(PseudoToken if tokenize_ioredirects else PseudoTokenWithoutIO).match(
+                line, pos
+            )
             if pseudomatch:  # scan for tokens
                 start, end = pseudomatch.span(1)
                 spos, epos, pos = (lnum, start), (lnum, end), end
@@ -997,8 +982,10 @@ def _tokenize(readline, encoding, tolerant=False):
                     continue
                 token, initial = line[start:end], line[start]
 
-                if token in _redir_check:
-                    yield TokenInfo(IOREDIRECT, token, spos, epos, line)
+                if token in _redir_check_single:
+                    yield TokenInfo(IOREDIRECT1, token, spos, epos, line)
+                elif token in _redir_check_map:
+                    yield TokenInfo(IOREDIRECT2, token, spos, epos, line)
                 elif initial in numchars or (  # ordinary number
                     initial == "." and token != "." and token != "..."
                 ):
@@ -1035,16 +1022,10 @@ def _tokenize(readline, encoding, tolerant=False):
                         contstr = line[start:]
                         contline = line
                         break
-                elif (
-                    initial in single_quoted
-                    or token[:2] in single_quoted
-                    or token[:3] in single_quoted
-                ):
+                elif initial in single_quoted or token[:2] in single_quoted or token[:3] in single_quoted:
                     if token[-1] == "\n":  # continued string
                         strstart = (lnum, start)
-                        endprog = _compile(
-                            endpats[initial] or endpats[token[1]] or endpats[token[2]]
-                        )
+                        endprog = _compile(endpats[initial] or endpats[token[1]] or endpats[token[2]])
                         contstr, needcont = line[start:], 1
                         contline = line
                         break
@@ -1053,10 +1034,38 @@ def _tokenize(readline, encoding, tolerant=False):
                 elif token.startswith("$") and token[1:].isidentifier():
                     yield TokenInfo(DOLLARNAME, token, spos, epos, line)
                 elif initial.isidentifier():  # ordinary name
+                    if token in ("async", "await"):
+                        if async_def:
+                            yield TokenInfo(
+                                ASYNC if token == "async" else AWAIT,
+                                token,
+                                spos,
+                                epos,
+                                line,
+                            )
+                            continue
+
                     tok = TokenInfo(NAME, token, spos, epos, line)
                     if token == "async" and not stashed:
                         stashed = tok
                         continue
+
+                    if (
+                        HAS_ASYNC
+                        and token == "def"
+                        and (stashed and stashed.type == NAME and stashed.string == "async")
+                    ):
+                        async_def = True
+                        async_def_indent = indents[-1]
+
+                        yield TokenInfo(
+                            ASYNC,
+                            stashed.string,
+                            stashed.start,
+                            stashed.end,
+                            stashed.line,
+                        )
+                        stashed = None
 
                     if stashed:
                         yield stashed
@@ -1081,9 +1090,7 @@ def _tokenize(readline, encoding, tolerant=False):
                         stashed = None
                     yield TokenInfo(OP, token, spos, epos, line)
             else:
-                yield TokenInfo(
-                    ERRORTOKEN, line[pos], (lnum, pos), (lnum, pos + 1), line
-                )
+                yield TokenInfo(ERRORTOKEN, line[pos], (lnum, pos), (lnum, pos + 1), line)
                 pos += 1
 
     if stashed:
@@ -1095,7 +1102,7 @@ def _tokenize(readline, encoding, tolerant=False):
     yield TokenInfo(ENDMARKER, "", (lnum, 0), (lnum, 0), "")
 
 
-def tokenize(readline, tolerant=False):
+def tokenize(readline, tolerant=False, tokenize_ioredirects=True):
     """
     The tokenize() generator requires one argument, readline, which
     must be a callable object which provides the same interface as the
@@ -1116,12 +1123,19 @@ def tokenize(readline, tolerant=False):
 
     If ``tolerant`` is True, yield ERRORTOKEN with the erroneous string instead of
     throwing an exception when encountering an error.
+
+    If ``tokenize_ioredirects`` is True, produce IOREDIRECT tokens for special
+    io-redirection operators like ``2>``. Otherwise, treat code like ``2>`` as
+    regular Python code.
     """
     encoding, consumed = detect_encoding(readline)
     rl_gen = iter(readline, b"")
     empty = itertools.repeat(b"")
     return _tokenize(
-        itertools.chain(consumed, rl_gen, empty).__next__, encoding, tolerant
+        itertools.chain(consumed, rl_gen, empty).__next__,
+        encoding,
+        tolerant,
+        tokenize_ioredirects,
     )
 
 

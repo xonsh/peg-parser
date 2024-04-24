@@ -1,4 +1,5 @@
 """Abstract Syntax Tree handler"""
+
 # These are imported into our module namespace for the benefit of parser.py.
 # pylint: disable=unused-import
 import itertools
@@ -25,7 +26,6 @@ from ast import (
     BitXor,
     BoolOp,
     Break,
-    Bytes,
     Call,
     ClassDef,
     Compare,
@@ -72,13 +72,12 @@ from ast import (
     Module,
     Mult,
     Name,
-    NameConstant,
+    NamedExpr,
     NodeTransformer,
     Nonlocal,
     Not,
     NotEq,
     NotIn,
-    Num,
     Or,
     Pass,
     Pow,
@@ -90,7 +89,6 @@ from ast import (
     Slice,
     Starred,
     Store,
-    Str,
     Sub,
     Subscript,
     Try,
@@ -113,14 +111,8 @@ from ast import (
     walk,
     withitem,
 )
-from ast import Ellipsis as EllipsisNode
 
-from xonsh_parser.tools import get_logical_line
-
-from .platform import PYTHON_VERSION_INFO
-
-if PYTHON_VERSION_INFO > (3, 8):
-    from ast import NamedExpr  # type:ignore
+from .tools import find_next_break, get_logical_line, subproc_toks
 
 STATEMENTS = (
     FunctionDef,
@@ -148,6 +140,38 @@ STATEMENTS = (
 )
 
 
+def const_str(s: str, **kwargs):
+    return Constant(value=s, kind="str", **kwargs)
+
+
+def is_const_str(node):
+    return isinstance(node, Constant) and node.kind == "str"
+
+
+def const_bytes(s: str, **kwargs):
+    return Constant(value=s, kind="bytes", **kwargs)
+
+
+def is_const_bytes(node):
+    return isinstance(node, Constant) and node.kind == "bytes"
+
+
+def const_num(n, **kwargs):
+    return Constant(value=n, kind="num", **kwargs)
+
+
+def is_const_num(node):
+    return isinstance(node, Constant) and node.kind == "num"
+
+
+def const_name(value, **kwargs):
+    return Constant(value=value, kind="name", **kwargs)
+
+
+def is_const_name(node):
+    return isinstance(node, Constant) and node.kind == "name"
+
+
 def leftmostname(node):
     """Attempts to find the first name in the tree."""
     if isinstance(node, Name):
@@ -166,7 +190,7 @@ def leftmostname(node):
         rtn = leftmostname(node.targets[0])
     elif isinstance(node, AnnAssign):
         rtn = leftmostname(node.target)
-    elif isinstance(node, (Str, Bytes, JoinedStr)):
+    elif isinstance(node, JoinedStr) or is_const_str(node) or is_const_bytes(node):
         # handles case of "./my executable"
         rtn = leftmostname(node.s)
     elif isinstance(node, Tuple) and len(node.elts) > 0:
@@ -273,9 +297,7 @@ def load_attribute_chain(name, lineno=None, col=None):
     names = name.split(".")
     node = Name(id=names.pop(0), ctx=Load(), lineno=lineno, col_offset=col)
     for attr in names:
-        node = Attribute(
-            value=node, attr=attr, ctx=Load(), lineno=lineno, col_offset=col
-        )
+        node = Attribute(value=node, attr=attr, ctx=Load(), lineno=lineno, col_offset=col)
     return node
 
 
@@ -381,14 +403,15 @@ class CtxAwareTransformer(NodeTransformer):
             mincol = max(min_col(node) - 1, 0)
             maxcol = max_col(node)
             if mincol == maxcol:
-                maxcol = self.parser.lexer.find_next_break(line, mincol=mincol)
+                maxcol = find_next_break(line, mincol=mincol, lexer=self.parser.lexer)
             elif nlogical > 1:
                 maxcol = None
             elif maxcol < len(line) and line[maxcol] == ";":
                 pass
             else:
                 maxcol += 1
-        spline = self.parser.lexer.subproc_toks(
+        spline = subproc_toks(
+            self.parser.lexer,
             line,
             mincol=mincol,
             maxcol=maxcol,
@@ -396,7 +419,8 @@ class CtxAwareTransformer(NodeTransformer):
         )
         if spline is None or spline != f"![{line[mincol:maxcol].strip()}]":
             # failed to get something consistent, try greedy wrap
-            spline = self.parser.lexer.subproc_toks(
+            spline = subproc_toks(
+                self.parser.lexer,
                 line,
                 mincol=mincol,
                 maxcol=maxcol,
@@ -466,9 +490,7 @@ class CtxAwareTransformer(NodeTransformer):
         else:
             newnode = self.try_subproc_toks(node)
             if not isinstance(newnode, Expr):
-                newnode = Expr(
-                    value=newnode, lineno=node.lineno, col_offset=node.col_offset
-                )
+                newnode = Expr(value=newnode, lineno=node.lineno, col_offset=node.col_offset)
                 if hasattr(node, "max_lineno"):
                     newnode.max_lineno = node.max_lineno
                     newnode.max_col = node.max_col
@@ -648,8 +670,8 @@ def _getblockattr(name, lineno, col):
         "getattr",
         args=[
             Name(id=name, ctx=Load(), lineno=lineno, col_offset=col),
-            Str(s="__xonsh_block__", lineno=lineno, col_offset=col),
-            NameConstant(value=False, lineno=lineno, col_offset=col),
+            const_str(s="__xonsh_block__", lineno=lineno, col_offset=col),
+            const_name(value=False, lineno=lineno, col_offset=col),
         ],
         lineno=lineno,
         col=col,
