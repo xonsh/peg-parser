@@ -12,25 +12,32 @@ import pytest
 from peg_parser.parser import tokenize
 
 
+def dump_diff(original: ast.AST, pp_ast: ast.AST):
+    kwargs = dict(include_attributes=True, indent="  ")
+    o = ast.dump(original, **kwargs)
+    p = ast.dump(pp_ast, **kwargs)
+    return "\n".join(difflib.unified_diff(o.split("\n"), p.split("\n"), "cpython", "pegen"))
+
+
 @pytest.mark.parametrize(
     "filename",
     [
         "advanced_decorators.py",
-        # "assignment.py",
-        # "async.py",
-        # "call.py",
-        # "comprehensions.py",
-        # "expressions.py",
-        # "function_def.py",
-        # "imports.py",
-        # "lambdas.py",
-        # "multi_statement_per_line.py",
-        # "no_newline_at_end_of_file.py",
-        # "no_newline_at_end_of_file_with_comment.py",
-        # "pattern_matching.py",
-        # "simple_decorators.py",
-        # "statements.py",
-        # "with_statement_multi_items.py",
+        "assignment.py",
+        "async.py",
+        "call.py",
+        "comprehensions.py",
+        "expressions.py",
+        "function_def.py",
+        "imports.py",
+        "lambdas.py",
+        "multi_statement_per_line.py",
+        "no_newline_at_end_of_file.py",
+        "no_newline_at_end_of_file_with_comment.py",
+        "pattern_matching.py",
+        "simple_decorators.py",
+        "statements.py",
+        "with_statement_multi_items.py",
     ],
 )
 def test_parser(python_parse_file, python_parse_str, filename):
@@ -62,10 +69,7 @@ def test_parser(python_parse_file, python_parse_str, filename):
                 print(t)
             raise
 
-        o = ast.dump(original, **kwargs)
-        p = ast.dump(pp_ast, **kwargs)
-        diff = "\n".join(difflib.unified_diff(o.split("\n"), p.split("\n"), "cpython", "python-pegen"))
-        if diff:
+        if diff := dump_diff(original, pp_ast):
             print(part)
             print(diff)
         assert not diff
@@ -74,3 +78,14 @@ def test_parser(python_parse_file, python_parse_str, filename):
     p = ast.dump(python_parse_file(path), **kwargs)
     diff = "\n".join(difflib.unified_diff(o.split("\n"), p.split("\n"), "cpython", "python-pegen"))
     assert not diff
+
+
+def unparse_diff(left, right):
+    import ast
+
+    assert ast.unparse(left) == ast.unparse(right)
+
+
+def test_ast_triple(parse_str):
+    st = 'r"""some long lines\nmore lines\n"""'
+    unparse_diff(ast.parse(st).body[0], parse_str(st))

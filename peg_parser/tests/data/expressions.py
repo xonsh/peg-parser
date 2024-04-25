@@ -39,3 +39,22 @@ a * (~1)
 
 (a)
 (yield a)
+
+
+
+"""
+some long lines
+more lines
+"""
+
+
+rf"""
+some long lines
+more line
+"""
+
+
+r"""
+some long lines
+more line
+"""

@@ -27,15 +27,15 @@ __credits__ = (
     "Michael Foord"
 )
 import functools
+import io
 import itertools as _itertools
 import re
-import sys
 from builtins import open as _builtin_open
 from codecs import BOM_UTF8, lookup
-from io import TextIOWrapper
-from token import *  # noqa
-from token import EXACT_TOKEN_TYPES
 from typing import NamedTuple
+
+from peg_parser.parser.token import *  # noqa
+from peg_parser.parser.token import EXACT_TOKEN_TYPES
 
 cookie_re = re.compile(r"^[ \t\f]*#.*?coding[:=][ \t]*([-\w.]+)", re.ASCII)
 blank_re = re.compile(rb"^[ \t\f]*(?:[#\r\n]|$)", re.ASCII)
@@ -60,8 +60,16 @@ class TokenInfo(NamedTuple):
             return self.type
 
 
-def group(*choices):
-    return "(" + "|".join(choices) + ")"
+def capname(name: str, pattern: str) -> str:
+    return f"(?P<{name}>{pattern})"
+
+
+def group(*choices, name="", **named_choices):
+    choices += tuple(f"(?P<{name}>{pattern})" for name, pattern in named_choices.items())
+    pattern = "(" + "|".join(choices) + ")"
+    if name:
+        pattern = capname(name, pattern)
+    return pattern
 
 
 def any(*choices):
@@ -97,7 +105,7 @@ def _all_string_prefixes():
     # The valid string prefixes. Only contain the lower case versions,
     #  and don't contain any permutations (include 'fr', but not
     #  'rf'). The various permutations will be generated.
-    _valid_string_prefixes = ["b", "r", "u", "f", "br", "fr"]
+    _valid_string_prefixes = ["b", "r", "u", "f", "br", "fr", "p", "pr", "pf"]
     # if we add binary f-strings, add: ['fb', 'fbr']
     result = {""}
     for prefix in _valid_string_prefixes:
@@ -126,7 +134,7 @@ Double = r'[^"\\]*(?:\\.[^"\\]*)*"'
 Single3 = r"[^'\\]*(?:(?:\\.|'(?!''))[^'\\]*)*'''"
 # Tail end of """ string.
 Double3 = r'[^"\\]*(?:(?:\\.|"(?!""))[^"\\]*)*"""'
-Triple = group(StringPrefix + "'''", StringPrefix + '"""')
+Triple = StringPrefix + group("'''", '"""')
 # Single-line ' or " string.
 String = group(StringPrefix + r"'[^\n'\\]*(?:\\.[^\n'\\]*)*'", StringPrefix + r'"[^\n"\\]*(?:\\.[^\n"\\]*)*"')
 
@@ -140,12 +148,12 @@ PlainToken = group(Number, Funny, String, Name)
 Token = Ignore + PlainToken
 
 # First (or only) line of ' or " string.
-ContStr = group(
-    StringPrefix + r"'[^\n'\\]*(?:\\.[^\n'\\]*)*" + group("'", r"\\\r?\n"),
-    StringPrefix + r'"[^\n"\\]*(?:\\.[^\n"\\]*)*' + group('"', r"\\\r?\n"),
+ContStr = StringPrefix + group(
+    r"'[^\n'\\]*(?:\\.[^\n'\\]*)*" + group("'", r"\\\r?\n"),
+    r'"[^\n"\\]*(?:\\.[^\n"\\]*)*' + group('"', r"\\\r?\n"),
 )
-PseudoExtras = group(r"\\\r?\n|\Z", Comment, Triple)
-PseudoToken = Whitespace + group(PseudoExtras, Number, Funny, ContStr, Name)
+PseudoExtras = group(End=r"\\\r?\n|\Z", Comment=Comment, Triple=Triple)
+PseudoToken = Whitespace + group(PseudoExtras, Number=Number, Funny=Funny, ContStr=ContStr, Name=Name)
 
 # For a given string prefix plus quotes, endpats maps it to a regex
 #  to match the remainder of that string. _prefix can be empty, for
@@ -156,16 +164,6 @@ for _prefix in _all_string_prefixes():
     endpats[_prefix + '"'] = Double
     endpats[_prefix + "'''"] = Single3
     endpats[_prefix + '"""'] = Double3
-
-# A set of all of the single and triple quoted string prefixes,
-#  including the opening quotes.
-single_quoted = set()
-triple_quoted = set()
-for t in _all_string_prefixes():
-    for u in (t + '"', t + "'"):
-        single_quoted.add(u)
-    for u in (t + '"""', t + "'''"):
-        triple_quoted.add(u)
 
 tabsize = 8
 
@@ -412,7 +410,7 @@ def open(filename):
     try:
         encoding, lines = detect_encoding(buffer.readline)
         buffer.seek(0)
-        text = TextIOWrapper(buffer, encoding, line_buffering=True)
+        text = io.TextIOWrapper(buffer, encoding, line_buffering=True)
         text.mode = "r"
         return text
     except:
@@ -447,7 +445,6 @@ def tokenize(readline):
 
 def _tokenize(readline, encoding):
     lnum = parenlev = continued = 0
-    numchars = "0123456789"
     contstr, needcont = "", 0
     contline = None
     indents = [0]
@@ -546,10 +543,11 @@ def _tokenize(readline, encoding):
                 spos, epos, pos = (lnum, start), (lnum, end), end
                 if start == end:
                     continue
+                cap_groups = pseudomatch.groupdict()
                 token, initial = line[start:end], line[start]
 
                 if (
-                    initial in numchars  # ordinary number
+                    cap_groups.get("Number")  # ordinary number
                     or (initial == "." and token != "." and token != "...")
                 ):
                     yield TokenInfo(NUMBER, token, spos, epos, line)
@@ -559,11 +557,11 @@ def _tokenize(readline, encoding):
                     else:
                         yield TokenInfo(NEWLINE, token, spos, epos, line)
 
-                elif initial == "#":
+                elif cap_groups.get("Comment"):
                     assert not token.endswith("\n")
                     yield TokenInfo(COMMENT, token, spos, epos, line)
 
-                elif token in triple_quoted:
+                elif cap_groups.get("Triple"):
                     endprog = _compile(endpats[token])
                     endmatch = endprog.match(line, pos)
                     if endmatch:  # all on one line
@@ -576,17 +574,9 @@ def _tokenize(readline, encoding):
                         contline = line
                         break
 
-                # Check up to the first 3 chars of the token to see if
-                #  they're in the single_quoted set. If so, they start
-                #  a string.
-                # We're using the first 3, because we're looking for
-                #  "rb'" (for example) at the start of the token. If
-                #  we switch to longer prefixes, this needs to be
-                #  adjusted.
-                # Note that initial == token[:1].
                 # Also note that single quote checking must come after
                 #  triple quote checking (above).
-                elif initial in single_quoted or token[:2] in single_quoted or token[:3] in single_quoted:
+                elif cap_groups.get("ContStr"):
                     if token[-1] == "\n":  # continued string
                         strstart = (lnum, start)
                         # Again, using the first 3 chars of the
@@ -595,16 +585,14 @@ def _tokenize(readline, encoding):
                         #  character. So it's really looking for
                         #  endpats["'"] or endpats['"'], by trying to
                         #  skip string prefix characters, if any.
-                        endprog = _compile(
-                            endpats.get(initial) or endpats.get(token[1]) or endpats.get(token[2])
-                        )
+                        endprog = _compile(token.removeprefix(cap_groups.get("pre2", ""))[0])
                         contstr, needcont = line[start:], 1
                         contline = line
                         break
                     else:  # ordinary string
                         yield TokenInfo(STRING, token, spos, epos, line)
 
-                elif initial.isidentifier():  # ordinary name
+                elif cap_groups.get("Name"):  # ordinary name
                     yield TokenInfo(NAME, token, spos, epos, line)
                 elif initial == "\\":  # continued stmt
                     continued = 1
@@ -632,70 +620,6 @@ def generate_tokens(readline):
     This has the same API as tokenize(), except that it expects the *readline*
     callable to return str objects instead of bytes.
     """
+    if isinstance(readline, str):
+        readline = io.StringIO(readline).readline
     return _tokenize(readline, None)
-
-
-def main():
-    import argparse
-
-    # Helper error handling routines
-    def perror(message):
-        sys.stderr.write(message)
-        sys.stderr.write("\n")
-
-    def error(message, filename=None, location=None):
-        if location:
-            args = (filename,) + location + (message,)
-            perror("%s:%d:%d: error: %s" % args)
-        elif filename:
-            perror(f"{filename}: error: {message}")
-        else:
-            perror("error: %s" % message)
-        sys.exit(1)
-
-    # Parse the arguments and options
-    parser = argparse.ArgumentParser(prog="python -m tokenize")
-    parser.add_argument(
-        dest="filename", nargs="?", metavar="filename.py", help="the file to tokenize; defaults to stdin"
-    )
-    parser.add_argument(
-        "-e", "--exact", dest="exact", action="store_true", help="display token names using the exact type"
-    )
-    args = parser.parse_args()
-
-    try:
-        # Tokenize the input
-        if args.filename:
-            filename = args.filename
-            with _builtin_open(filename, "rb") as f:
-                tokens = list(tokenize(f.readline))
-        else:
-            filename = "<stdin>"
-            tokens = _tokenize(sys.stdin.readline, None)
-
-        # Output the tokenization
-        for token in tokens:
-            token_type = token.type
-            if args.exact:
-                token_type = token.exact_type
-            token_range = "%d,%d-%d,%d:" % (token.start + token.end)
-            print("%-20s%-15s%-15r" % (token_range, tok_name[token_type], token.string))
-    except IndentationError as err:
-        line, column = err.args[1][1:3]
-        error(err.args[0], filename, (line, column))
-    except TokenError as err:
-        line, column = err.args[1]
-        error(err.args[0], filename, (line, column))
-    except SyntaxError as err:
-        error(err, filename)
-    except OSError as err:
-        error(err)
-    except KeyboardInterrupt:
-        print("interrupted\n")
-    except Exception as err:
-        perror("unexpected error: %s" % err)
-        raise
-
-
-if __name__ == "__main__":
-    main()
