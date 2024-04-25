@@ -372,8 +372,9 @@ class Parser:
 
     def generate_ast_for_string(self, tokens):
         """Generate AST nodes for strings."""
-        err_msg = ""
-        line = 1
+        err_args = None
+        line_offset = tokens[0].start[0]
+        line = line_offset
         col_offset = 0
         source = ""
         for t in tokens:
@@ -389,21 +390,16 @@ class Parser:
         source += ")"
         try:
             m = ast.parse(source)
-        except SyntaxError as e:
-            err_msg = e.args[0]
-            # Identify the line at which the error occurred to get a more
-            # accurate line number
-            for t in tokens:
-                try:
-                    m = ast.parse(t.string)
-                except SyntaxError:
-                    break
+        except SyntaxError as err:
+            args = (err.filename, err.lineno + line_offset - 2, err.offset, err.text)
+            if sys.version_info >= (3, 10):
+                args += (err.end_lineno + line_offset - 2, err.end_offset)
+            err_args = (err.msg, args)
 
         # Avoid getting a triple nesting in the error report that does not
         # bring anything relevant to the traceback.
-        if err_msg:
-            self.raise_syntax_error_known_location(err_msg, t)
-            raise self._exception
+        if err_args:
+            raise SyntaxError(*err_args)
 
         return m.body[0].value
 
