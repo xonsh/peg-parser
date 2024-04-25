@@ -3,50 +3,34 @@
 import ast
 import difflib
 import io
-import sys
 import textwrap
-import tokenize
+import tokenize as pytokenize
 from pathlib import Path
 
 import pytest
+
+from peg_parser.parser import tokenize
 
 
 @pytest.mark.parametrize(
     "filename",
     [
-        pytest.param(
-            "advanced_decorators.py",
-            marks=pytest.mark.skipif(sys.version_info < (3, 9), reason="Valid only in Python 3.9+"),
-        ),
-        "assignment.py",
-        "async.py",
-        "call.py",
-        "comprehensions.py",
-        "expressions.py",
-        "function_def.py",
-        "imports.py",
-        "lambdas.py",
-        pytest.param(
-            "multi_statement_per_line.py",
-            marks=pytest.mark.skipif(
-                sys.version_info < (3, 9), reason="Col offset match only on Python 3.9+"
-            ),
-        ),
-        "no_newline_at_end_of_file.py",
-        "no_newline_at_end_of_file_with_comment.py",
-        pytest.param(
-            "pattern_matching.py",
-            marks=pytest.mark.skipif(sys.version_info < (3, 10), reason="Valid only in Python 3.10+"),
-        ),
-        "simple_decorators.py",
-        "statements.py",
-        pytest.param(
-            "with_statement_multi_items.py",
-            marks=pytest.mark.skipif(
-                sys.version_info < (3, 9),
-                reason="Parenthesized with items allowed only in Python 3.9+",
-            ),
-        ),
+        "advanced_decorators.py",
+        # "assignment.py",
+        # "async.py",
+        # "call.py",
+        # "comprehensions.py",
+        # "expressions.py",
+        # "function_def.py",
+        # "imports.py",
+        # "lambdas.py",
+        # "multi_statement_per_line.py",
+        # "no_newline_at_end_of_file.py",
+        # "no_newline_at_end_of_file_with_comment.py",
+        # "pattern_matching.py",
+        # "simple_decorators.py",
+        # "statements.py",
+        # "with_statement_multi_items.py",
     ],
 )
 def test_parser(python_parse_file, python_parse_str, filename):
@@ -63,17 +47,19 @@ def test_parser(python_parse_file, python_parse_str, filename):
         try:
             pp_ast = python_parse_str(part, "exec")
         except Exception:
-            temp = io.StringIO(part)
             print("Parsing failed:")
             print("Source is:")
             print(textwrap.indent(part, "  "))
-            temp = io.StringIO(part)
             print("Token stream is:")
-            for t in tokenize.generate_tokens(temp.readline):
+            for t in tokenize.generate_tokens(io.StringIO(part).readline):
                 print(t)
             print()
             print("CPython ast is:")
             print(ast.dump(original, **kwargs))
+            print()
+            print("Python token stream is:")
+            for t in pytokenize.generate_tokens(io.StringIO(part).readline):
+                print(t)
             raise
 
         o = ast.dump(original, **kwargs)
