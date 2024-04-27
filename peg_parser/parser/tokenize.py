@@ -134,7 +134,7 @@ Double = r'[^"\\]*(?:\\.[^"\\]*)*"'
 Single3 = r"[^'\\]*(?:(?:\\.|'(?!''))[^'\\]*)*'''"
 # Tail end of """ string.
 Double3 = r'[^"\\]*(?:(?:\\.|"(?!""))[^"\\]*)*"""'
-Triple = StringPrefix + group("'''", '"""')
+Triple = capname("pre1", StringPrefix) + group("'''", '"""', name="tquote")
 # Single-line ' or " string.
 String = group(StringPrefix + r"'[^\n'\\]*(?:\\.[^\n'\\]*)*'", StringPrefix + r'"[^\n"\\]*(?:\\.[^\n"\\]*)*"')
 
@@ -148,9 +148,10 @@ PlainToken = group(Number, Funny, String, Name)
 Token = Ignore + PlainToken
 
 # First (or only) line of ' or " string.
-ContStr = StringPrefix + group(
+ContStr = capname("pre2", StringPrefix) + group(
     r"'[^\n'\\]*(?:\\.[^\n'\\]*)*" + group("'", r"\\\r?\n"),
     r'"[^\n"\\]*(?:\\.[^\n"\\]*)*' + group('"', r"\\\r?\n"),
+    name="Str2",
 )
 PseudoExtras = group(End=r"\\\r?\n|\Z", Comment=Comment, Triple=Triple)
 PseudoToken = Whitespace + group(PseudoExtras, Number=Number, Funny=Funny, ContStr=ContStr, Name=Name)
@@ -158,12 +159,12 @@ PseudoToken = Whitespace + group(PseudoExtras, Number=Number, Funny=Funny, ContS
 # For a given string prefix plus quotes, endpats maps it to a regex
 #  to match the remainder of that string. _prefix can be empty, for
 #  a normal single or triple quoted string (with no prefix).
-endpats = {}
-for _prefix in _all_string_prefixes():
-    endpats[_prefix + "'"] = Single
-    endpats[_prefix + '"'] = Double
-    endpats[_prefix + "'''"] = Single3
-    endpats[_prefix + '"""'] = Double3
+endpats = {
+    "'": Single,
+    '"': Double,
+    "'''": Single3,
+    '"""': Double3,
+}
 
 tabsize = 8
 
@@ -543,7 +544,7 @@ def _tokenize(readline, encoding):
                 spos, epos, pos = (lnum, start), (lnum, end), end
                 if start == end:
                     continue
-                cap_groups = pseudomatch.groupdict()
+                cap_groups: dict[str, str | None] = pseudomatch.groupdict()
                 token, initial = line[start:end], line[start]
 
                 if (
@@ -562,7 +563,7 @@ def _tokenize(readline, encoding):
                     yield TokenInfo(COMMENT, token, spos, epos, line)
 
                 elif cap_groups.get("Triple"):
-                    endprog = _compile(endpats[token])
+                    endprog = _compile(endpats[cap_groups.get("tquote")])
                     endmatch = endprog.match(line, pos)
                     if endmatch:  # all on one line
                         pos = endmatch.end(0)
@@ -579,13 +580,8 @@ def _tokenize(readline, encoding):
                 elif cap_groups.get("ContStr"):
                     if token[-1] == "\n":  # continued string
                         strstart = (lnum, start)
-                        # Again, using the first 3 chars of the
-                        #  token. This is looking for the matching end
-                        #  regex for the correct type of quote
-                        #  character. So it's really looking for
-                        #  endpats["'"] or endpats['"'], by trying to
-                        #  skip string prefix characters, if any.
-                        endprog = _compile(token.removeprefix(cap_groups.get("pre2", ""))[0])
+                        # check for matching quote
+                        endprog = _compile(endpats[cap_groups["Str2"][0]])
                         contstr, needcont = line[start:], 1
                         contline = line
                         break
