@@ -1797,28 +1797,34 @@ def test_async_await(check_stmts):
 
 
 @pytest.mark.parametrize(
-    "inp",
+    "inp,expanded",
     [
-        'p"/foo"',
-        'pr"/foo"',
-        'rp"/foo"',
-        'pR"/foo"',
-        'Rp"/foo"',
+        ['p"/foo"', "__xonsh__.path_literal('/foo')"],
+        ['pr"/foo"', "__xonsh__.path_literal('/foo')"],
+        ['rp"/foo"', "__xonsh__.path_literal('/foo')"],
+        ['pR"/foo"', "__xonsh__.path_literal('/foo')"],
+        ['Rp"/foo"', "__xonsh__.path_literal('/foo')"],
     ],
 )
-def test_path_literal(inp, parse_str):
-    parse_str(inp)
+def test_path_literal(inp, expanded, unparse_diff):
+    unparse_diff(inp, expanded)
 
 
-def test_path_fstring_literal(check_xonsh_ast):
-    check_xonsh_ast({}, 'pf"/foo"', False)
-    check_xonsh_ast({}, 'fp"/foo"', False)
-    check_xonsh_ast({}, 'pF"/foo"', False)
-    check_xonsh_ast({}, 'Fp"/foo"', False)
-    check_xonsh_ast({}, 'pf"/foo{1+1}"', False)
-    check_xonsh_ast({}, 'fp"/foo{1+1}"', False)
-    check_xonsh_ast({}, 'pF"/foo{1+1}"', False)
-    check_xonsh_ast({}, 'Fp"/foo{1+1}"', False)
+@pytest.mark.parametrize(
+    "inp,expanded",
+    [
+        ['pf"/foo"', "__xonsh__.path_literal(f'/foo')"],
+        ['fp"/foo"', "__xonsh__.path_literal(f'/foo')"],
+        ['pF"/foo"', "__xonsh__.path_literal(f'/foo')"],
+        ['Fp"/foo"', "__xonsh__.path_literal(f'/foo')"],
+        ['pf"/foo{1+1}"', "__xonsh__.path_literal(f'/foo{1 + 1}')"],
+        ['fp"/foo{1+1}"', "__xonsh__.path_literal(f'/foo{1 + 1}')"],
+        ['pF"/foo{1+1}"', "__xonsh__.path_literal(f'/foo{1 + 1}')"],
+        ['Fp"/foo{1+1}"', "__xonsh__.path_literal(f'/foo{1 + 1}')"],
+    ],
+)
+def test_path_fstring_literal(inp, expanded, unparse_diff):
+    unparse_diff(inp, expanded)
 
 
 @pytest.mark.parametrize(

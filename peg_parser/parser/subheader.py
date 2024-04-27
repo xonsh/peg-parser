@@ -188,6 +188,32 @@ def memoize_left_rec(method: Callable[[P], Optional[T]]) -> Callable[[P], Option
     return memoize_left_rec_wrapper
 
 
+def load_attribute_chain(name, lineno=None, col=None):
+    """Creates an AST that loads variable name that may (or may not)
+    have attribute chains. For example, "a.b.c"
+    """
+    names = name.split(".")
+    node = ast.Name(id=names.pop(0), ctx=Load, lineno=lineno, col_offset=col)
+    for attr in names:
+        node = ast.Attribute(value=node, attr=attr, ctx=Load, lineno=lineno, col_offset=col)
+    return node
+
+
+def xonsh_call(name, args, lineno=None, col=None) -> ast.Call:
+    """Creates the AST node for calling a function of a given name.
+    Functions names may contain attribute access, e.g. __xonsh__.env.
+    """
+    return ast.Call(
+        func=load_attribute_chain(name, lineno=lineno, col=col),
+        args=args,
+        keywords=[],
+        starargs=None,
+        kwargs=None,
+        lineno=lineno,
+        col_offset=col,
+    )
+
+
 class Parser:
     KEYWORDS: ClassVar[tuple[str, ...]]
     SOFT_KEYWORDS: ClassVar[tuple[str, ...]]
@@ -370,11 +396,9 @@ class Parser:
             self.raise_syntax_error("imaginary number required in complex literal")
         return number
 
-    def generate_ast_for_string(self, tokens):
-        """Generate AST nodes for strings."""
-        err_args = None
-        line_offset = tokens[0].start[0]
-        line = line_offset
+    @staticmethod
+    def _join_str_tokens(tokens: list[tokenize.TokenInfo]) -> str:
+        line = 1
         col_offset = 0
         source = ""
         for t in tokens:
@@ -388,9 +412,39 @@ class Parser:
         else:
             source = "(" + source
         source += ")"
+        return source
+
+    @staticmethod
+    def _has_path_prefix(token: tokenize.TokenInfo) -> bool:
+        text = token.string
+        if not text.startswith(("'", '"')):
+            prefix = text[:2].lower()
+            return prefix and "p" in prefix
+        return False
+
+    def generate_ast_for_string(self, tokens: list[tokenize.TokenInfo]):
+        """Generate AST nodes for strings."""
+        first_token = tokens[0]
+        if path_literal := self._has_path_prefix(first_token):
+            tokens[0] = first_token._replace(
+                string=first_token.string.replace("p", "", 1).replace("P", "", 1)
+            )
+
+        node = self._parse_pure_string(tokens)
+        if path_literal:
+            return xonsh_call("__xonsh__.path_literal", [node], first_token.start[0], first_token.start[1])
+
+        return node
+
+    def _parse_pure_string(self, tokens: list[tokenize.TokenInfo]):
+        err_args = None
+        source = self._join_str_tokens(tokens)
+
         try:
+            # ast.Module
             m = ast.parse(source)
         except SyntaxError as err:
+            line_offset = tokens[0].start[0]
             args = (err.filename, err.lineno + line_offset - 2, err.offset, err.text)
             if sys.version_info >= (3, 10):
                 args += (err.end_lineno + line_offset - 2, err.end_offset)

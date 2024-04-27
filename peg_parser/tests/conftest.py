@@ -78,3 +78,18 @@ def check_ast(parse_str):
         assert nodes_equal(exp, obs)
 
     return factory
+
+
+@pytest.fixture
+def unparse_diff(parse_str):
+    def factory(text: str, right: str | None = None):
+        import ast
+
+        left = parse_str(text)
+        left = ast.unparse(left)
+        if right is None:
+            right = ast.parse(text).body[0]
+            right = ast.unparse(right)
+        assert left == right
+
+    return factory
