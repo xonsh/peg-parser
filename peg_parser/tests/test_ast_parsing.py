@@ -80,12 +80,6 @@ def test_parser(python_parse_file, python_parse_str, filename):
     assert not diff
 
 
-def unparse_diff(left, right):
-    import ast
-
-    assert ast.unparse(left) == ast.unparse(right)
-
-
-def test_ast_triple(parse_str):
-    st = 'r"""some long lines\nmore lines\n"""'
-    unparse_diff(ast.parse(st).body[0], parse_str(st))
+@pytest.mark.parametrize("inp", ['r"""some long lines\nmore lines\n"""', 'r"some \\nlong lines"'])
+def test_ast_strings(inp, unparse_diff):
+    unparse_diff(inp)
