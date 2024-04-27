@@ -136,7 +136,8 @@ warn_unused_configs = true
 #warn_redundant_casts = true
 exclude = [
     'xonsh_parser/ply/.*.py',
-    'xonsh_parser/parsers/'
+    'xonsh_parser/parsers/',
+    'xonsh_parser/tests/line-items/',
 ]
 
 [[tool.mypy.overrides]]
