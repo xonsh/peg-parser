@@ -1,7 +1,6 @@
 import token
+import tokenize
 from typing import Dict, Iterator, List
-
-from peg_parser.parser import tokenize
 
 Mark = int  # NewType('Mark', int)
 
@@ -56,7 +55,7 @@ class Tokenizer:
             ):
                 continue
             self._tokens.append(tok)
-            if not self._path and tok.start[0] not in self._lines:
+            if not self._path:
                 self._lines[tok.start[0]] = tok.line
         return self._tokens[self._index]
 
@@ -83,11 +82,11 @@ class Tokenizer:
             count = 0
             seen = 0
             with open(self._path) as f:
-                for line in f:
+                for l in f:
                     count += 1
                     if count in line_numbers:
                         seen += 1
-                        lines[count] = line
+                        lines[count] = l
                         if seen == n:
                             break
 
