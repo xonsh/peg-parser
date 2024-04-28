@@ -1,33 +1,19 @@
-import string
 from pathlib import Path
 
-from pegen.build import build_python_parser_and_generator
+from peg_parser.parser import token
+from pegen.build import build_parser
+from pegen.python_generator import PythonParserGenerator
 
 
 def main():
-    grammar_path = Path(__file__).parent.parent / "parser" / "xonsh.gram"
-    tmpl = string.Template(grammar_path.read_text())
-    gram_content = tmpl.substitute(
-        subheader=grammar_path.with_name("subheader.py").read_text(),
-        # trailer=grammar_path.with_name("trailer.py").read_text(),
-    )
-    with grammar_path.with_name("full.gram").open(mode="w") as fw:
-        skip = False
-        for lin in gram_content.splitlines(keepends=True):
-            if lin.startswith("# <!--"):
-                skip = True
-            elif lin.startswith("# -->"):
-                skip = False
-                continue
-            if skip:
-                continue
-            fw.write(lin)
+    grammar_file = Path(__file__).parent.parent / "parser" / "xonsh.gram"
+    output_file = grammar_file.with_name("parser.py")
 
-    output = str(grammar_path.with_name("parser.py"))
-
-    grammar, parser, tokenizer, gen = build_python_parser_and_generator(fw.name, output)
-
-    return grammar, parser, tokenizer, gen
+    grammar, parser, tokenizer = build_parser(str(grammar_file))
+    with output_file.open("w") as file:
+        gen = PythonParserGenerator(grammar, file, tokens=set(token.tok_name.values()))
+        gen.generate(str(grammar_file))
+    return gen
 
 
 if __name__ == "__main__":
