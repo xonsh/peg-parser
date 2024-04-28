@@ -82,8 +82,9 @@ DOLLARLBRACE = 72
 DOUBLEQUESTION = 73
 ATDOLLARLPAREN = 74
 QUESTION = 75
+ENVNAME = 76
 
-N_TOKENS = 76
+N_TOKENS = 77
 # Special definitions for cooperation with parser
 NT_OFFSET = 256
 

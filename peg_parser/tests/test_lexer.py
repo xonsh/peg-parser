@@ -6,11 +6,9 @@ from pprint import pformat
 
 import pytest
 
+import peg_parser.parser.token as t
 from peg_parser.parser import token, tokenize
-from peg_parser.parser.token import ENDMARKER, NEWLINE, NUMBER
 from peg_parser.parser.tokenize import TokenInfo
-
-LEXER_ARGS = {"lextab": "lexer_test_table", "debug": 0}
 
 
 def ensure_tuple(seq) -> tuple:
@@ -56,9 +54,9 @@ def lex_input(inp: str):
     # skip the NEWLINE, ENDMARKER tokens for easier testing
 
     tokens = list(tokenize.generate_tokens(io.StringIO(inp).readline))
-    if tokens[-1].type == ENDMARKER:
+    if tokens[-1].type == t.ENDMARKER:
         tokens.pop()
-    if tokens[-1].type == NEWLINE:
+    if tokens[-1].type == t.NEWLINE:
         tokens.pop()
     return tokens
 
@@ -85,14 +83,14 @@ def check_tokens_subproc(inp, exp, stop=-1):
 @pytest.mark.parametrize(
     "inp, exp",
     [
-        ["42", [NUMBER, "42", 0]],
-        ["42.0", [NUMBER, "42.0", 0]],
-        ["0x42", [NUMBER, "0x42", 0]],
-        ["0x4_2", [NUMBER, "0x4_2", 0]],
-        ["0o42", [NUMBER, "0o42", 0]],
-        ["0o4_2", [NUMBER, "0o4_2", 0]],
-        ["0b101010", [NUMBER, "0b101010", 0]],
-        ["0b10_10_10", [NUMBER, "0b10_10_10", 0]],
+        ["42", [t.NUMBER, "42", 0]],
+        ["42.0", [t.NUMBER, "42.0", 0]],
+        ["0x42", [t.NUMBER, "0x42", 0]],
+        ["0x4_2", [t.NUMBER, "0x4_2", 0]],
+        ["0o42", [t.NUMBER, "0o42", 0]],
+        ["0o4_2", [t.NUMBER, "0o4_2", 0]],
+        ["0b101010", [t.NUMBER, "0b101010", 0]],
+        ["0b10_10_10", [t.NUMBER, "0b10_10_10", 0]],
     ],
 )
 def test_literals(inp, exp):
@@ -121,8 +119,9 @@ def test_indent_internal_whitespace():
     exp = [
         ("INDENT", " ", 0),
         ("NUMBER", "42", 1),
-        ("PLUS", "+", 5),
+        ("OP", "+", 5),
         ("NUMBER", "65", 7),
+        ("NEWLINE", "", 9),
         ("DEDENT", "", 0),
     ]
     assert check_tokens(inp, exp)
@@ -137,6 +136,17 @@ def test_assignment():
 def test_multiline():
     inp = "x\ny"
     exp = [("NAME", "x", 0), ("NEWLINE", "\n", 1), ("NAME", "y", 0)]
+    assert check_tokens(inp, exp)
+
+
+@pytest.mark.parametrize(
+    "inp,exp",
+    [
+        ("$ENV", [[t.ENVNAME, "$ENV", 0]]),
+        ("$ENV = 'val'", [[t.ENVNAME, "$ENV", 0], [t.OP, "=", 5], [t.STRING, "'val'", 7]]),
+    ],
+)
+def test_dollar_names(inp, exp):
     assert check_tokens(inp, exp)
 
 
@@ -441,7 +451,7 @@ def test_redir_whitespace(case):
     ],
 )
 def test_lexer_split(s, exp):
-    lexer = Lexer()
+    lexer = tokenize.generate_tokens(s)
     obs = lexer.split(s)
     assert exp == obs
 
@@ -462,8 +472,7 @@ def test_lexer_split(s, exp):
     ),
 )
 def test_tolerant_lexer(s):
-    lexer = Lexer(tolerant=True)
-    lexer.input(s)
+    lexer = tokenize.generate_tokens(s)
     error_tokens = list(tok for tok in lexer if tok.type == "ERRORTOKEN")
     assert all(tok.value in s for tok in error_tokens)  # no error messages
 
