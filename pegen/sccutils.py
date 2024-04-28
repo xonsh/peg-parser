@@ -1,6 +1,6 @@
 # Adapted from mypy (mypy/build.py) under the MIT license.
 
-from typing import AbstractSet, Dict, Iterable, Iterator, List, Set
+from typing import *
 
 
 def strongly_connected_components(

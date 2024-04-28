@@ -1,17 +1,15 @@
 import argparse
-import ast
 import sys
 import time
 import token
 import tokenize
 import traceback
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Any, Callable, ClassVar, Dict, Optional, Tuple, Type, TypeVar, cast
 
 from pegen.tokenizer import Mark, Tokenizer, exact_token_types
 
 T = TypeVar("T")
-P = TypeVar("P", bound="Parser")
 F = TypeVar("F", bound=Callable[..., Any])
 
 
@@ -22,7 +20,7 @@ def logger(method: F) -> F:
     """
     method_name = method.__name__
 
-    def logger_wrapper(self: P, *args: object) -> T:
+    def logger_wrapper(self: "Parser", *args: object) -> Any:
         if not self._verbose:
             return method(self, *args)
         argsr = ",".join(repr(arg) for arg in args)
@@ -34,7 +32,7 @@ def logger(method: F) -> F:
         print(f"{fill}... {method_name}({argsr}) --> {tree!s:.200}")
         return tree
 
-    logger_wrapper.__wrapped__ = method  # type: ignore
+    logger_wrapper.__wrapped__ = method  # type: ignore[attr-defined]
     return cast(F, logger_wrapper)
 
 
@@ -42,7 +40,7 @@ def memoize(method: F) -> F:
     """Memoize a symbol method."""
     method_name = method.__name__
 
-    def memoize_wrapper(self: P, *args: object) -> T:
+    def memoize_wrapper(self: "Parser", *args: object) -> Any:
         mark = self._mark()
         key = mark, method_name, args
         # Fast path: cache hit, and not verbose.
@@ -71,15 +69,17 @@ def memoize(method: F) -> F:
             self._reset(endmark)
         return tree
 
-    memoize_wrapper.__wrapped__ = method  # type: ignore
+    memoize_wrapper.__wrapped__ = method  # type: ignore[attr-defined]
     return cast(F, memoize_wrapper)
 
 
-def memoize_left_rec(method: Callable[[P], Optional[T]]) -> Callable[[P], Optional[T]]:
+def memoize_left_rec(
+    method: Callable[["Parser"], Optional[T]]
+) -> Callable[["Parser"], Optional[T]]:
     """Memoize a left-recursive symbol method."""
     method_name = method.__name__
 
-    def memoize_left_rec_wrapper(self: P) -> Optional[T]:
+    def memoize_left_rec_wrapper(self: "Parser") -> Optional[T]:
         mark = self._mark()
         key = mark, method_name, ()
         # Fast path: cache hit, and not verbose.
@@ -153,11 +153,11 @@ def memoize_left_rec(method: Callable[[P], Optional[T]]) -> Callable[[P], Option
                 self._reset(endmark)
         return tree
 
-    memoize_left_rec_wrapper.__wrapped__ = method  # type: ignore
+    memoize_left_rec_wrapper.__wrapped__ = method  # type: ignore[attr-defined]
     return memoize_left_rec_wrapper
 
 
-class Parser(ABC):
+class Parser:
     """Parsing base class."""
 
     KEYWORDS: ClassVar[Tuple[str, ...]]
@@ -169,26 +169,15 @@ class Parser(ABC):
         self._verbose = verbose
         self._level = 0
         self._cache: Dict[Tuple[Mark, str, Tuple[Any, ...]], Tuple[Any, Mark]] = {}
-
-        # Integer tracking wether we are in a left recursive rule or not. Can be useful
+        # Integer tracking whether we are in a left recursive rule or not. Can be useful
         # for error reporting.
         self.in_recursive_rule = 0
-
         # Pass through common tokenizer methods.
         self._mark = self._tokenizer.mark
         self._reset = self._tokenizer.reset
 
-        # Are we looking for syntax error ? When true enable matching on invalid rules
-        self.call_invalid_rules = False
-
     @abstractmethod
     def start(self) -> Any:
-        """Expected grammar entry point.
-
-        This is not strictly necessary but is assumed to exist in most utility
-        functions consuming parser instances.
-
-        """
         pass
 
     def showpeek(self) -> str:
@@ -286,7 +275,6 @@ def simple_parser_main(parser_class: Type[Parser]) -> None:
     argparser.add_argument(
         "-q", "--quiet", action="store_true", help="Don't print the parsed program"
     )
-    argparser.add_argument("-r", "--run", action="store_true", help="Run the parsed program")
     argparser.add_argument("filename", help="Input file ('-' to use stdin)")
 
     args = argparser.parse_args()
@@ -326,9 +314,7 @@ def simple_parser_main(parser_class: Type[Parser]) -> None:
         sys.exit(1)
 
     if not args.quiet:
-        print(ast.dump(tree))
-    if args.run:
-        exec(compile(tree, filename=filename, mode="exec"))
+        print(tree)
 
     if verbose:
         dt = t1 - t0
