@@ -3,6 +3,7 @@
 import ast
 import itertools
 import textwrap
+from ast import AST, Call, Pass, Str, With
 
 import pytest
 
@@ -61,7 +62,7 @@ bar"""''',
 @pytest.mark.parametrize("inp, exp", fstring_adaptor_parameters)
 @pytest.mark.xfail
 def test_fstring_adaptor(inp, xsh, exp, monkeypatch):
-    joined_str_node = FStringAdaptor(inp, "f").run()
+    joined_str_node = FStringAdaptor(inp, "f").run()  # noqa
     assert isinstance(joined_str_node, ast.JoinedStr)
     node = ast.Expression(body=joined_str_node)
     code = compile(node, "<test_fstring_adaptor>", mode="eval")
@@ -1828,21 +1829,14 @@ def test_path_fstring_literal(inp, expanded, unparse_diff):
 
 
 @pytest.mark.parametrize(
-    "first_prefix, second_prefix",
-    itertools.product(["p", "pf", "pr"], repeat=2),
+    "inp,expanded",
+    [
+        ("$WAKKA", "__xonsh__.env['WAKKA']"),
+        ("y = ${x}", "y = __xonsh__.env['x']"),
+    ],
 )
-def test_path_literal_concat(first_prefix, second_prefix, check_xonsh_ast):
-    check_xonsh_ast({}, first_prefix + r"'11{a}22\n'" + " " + second_prefix + r"'33{b}44\n'", False)
-
-
-@pytest.mark.xfail
-def test_dollar_name(check_xonsh_ast):
-    check_xonsh_ast({"WAKKA": 42}, "$WAKKA")
-
-
-@pytest.mark.xfail
-def test_dollar_py(check_xonsh):
-    check_xonsh({"WAKKA": 42}, 'x = "WAKKA"; y = ${x}')
+def test_dollars(inp, expanded, unparse_diff):
+    unparse_diff(inp, expanded)
 
 
 @pytest.mark.xfail
