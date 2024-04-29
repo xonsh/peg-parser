@@ -15,16 +15,16 @@ test:
 watch:
     watchexec -e py,gram --watch peg_parser/parser -- just generate
 
-pegen-add:
+cpy-pegen-add:
     # add remote if not exists
-    git remote | grep cpython || git remote add cpython https://github.com/python/cpython.git
-    git fetch cpython main:cpython-main --no-tags --depth 1
+    git fetch https://github.com/python/cpython.git main:cpython-main --no-tags --depth 1
     git read-tree --prefix=pegen -u cpython-main:Tools/peg_generator/pegen
 
-we-pegen-add:
+pegen-add:
     # add remote if not exists
-    git fetch https://github.com/we-like-parsers/pegen.git main:pegen-main --no-tags --depth 1
-    git read-tree --prefix=pegen -u pegen-main:src/pegen
+    git fetch https://github.com/we-like-parsers/pegen.git main:tmp-pegen-main --no-tags --depth 1
+    git show tmp-pegen-main:data/python.gram > .local/python.gram
+    git read-tree --prefix=pegen -u tmp-pegen-main:src/pegen
 
 pegen-update:
     ## In future, you can merge in additional changes as follows: - https://stackoverflow.com/questions/23937436/add-subdirectory-of-remote-repo-with-git-subtree
