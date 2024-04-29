@@ -1,4 +1,5 @@
 import argparse
+import ast
 import sys
 import time
 import token
@@ -10,7 +11,13 @@ from typing import Any, Callable, ClassVar, Dict, Optional, Tuple, Type, TypeVar
 from pegen.tokenizer import Mark, Tokenizer, exact_token_types
 
 T = TypeVar("T")
+P = TypeVar("P", bound="Parser")
 F = TypeVar("F", bound=Callable[..., Any])
+
+# Tokens added in Python 3.12
+FSTRING_START = getattr(token, "FSTRING_START", None)
+FSTRING_MIDDLE = getattr(token, "FSTRING_MIDDLE", None)
+FSTRING_END = getattr(token, "FSTRING_END", None)
 
 
 def logger(method: F) -> F:
@@ -20,7 +27,7 @@ def logger(method: F) -> F:
     """
     method_name = method.__name__
 
-    def logger_wrapper(self: "Parser", *args: object) -> Any:
+    def logger_wrapper(self: P, *args: object) -> F:
         if not self._verbose:
             return method(self, *args)
         argsr = ",".join(repr(arg) for arg in args)
@@ -32,7 +39,7 @@ def logger(method: F) -> F:
         print(f"{fill}... {method_name}({argsr}) --> {tree!s:.200}")
         return tree
 
-    logger_wrapper.__wrapped__ = method  # type: ignore[attr-defined]
+    logger_wrapper.__wrapped__ = method  # type: ignore
     return cast(F, logger_wrapper)
 
 
@@ -40,7 +47,7 @@ def memoize(method: F) -> F:
     """Memoize a symbol method."""
     method_name = method.__name__
 
-    def memoize_wrapper(self: "Parser", *args: object) -> Any:
+    def memoize_wrapper(self: P, *args: object) -> F:
         mark = self._mark()
         key = mark, method_name, args
         # Fast path: cache hit, and not verbose.
@@ -69,17 +76,15 @@ def memoize(method: F) -> F:
             self._reset(endmark)
         return tree
 
-    memoize_wrapper.__wrapped__ = method  # type: ignore[attr-defined]
+    memoize_wrapper.__wrapped__ = method  # type: ignore
     return cast(F, memoize_wrapper)
 
 
-def memoize_left_rec(
-    method: Callable[["Parser"], Optional[T]]
-) -> Callable[["Parser"], Optional[T]]:
+def memoize_left_rec(method: Callable[[P], Optional[T]]) -> Callable[[P], Optional[T]]:
     """Memoize a left-recursive symbol method."""
     method_name = method.__name__
 
-    def memoize_left_rec_wrapper(self: "Parser") -> Optional[T]:
+    def memoize_left_rec_wrapper(self: P) -> Optional[T]:
         mark = self._mark()
         key = mark, method_name, ()
         # Fast path: cache hit, and not verbose.
@@ -153,7 +158,7 @@ def memoize_left_rec(
                 self._reset(endmark)
         return tree
 
-    memoize_left_rec_wrapper.__wrapped__ = method  # type: ignore[attr-defined]
+    memoize_left_rec_wrapper.__wrapped__ = method  # type: ignore
     return memoize_left_rec_wrapper
 
 
@@ -169,15 +174,26 @@ class Parser:
         self._verbose = verbose
         self._level = 0
         self._cache: Dict[Tuple[Mark, str, Tuple[Any, ...]], Tuple[Any, Mark]] = {}
-        # Integer tracking whether we are in a left recursive rule or not. Can be useful
+
+        # Integer tracking wether we are in a left recursive rule or not. Can be useful
         # for error reporting.
         self.in_recursive_rule = 0
+
         # Pass through common tokenizer methods.
         self._mark = self._tokenizer.mark
         self._reset = self._tokenizer.reset
 
+        # Are we looking for syntax error ? When true enable matching on invalid rules
+        self.call_invalid_rules = False
+
     @abstractmethod
     def start(self) -> Any:
+        """Expected grammar entry point.
+
+        This is not strictly necessary but is assumed to exist in most utility
+        functions consuming parser instances.
+
+        """
         pass
 
     def showpeek(self) -> str:
@@ -202,6 +218,27 @@ class Parser:
     def string(self) -> Optional[tokenize.TokenInfo]:
         tok = self._tokenizer.peek()
         if tok.type == token.STRING:
+            return self._tokenizer.getnext()
+        return None
+
+    @memoize
+    def fstring_start(self) -> Optional[tokenize.TokenInfo]:
+        tok = self._tokenizer.peek()
+        if tok.type == FSTRING_START:
+            return self._tokenizer.getnext()
+        return None
+
+    @memoize
+    def fstring_middle(self) -> Optional[tokenize.TokenInfo]:
+        tok = self._tokenizer.peek()
+        if tok.type == FSTRING_MIDDLE:
+            return self._tokenizer.getnext()
+        return None
+
+    @memoize
+    def fstring_end(self) -> Optional[tokenize.TokenInfo]:
+        tok = self._tokenizer.peek()
+        if tok.type == FSTRING_END:
             return self._tokenizer.getnext()
         return None
 
@@ -275,6 +312,7 @@ def simple_parser_main(parser_class: Type[Parser]) -> None:
     argparser.add_argument(
         "-q", "--quiet", action="store_true", help="Don't print the parsed program"
     )
+    argparser.add_argument("-r", "--run", action="store_true", help="Run the parsed program")
     argparser.add_argument("filename", help="Input file ('-' to use stdin)")
 
     args = argparser.parse_args()
@@ -314,7 +352,9 @@ def simple_parser_main(parser_class: Type[Parser]) -> None:
         sys.exit(1)
 
     if not args.quiet:
-        print(tree)
+        print(ast.dump(tree))
+    if args.run:
+        exec(compile(tree, filename=filename, mode="exec"))
 
     if verbose:
         dt = t1 - t0
