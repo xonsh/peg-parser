@@ -13,38 +13,6 @@ from typing import *
 from peg_parser.parser.subheader import memoize, memoize_left_rec, logger, Parser, Load, Store, Del, tokenize, Tokenizer
 '''
 
-@trailer'''
-def parse_file(
-    path: str,
-    py_version: Optional[tuple] = None,
-    verbose: bool = False,
-) -> ast.Module:
-    """Parse a file."""
-    with open(path) as f:
-        tok_stream = tokenize.generate_tokens(f.readline)
-        tokenizer = Tokenizer(tok_stream, verbose=verbose, path=path)
-        parser = XonshParser(
-            tokenizer,
-            verbose=verbose,
-            filename=os.path.basename(path),
-            py_version=py_version,
-        )
-        return parser.parse("file")
-
-
-def parse_string(
-    source: str,
-    mode: Literal["eval", "exec"] = "eval",
-    py_version: Optional[tuple] = None,
-    verbose: bool = False,
-) -> Any:
-    """Parse a string."""
-    tok_stream = tokenize.generate_tokens(io.StringIO(source).readline)
-    tokenizer = Tokenizer(tok_stream, verbose=verbose)
-    parser = XonshParser(tokenizer, verbose=verbose, py_version=py_version)
-    return parser.parse(mode if mode == "eval" else "file")
-'''
-
 # STARTING RULES
 # ==============
 

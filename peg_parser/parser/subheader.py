@@ -1,6 +1,7 @@
 import ast
 import sys
-from typing import Any, Callable, ClassVar, Optional, TypeVar, Union, cast
+from pathlib import Path
+from typing import Any, Callable, ClassVar, Literal, Optional, TypeVar, Union, cast
 
 from peg_parser.parser import token, tokenize
 from peg_parser.parser.tokenizer import Mark, Tokenizer, exact_token_types
@@ -592,3 +593,38 @@ class Parser:
             start = start_node.lineno, start_node.col_offset
 
         raise self._build_syntax_error(message, start, None)
+
+    @classmethod
+    def parse_file(
+        cls,
+        path: Path,
+        py_version: Optional[tuple] = None,
+        verbose: bool = False,
+    ) -> ast.Module:
+        """Parse a file or string."""
+        with open(path) as f:
+            tok_stream = tokenize.generate_tokens(f.readline)
+            tokenizer = Tokenizer(tok_stream, verbose=verbose, path=str(path))
+            parser = cls(
+                tokenizer,
+                verbose=verbose,
+                filename=path.name,
+                py_version=py_version,
+            )
+            return parser.parse("file")
+
+    @classmethod
+    def parse_string(
+        cls,
+        source: str,
+        mode: Literal["eval", "exec"] = "eval",
+        py_version: Optional[tuple] = None,
+        verbose: bool = False,
+    ) -> Any:
+        """Parse a string."""
+        import io
+
+        tok_stream = tokenize.generate_tokens(io.StringIO(source).readline)
+        tokenizer = Tokenizer(tok_stream, verbose=verbose)
+        parser = cls(tokenizer, verbose=verbose, py_version=py_version)
+        return parser.parse(mode if mode == "eval" else "file")
