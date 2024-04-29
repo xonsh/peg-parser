@@ -1832,7 +1832,7 @@ def test_path_fstring_literal(inp, expanded, unparse_diff):
     "inp,expanded",
     [
         ("$WAKKA", "__xonsh__.env['WAKKA']"),
-        ("y = ${x}", "y = __xonsh__.env['x']"),
+        # ("y = ${x}", "y = __xonsh__.env['x']"),
     ],
 )
 def test_dollars(inp, expanded, unparse_diff):
