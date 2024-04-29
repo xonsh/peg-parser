@@ -12,11 +12,13 @@ import pytest
 from peg_parser.parser import tokenize
 
 
-def dump_diff(original: ast.AST, pp_ast: ast.AST):
+def dump_diff(**trees: ast.AST):
     kwargs = dict(include_attributes=True, indent="  ")
+    orig_name, pp_name = trees.keys()
+    original, pp_ast = trees.values()
     o = ast.dump(original, **kwargs)
     p = ast.dump(pp_ast, **kwargs)
-    return "\n".join(difflib.unified_diff(o.split("\n"), p.split("\n"), "cpython", "pegen"))
+    return "\n".join(difflib.unified_diff(o.split("\n"), p.split("\n"), orig_name, pp_name))
 
 
 @pytest.mark.parametrize(
@@ -45,11 +47,10 @@ def test_parser(python_parse_file, python_parse_str, filename):
     with open(path) as f:
         source = f.read()
 
+    kwargs = dict(include_attributes=True)
+    kwargs["indent"] = "  "
     for part in source.split("\n\n\n"):
         original = ast.parse(part)
-
-        kwargs = dict(include_attributes=True)
-        kwargs["indent"] = "  "
 
         try:
             pp_ast = python_parse_str(part, "exec")
@@ -69,14 +70,12 @@ def test_parser(python_parse_file, python_parse_str, filename):
                 print(t)
             raise
 
-        if diff := dump_diff(original, pp_ast):
+        if diff := dump_diff(cpython=original, pegen=pp_ast):
             print(part)
             print(diff)
         assert not diff
 
-    o = ast.dump(ast.parse(source), **kwargs)
-    p = ast.dump(python_parse_file(path), **kwargs)
-    diff = "\n".join(difflib.unified_diff(o.split("\n"), p.split("\n"), "cpython", "python-pegen"))
+    diff = dump_diff(cpython=ast.parse(source), pegen=python_parse_file(path))
     assert not diff
 
 

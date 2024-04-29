@@ -69,7 +69,6 @@ def check_ast(parse_str):
     import ast
 
     def factory(inp: str, mode="eval", verbose=False):
-        # __tracebackhide__ = True
         # expect a Python AST
         exp = ast.parse(inp, mode=mode)
         # observe something from xonsh
@@ -82,10 +81,18 @@ def check_ast(parse_str):
 
 @pytest.fixture
 def unparse_diff(parse_str):
-    def factory(text: str, right: str | None = None):
+    def factory(text: str, right: str | None = None, mode="eval"):
         import ast
 
-        left = parse_str(text)
+        try:
+            left = parse_str(text, mode=mode)
+        except Exception as e:
+            print("Parsing failed:")
+            print("Source is:")
+            print(text)
+            print("Verbose output of the parser:")
+            parse_str(text, verbose=True, mode=mode)
+            raise e
         left = ast.unparse(left)
         if right is None:
             right = ast.parse(text).body[0]
