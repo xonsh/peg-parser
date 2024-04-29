@@ -6,6 +6,7 @@ import sys
 from typing import Dict, Set
 
 from pegen.build import build_parser
+from pegen.parser_generator import compute_nullables
 from pegen.grammar import (
     Alt,
     Cut,
@@ -23,7 +24,6 @@ from pegen.grammar import (
     Rule,
     StringLeaf,
 )
-from pegen.parser_generator import compute_nullables
 
 argparser = argparse.ArgumentParser(
     prog="calculate_first_sets",
@@ -35,7 +35,7 @@ argparser.add_argument("grammar_file", help="The grammar file")
 class FirstSetCalculator(GrammarVisitor):
     def __init__(self, rules: Dict[str, Rule]) -> None:
         self.rules = rules
-        self.nullables = compute_nullables(rules)
+        compute_nullables(self.rules)
         self.first_sets: Dict[str, Set[str]] = dict()
         self.in_process: Set[str] = set()
 
@@ -56,7 +56,7 @@ class FirstSetCalculator(GrammarVisitor):
                 result -= to_remove
 
             # If the set of new terminals can start with the empty string,
-            # it means that the item is completely nullable and we should
+            # it means that the item is completelly nullable and we should
             # also considering at least the next item in case the current
             # one fails to parse.
 
@@ -125,7 +125,7 @@ class FirstSetCalculator(GrammarVisitor):
         elif item.name not in self.first_sets:
             self.in_process.add(item.name)
             terminals = self.visit(item.rhs)
-            if item in self.nullables:
+            if item.nullable:
                 terminals.add("")
             self.first_sets[item.name] = terminals
             self.in_process.remove(item.name)
@@ -137,12 +137,12 @@ def main() -> None:
 
     try:
         grammar, parser, tokenizer = build_parser(args.grammar_file)
-    except Exception as err:
+    except Exception:
         print("ERROR: Failed to parse grammar file", file=sys.stderr)
         sys.exit(1)
 
-    firs_sets = FirstSetCalculator(grammar.rules).calculate()
-    pprint.pprint(firs_sets)
+    first_sets = FirstSetCalculator(grammar.rules).calculate()
+    pprint.pprint(first_sets)
 
 
 if __name__ == "__main__":

@@ -1,21 +1,6 @@
-import ast
 import contextlib
-import re
 from abc import abstractmethod
-from typing import (
-    IO,
-    AbstractSet,
-    Any,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Set,
-    Text,
-    Tuple,
-    Union,
-)
+from typing import Any, IO, AbstractSet, Dict, Iterator, List, Optional, Set, Text, Tuple
 
 from pegen import sccutils
 from pegen.grammar import (
@@ -40,37 +25,6 @@ from pegen.grammar import (
 )
 
 
-class RuleCollectorVisitor(GrammarVisitor):
-    """Visitor that invokes a provieded callmaker visitor with just the NamedItem nodes"""
-
-    def __init__(self, rules: Dict[str, Rule], callmakervisitor: GrammarVisitor) -> None:
-        self.rulses = rules
-        self.callmaker = callmakervisitor
-
-    def visit_Rule(self, rule: Rule) -> None:
-        self.visit(rule.flatten())
-
-    def visit_NamedItem(self, item: NamedItem) -> None:
-        self.callmaker.visit(item)
-
-
-class KeywordCollectorVisitor(GrammarVisitor):
-    """Visitor that collects all the keywods and soft keywords in the Grammar"""
-
-    def __init__(self, gen: "ParserGenerator", keywords: Dict[str, int], soft_keywords: Set[str]):
-        self.generator = gen
-        self.keywords = keywords
-        self.soft_keywords = soft_keywords
-
-    def visit_StringLeaf(self, node: StringLeaf) -> None:
-        val = ast.literal_eval(node.value)
-        if re.match(r"[a-zA-Z_]\w*\Z", val):  # This is a keyword
-            if node.value.endswith("'") and node.value not in self.keywords:
-                self.keywords[val] = self.generator.keyword_type()
-            else:
-                return self.soft_keywords.add(node.value.replace('"', ""))
-
-
 class RuleCheckingVisitor(GrammarVisitor):
     def __init__(self, rules: Dict[str, Rule], tokens: Set[str]):
         self.rules = rules
@@ -78,6 +32,7 @@ class RuleCheckingVisitor(GrammarVisitor):
 
     def visit_NameLeaf(self, node: NameLeaf) -> None:
         if node.value not in self.rules and node.value not in self.tokens:
+            # TODO: Add line/col info to (leaf) nodes
             raise GrammarError(f"Dangling reference to rule {node.value!r}")
 
     def visit_NamedItem(self, node: NamedItem) -> None:
@@ -92,8 +47,6 @@ class ParserGenerator:
     def __init__(self, grammar: Grammar, tokens: Set[str], file: Optional[IO[Text]]):
         self.grammar = grammar
         self.tokens = tokens
-        self.keywords: Dict[str, int] = {}
-        self.soft_keywords: Set[str] = set()
         self.rules = grammar.rules
         self.validate_rule_names()
         if "trailer" not in grammar.metas and "start" not in self.rules:
@@ -103,10 +56,11 @@ class ParserGenerator:
             checker.visit(rule)
         self.file = file
         self.level = 0
+        compute_nullables(self.rules)
         self.first_graph, self.first_sccs = compute_left_recursives(self.rules)
+        self.todo = self.rules.copy()  # Rules to generate
         self.counter = 0  # For name_rule()/name_loop()
-        self.keyword_counter = 499  # For keyword_type()
-        self.all_rules: Dict[str, Rule] = self.rules.copy()  # Rules + temporal rules
+        self.all_rules: Dict[str, Rule] = {}  # Rules + temporal rules
         self._local_variable_stack: List[List[str]] = []
 
     def validate_rule_names(self) -> None:
@@ -147,30 +101,22 @@ class ParserGenerator:
         for line in lines.splitlines():
             self.print(line)
 
-    def collect_rules(self) -> None:
-        keyword_collector = KeywordCollectorVisitor(self, self.keywords, self.soft_keywords)
-        for rule in self.all_rules.values():
-            keyword_collector.visit(rule)
-
-        rule_collector = RuleCollectorVisitor(self.rules, self.callmakervisitor)
+    def collect_todo(self) -> None:
         done: Set[str] = set()
         while True:
-            computed_rules = list(self.all_rules)
-            todo = [i for i in computed_rules if i not in done]
+            alltodo = list(self.todo)
+            self.all_rules.update(self.todo)
+            todo = [i for i in alltodo if i not in done]
             if not todo:
                 break
-            done = set(self.all_rules)
             for rulename in todo:
-                rule_collector.visit(self.all_rules[rulename])
-
-    def keyword_type(self) -> int:
-        self.keyword_counter += 1
-        return self.keyword_counter
+                self.todo[rulename].collect_todo(self)
+            done = set(alltodo)
 
     def artifical_rule_from_rhs(self, rhs: Rhs) -> str:
         self.counter += 1
         name = f"_tmp_{self.counter}"  # TODO: Pick a nicer name.
-        self.all_rules[name] = Rule(name, None, rhs)
+        self.todo[name] = Rule(name, None, rhs)
         return name
 
     def artificial_rule_from_repeat(self, node: Plain, is_repeat1: bool) -> str:
@@ -179,8 +125,8 @@ class ParserGenerator:
             prefix = "_loop1_"
         else:
             prefix = "_loop0_"
-        name = f"{prefix}{self.counter}"
-        self.all_rules[name] = Rule(name, None, Rhs([Alt([NamedItem(None, node)])]))
+        name = f"{prefix}{self.counter}"  # TODO: It's ugly to signal via the name.
+        self.todo[name] = Rule(name, None, Rhs([Alt([NamedItem(None, node)])]))
         return name
 
     def artifical_rule_from_gather(self, node: Gather) -> str:
@@ -192,7 +138,7 @@ class ParserGenerator:
             [NamedItem(None, node.separator), NamedItem("elem", node.node)],
             action="elem",
         )
-        self.all_rules[extra_function_name] = Rule(
+        self.todo[extra_function_name] = Rule(
             extra_function_name,
             None,
             Rhs([extra_function_alt]),
@@ -200,7 +146,7 @@ class ParserGenerator:
         alt = Alt(
             [NamedItem("elem", node.node), NamedItem("seq", NameLeaf(extra_function_name))],
         )
-        self.all_rules[name] = Rule(
+        self.todo[name] = Rule(
             name,
             None,
             Rhs([alt]),
@@ -221,15 +167,14 @@ class NullableVisitor(GrammarVisitor):
     def __init__(self, rules: Dict[str, Rule]) -> None:
         self.rules = rules
         self.visited: Set[Any] = set()
-        self.nullables: Set[Union[Rule, NamedItem]] = set()
 
     def visit_Rule(self, rule: Rule) -> bool:
         if rule in self.visited:
             return False
         self.visited.add(rule)
         if self.visit(rule.rhs):
-            self.nullables.add(rule)
-        return rule in self.nullables
+            rule.nullable = True
+        return rule.nullable
 
     def visit_Rhs(self, rhs: Rhs) -> bool:
         for alt in rhs.alts:
@@ -269,8 +214,8 @@ class NullableVisitor(GrammarVisitor):
 
     def visit_NamedItem(self, item: NamedItem) -> bool:
         if self.visit(item.item):
-            self.nullables.add(item)
-        return item in self.nullables
+            item.nullable = True
+        return item.nullable
 
     def visit_NameLeaf(self, node: NameLeaf) -> bool:
         if node.value in self.rules:
@@ -283,7 +228,7 @@ class NullableVisitor(GrammarVisitor):
         return not node.value
 
 
-def compute_nullables(rules: Dict[str, Rule]) -> Set[Any]:
+def compute_nullables(rules: Dict[str, Rule]) -> None:
     """Compute which rules in a grammar are nullable.
 
     Thanks to TatSu (tatsu/leftrec.py) for inspiration.
@@ -291,46 +236,6 @@ def compute_nullables(rules: Dict[str, Rule]) -> Set[Any]:
     nullable_visitor = NullableVisitor(rules)
     for rule in rules.values():
         nullable_visitor.visit(rule)
-    return nullable_visitor.nullables
-
-
-class InitialNamesVisitor(GrammarVisitor):
-    def __init__(self, rules: Dict[str, Rule]) -> None:
-        self.rules = rules
-        self.nullables = compute_nullables(rules)
-
-    def generic_visit(self, node: Iterable[Any], *args: Any, **kwargs: Any) -> Set[Any]:
-        names: Set[str] = set()
-        for value in node:
-            if isinstance(value, list):
-                for item in value:
-                    names |= self.visit(item, *args, **kwargs)
-            else:
-                names |= self.visit(value, *args, **kwargs)
-        return names
-
-    def visit_Alt(self, alt: Alt) -> Set[Any]:
-        names: Set[str] = set()
-        for item in alt.items:
-            names |= self.visit(item)
-            if item not in self.nullables:
-                break
-        return names
-
-    def visit_Forced(self, force: Forced) -> Set[Any]:
-        return set()
-
-    def visit_LookAhead(self, lookahead: Lookahead) -> Set[Any]:
-        return set()
-
-    def visit_Cut(self, cut: Cut) -> Set[Any]:
-        return set()
-
-    def visit_NameLeaf(self, node: NameLeaf) -> Set[Any]:
-        return {node.value}
-
-    def visit_StringLeaf(self, node: StringLeaf) -> Set[Any]:
-        return set()
 
 
 def compute_left_recursives(
@@ -371,11 +276,10 @@ def make_first_graph(rules: Dict[str, Rule]) -> Dict[str, AbstractSet[str]]:
 
     Note that this requires the nullable flags to have been computed.
     """
-    initial_name_visitor = InitialNamesVisitor(rules)
     graph = {}
     vertices: Set[str] = set()
     for rulename, rhs in rules.items():
-        graph[rulename] = names = initial_name_visitor.visit(rhs)
+        graph[rulename] = names = rhs.initial_names()
         vertices |= names
     for vertex in vertices:
         graph.setdefault(vertex, set())

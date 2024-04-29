@@ -1,6 +1,7 @@
-import os.path
+import ast
+import re
 import token
-from typing import IO, Any, Dict, Optional, Sequence, Set, Text, Tuple
+from typing import IO, Any, Dict, List, Optional, Sequence, Set, Text, Tuple
 
 from pegen import grammar
 from pegen.grammar import (
@@ -94,20 +95,37 @@ class PythonCallMakerVisitor(GrammarVisitor):
     def __init__(self, parser_generator: ParserGenerator):
         self.gen = parser_generator
         self.cache: Dict[Any, Any] = {}
+        self.keywords: Set[str] = set()
+        self.soft_keywords: Set[str] = set()
 
     def visit_NameLeaf(self, node: NameLeaf) -> Tuple[Optional[str], str]:
         name = node.value
         if name == "SOFT_KEYWORD":
             return "soft_keyword", "self.soft_keyword()"
-        if name in ("NAME", "NUMBER", "STRING", "OP", "TYPE_COMMENT"):
+        if name in (
+            "NAME",
+            "NUMBER",
+            "STRING",
+            "FSTRING_START",
+            "FSTRING_MIDDLE",
+            "FSTRING_END",
+            "OP",
+            "TYPE_COMMENT",
+        ):
             name = name.lower()
             return name, f"self.{name}()"
-        if name in ("NEWLINE", "DEDENT", "INDENT", "ENDMARKER"):
+        if name in ("NEWLINE", "DEDENT", "INDENT", "ENDMARKER", "ASYNC", "AWAIT"):
             # Avoid using names that can be Python keywords
             return "_" + name.lower(), f"self.expect({name!r})"
         return name, f"self.{name}()"
 
     def visit_StringLeaf(self, node: StringLeaf) -> Tuple[str, str]:
+        val = ast.literal_eval(node.value)
+        if re.match(r"[a-zA-Z_]\w*\Z", val):  # This is a keyword
+            if node.value.endswith("'"):
+                self.keywords.add(val)
+            else:
+                self.soft_keywords.add(val)
         return "literal", f"self.expect({node.value})"
 
     def visit_Rhs(self, node: Rhs) -> Tuple[Optional[str], str]:
@@ -189,6 +207,22 @@ class PythonCallMakerVisitor(GrammarVisitor):
             )
 
 
+class UsedNamesVisitor(ast.NodeVisitor):
+    def generic_visit(self, node: ast.AST) -> Set[str]:
+        result = set()
+        for _, value in ast.iter_fields(node):
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, ast.AST):
+                        result.update(self.visit(item))
+            elif isinstance(value, ast.AST):
+                result.update(self.visit(value))
+        return result
+
+    def visit_Name(self, node: ast.Name) -> Set[str]:
+        return {node.id}
+
+
 class PythonParserGenerator(ParserGenerator, GrammarVisitor):
     def __init__(
         self,
@@ -199,37 +233,42 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
         unreachable_formatting: Optional[str] = None,
     ):
         tokens.add("SOFT_KEYWORD")
+        tokens.update(
+            ["FSTRING_START", "FSTRING_MIDDLE", "FSTRING_END"]
+        )  # used in metagrammar to support Python 3.12 f-strings; don't exist in 3.11
         super().__init__(grammar, tokens, file)
         self.callmakervisitor: PythonCallMakerVisitor = PythonCallMakerVisitor(self)
         self.invalidvisitor: InvalidNodeVisitor = InvalidNodeVisitor()
+        self.usednamesvisitor: UsedNamesVisitor = UsedNamesVisitor()
         self.unreachable_formatting = unreachable_formatting or "None  # pragma: no cover"
         self.location_formatting = (
             location_formatting
             or "lineno=start_lineno, col_offset=start_col_offset, "
             "end_lineno=end_lineno, end_col_offset=end_col_offset"
         )
+        self.cleanup_statements: List[str] = []
 
     def generate(self, filename: str) -> None:
-        self.collect_rules()
         header = self.grammar.metas.get("header", MODULE_PREFIX)
         if header is not None:
-            basename = os.path.basename(filename)
-            self.print(header.rstrip("\n").format(filename=basename))
+            self.print(header.rstrip("\n").format(filename=filename))
         subheader = self.grammar.metas.get("subheader", "")
         if subheader:
             self.print(subheader)
         cls_name = self.grammar.metas.get("class", "GeneratedParser")
         self.print("# Keywords and soft keywords are listed at the end of the parser definition.")
         self.print(f"class {cls_name}(Parser):")
-        for rule in self.all_rules.values():
-            self.print()
-            with self.indent():
-                self.visit(rule)
+        while self.todo:
+            for rulename, rule in list(self.todo.items()):
+                del self.todo[rulename]
+                self.print()
+                with self.indent():
+                    self.visit(rule)
 
         self.print()
         with self.indent():
-            self.print(f"KEYWORDS = {tuple(self.keywords)}")
-            self.print(f"SOFT_KEYWORDS = {tuple(self.soft_keywords)}")
+            self.print(f"KEYWORDS = {tuple(sorted(self.callmakervisitor.keywords))}")
+            self.print(f"SOFT_KEYWORDS = {tuple(sorted(self.callmakervisitor.soft_keywords))}")
 
         trailer = self.grammar.metas.get("trailer", MODULE_SUFFIX.format(class_name=cls_name))
         if trailer is not None:
@@ -243,6 +282,11 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
                 if isinstance(n.item, Group) and self.alts_uses_locations(n.item.rhs.alts):
                     return True
         return False
+
+    def add_return(self, ret_val: str) -> None:
+        for stmt in self.cleanup_statements:
+            self.print(stmt)
+        self.print(f"return {ret_val};")
 
     def visit_Rule(self, node: Rule) -> None:
         is_loop = node.is_loop()
@@ -261,6 +305,14 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
         self.print(f"def {node.name}(self) -> Optional[{node_type}]:")
         with self.indent():
             self.print(f"# {node.name}: {rhs}")
+            if node.nullable:
+                self.print(f"# nullable={node.nullable}")
+
+            if node.name.endswith("without_invalid"):
+                self.print("_prev_call_invalid = self.call_invalid_rules")
+                self.print("self.call_invalid_rules = False")
+                self.cleanup_statements.append("self.call_invalid_rules = _prev_call_invalid")
+
             self.print("mark = self._mark()")
             if self.alts_uses_locations(node.rhs.alts):
                 self.print("tok = self._tokenizer.peek()")
@@ -269,16 +321,28 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
                 self.print("children = []")
             self.visit(rhs, is_loop=is_loop, is_gather=is_gather)
             if is_loop:
-                self.print("return children")
+                self.add_return("children")
             else:
-                self.print("return None")
+                self.add_return("None")
 
-    def visit_NamedItem(self, node: NamedItem) -> None:
+        if node.name.endswith("without_invalid"):
+            self.cleanup_statements.pop()
+
+    def visit_NamedItem(
+        self, node: NamedItem, used: Optional[Set[str]], unreachable: bool
+    ) -> None:
         name, call = self.callmakervisitor.visit(node.item)
-        if node.name:
+        if unreachable:
+            name = None
+        elif node.name:
             name = node.name
+
+        if used is not None and name not in used:
+            name = None
+
         if not name:
-            self.print(call)
+            # Parentheses are needed because the trailing comma may appear :>
+            self.print(f"({call})")
         else:
             if name != "cut":
                 name = self.dedupe(name)
@@ -290,8 +354,63 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
         for alt in node.alts:
             self.visit(alt, is_loop=is_loop, is_gather=is_gather)
 
+    def print_action(
+        self,
+        action: Optional[str],
+        locations: bool,
+        unreachable: bool,
+        is_gather: bool,
+        is_loop: bool,
+        has_invalid: bool,
+    ) -> None:
+        if not action:
+            if is_gather:
+                assert len(self.local_variable_names) == 2
+                action = f"[{self.local_variable_names[0]}] + {self.local_variable_names[1]}"
+            else:
+                if has_invalid:
+                    assert unreachable
+                    assert isinstance(action, str)  # for type checker
+                elif len(self.local_variable_names) == 1:
+                    action = f"{self.local_variable_names[0]}"
+                else:
+                    action = f"[{', '.join(self.local_variable_names)}]"
+
+        if locations:
+            self.print("tok = self._tokenizer.get_last_non_whitespace_token()")
+            self.print("end_lineno, end_col_offset = tok.end")
+
+        if is_loop:
+            self.print(f"children.append({action})")
+            self.print("mark = self._mark()")
+        else:
+            self.add_return(f"{action}")
+
     def visit_Alt(self, node: Alt, is_loop: bool, is_gather: bool) -> None:
         has_cut = any(isinstance(item.item, Cut) for item in node.items)
+        has_invalid = self.invalidvisitor.visit(node)
+
+        action = node.action
+        if not action and not is_gather and has_invalid:
+            action = "UNREACHABLE"
+
+        locations = False
+        unreachable = False
+        used = None
+        if action:
+            # Replace magic name in the action rule
+            if "LOCATIONS" in action:
+                locations = True
+                action = action.replace("LOCATIONS", self.location_formatting)
+            if "UNREACHABLE" in action:
+                unreachable = True
+                action = action.replace("UNREACHABLE", self.unreachable_formatting)
+
+            # Extract the names actually used in the action.
+            used = self.usednamesvisitor.visit(ast.parse(action))
+            if has_cut:
+                used.add("cut")
+
         with self.local_variable_context():
             if has_cut:
                 self.print("cut = False")
@@ -301,45 +420,26 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
                 self.print("if (")
             with self.indent():
                 first = True
+                if has_invalid:
+                    self.print("self.call_invalid_rules")
+                    first = False
                 for item in node.items:
                     if first:
                         first = False
                     else:
                         self.print("and")
-                    self.visit(item)
+                    self.visit(item, used=used, unreachable=unreachable)
                     if is_gather:
                         self.print("is not None")
 
             self.print("):")
             with self.indent():
-                action = node.action
-                if not action:
-                    if is_gather:
-                        assert len(self.local_variable_names) == 2
-                        action = (
-                            f"[{self.local_variable_names[0]}] + {self.local_variable_names[1]}"
-                        )
-                    else:
-                        if self.invalidvisitor.visit(node):
-                            action = "UNREACHABLE"
-                        elif len(self.local_variable_names) == 1:
-                            action = f"{self.local_variable_names[0]}"
-                        else:
-                            action = f"[{', '.join(self.local_variable_names)}]"
-                elif "LOCATIONS" in action:
-                    self.print("tok = self._tokenizer.get_last_non_whitespace_token()")
-                    self.print("end_lineno, end_col_offset = tok.end")
-                    action = action.replace("LOCATIONS", self.location_formatting)
-
-                if is_loop:
-                    self.print(f"children.append({action})")
-                    self.print(f"mark = self._mark()")
-                else:
-                    if "UNREACHABLE" in action:
-                        action = action.replace("UNREACHABLE", self.unreachable_formatting)
-                    self.print(f"return {action}")
+                # flake8 complains that visit_Alt is too complicated, so here we are :P
+                self.print_action(action, locations, unreachable, is_gather, is_loop, has_invalid)
 
             self.print("self._reset(mark)")
             # Skip remaining alternatives if a cut was reached.
             if has_cut:
-                self.print("if cut: return None")
+                self.print("if cut:")
+                with self.indent():
+                    self.add_return("None")

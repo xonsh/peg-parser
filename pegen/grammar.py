@@ -1,15 +1,21 @@
 from __future__ import annotations
 
+from abc import abstractmethod
 from typing import (
+    TYPE_CHECKING,
     AbstractSet,
     Any,
     Iterable,
     Iterator,
     List,
     Optional,
+    Set,
     Tuple,
     Union,
 )
+
+if TYPE_CHECKING:
+    from pegen.parser_generator import ParserGenerator
 
 
 class GrammarError(Exception):
@@ -23,7 +29,7 @@ class GrammarVisitor:
         visitor = getattr(self, method, self.generic_visit)
         return visitor(node, *args, **kwargs)
 
-    def generic_visit(self, node: Iterable[Any], *args: Any, **kwargs: Any) -> Any:
+    def generic_visit(self, node: Iterable[Any], *args: Any, **kwargs: Any) -> None:
         """Called if no explicit visitor function exists for a node."""
         for value in node:
             if isinstance(value, list):
@@ -35,13 +41,7 @@ class GrammarVisitor:
 
 class Grammar:
     def __init__(self, rules: Iterable[Rule], metas: Iterable[Tuple[str, Optional[str]]]):
-        # Check if there are repeated rules in "rules"
-        all_rules = {}
-        for rule in rules:
-            if rule.name in all_rules:
-                raise GrammarError(f"Repeated rule {rule.name!r}")
-            all_rules[rule.name] = rule
-        self.rules = all_rules
+        self.rules = {rule.name: rule for rule in rules}
         self.metas = dict(metas)
 
     def __str__(self) -> str:
@@ -71,6 +71,8 @@ class Rule:
         self.type = type
         self.rhs = rhs
         self.memo = bool(memo)
+        self.visited = False
+        self.nullable = False
         self.left_recursive = False
         self.leader = False
 
@@ -97,6 +99,9 @@ class Rule:
     def __iter__(self) -> Iterator[Rhs]:
         yield self.rhs
 
+    def initial_names(self) -> AbstractSet[str]:
+        return self.rhs.initial_names()
+
     def flatten(self) -> Rhs:
         # If it's a single parenthesized group, flatten it.
         rhs = self.rhs
@@ -109,6 +114,10 @@ class Rule:
             rhs = rhs.alts[0].items[0].item.rhs
         return rhs
 
+    def collect_todo(self, gen: ParserGenerator) -> None:
+        rhs = self.flatten()
+        rhs.collect_todo(gen)
+
 
 class Leaf:
     def __init__(self, value: str):
@@ -118,7 +127,12 @@ class Leaf:
         return self.value
 
     def __iter__(self) -> Iterable[str]:
-        yield from ()
+        if False:
+            yield
+
+    @abstractmethod
+    def initial_names(self) -> AbstractSet[str]:
+        raise NotImplementedError
 
 
 class NameLeaf(Leaf):
@@ -132,12 +146,18 @@ class NameLeaf(Leaf):
     def __repr__(self) -> str:
         return f"NameLeaf({self.value!r})"
 
+    def initial_names(self) -> AbstractSet[str]:
+        return {self.value}
+
 
 class StringLeaf(Leaf):
     """The value is a string literal, including quotes."""
 
     def __repr__(self) -> str:
         return f"StringLeaf({self.value!r})"
+
+    def initial_names(self) -> AbstractSet[str]:
+        return set()
 
 
 class Rhs:
@@ -154,14 +174,15 @@ class Rhs:
     def __iter__(self) -> Iterator[List[Alt]]:
         yield self.alts
 
-    @property
-    def can_be_inlined(self) -> bool:
-        if len(self.alts) != 1 or len(self.alts[0].items) != 1:
-            return False
-        # If the alternative has an action we cannot inline
-        if getattr(self.alts[0], "action", None) is not None:
-            return False
-        return True
+    def initial_names(self) -> AbstractSet[str]:
+        names: Set[str] = set()
+        for alt in self.alts:
+            names |= alt.initial_names()
+        return names
+
+    def collect_todo(self, gen: ParserGenerator) -> None:
+        for alt in self.alts:
+            alt.collect_todo(gen)
 
 
 class Alt:
@@ -188,12 +209,25 @@ class Alt:
     def __iter__(self) -> Iterator[List[NamedItem]]:
         yield self.items
 
+    def initial_names(self) -> AbstractSet[str]:
+        names: Set[str] = set()
+        for item in self.items:
+            names |= item.initial_names()
+            if not item.nullable:
+                break
+        return names
+
+    def collect_todo(self, gen: ParserGenerator) -> None:
+        for item in self.items:
+            item.collect_todo(gen)
+
 
 class NamedItem:
     def __init__(self, name: Optional[str], item: Item, type: Optional[str] = None):
         self.name = name
         self.item = item
         self.type = type
+        self.nullable = False
 
     def __str__(self) -> str:
         if not SIMPLE_STR and self.name:
@@ -207,6 +241,12 @@ class NamedItem:
     def __iter__(self) -> Iterator[Item]:
         yield self.item
 
+    def initial_names(self) -> AbstractSet[str]:
+        return self.item.initial_names()
+
+    def collect_todo(self, gen: ParserGenerator) -> None:
+        gen.callmakervisitor.visit(self.item)
+
 
 class Forced:
     def __init__(self, node: Plain):
@@ -217,6 +257,9 @@ class Forced:
 
     def __iter__(self) -> Iterator[Plain]:
         yield self.node
+
+    def initial_names(self) -> AbstractSet[str]:
+        return set()
 
 
 class Lookahead:
@@ -229,6 +272,9 @@ class Lookahead:
 
     def __iter__(self) -> Iterator[Plain]:
         yield self.node
+
+    def initial_names(self) -> AbstractSet[str]:
+        return set()
 
 
 class PositiveLookahead(Lookahead):
@@ -265,6 +311,9 @@ class Opt:
     def __iter__(self) -> Iterator[Item]:
         yield self.node
 
+    def initial_names(self) -> AbstractSet[str]:
+        return self.node.initial_names()
+
 
 class Repeat:
     """Shared base class for x* and x+."""
@@ -275,6 +324,9 @@ class Repeat:
 
     def __iter__(self) -> Iterator[Plain]:
         yield self.node
+
+    def initial_names(self) -> AbstractSet[str]:
+        return self.node.initial_names()
 
 
 class Repeat0(Repeat):
@@ -328,19 +380,23 @@ class Group:
     def __iter__(self) -> Iterator[Rhs]:
         yield self.rhs
 
+    def initial_names(self) -> AbstractSet[str]:
+        return self.rhs.initial_names()
+
 
 class Cut:
     def __init__(self) -> None:
         pass
 
     def __repr__(self) -> str:
-        return f"Cut()"
+        return "Cut()"
 
     def __str__(self) -> str:
-        return f"~"
+        return "~"
 
     def __iter__(self) -> Iterator[Tuple[str, str]]:
-        yield from ()
+        if False:
+            yield
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Cut):
@@ -353,9 +409,9 @@ class Cut:
 
 Plain = Union[Leaf, Group]
 Item = Union[Plain, Opt, Repeat, Forced, Lookahead, Rhs, Cut]
-RuleName = Tuple[str, Optional[str]]
+RuleName = Tuple[str, str]
 MetaTuple = Tuple[str, Optional[str]]
 MetaList = List[MetaTuple]
 RuleList = List[Rule]
 NamedItemList = List[NamedItem]
-LookaheadOrCut = Union[Lookahead, Cut]
+LookaheadOrCut = Union[Lookahead, Forced, Cut]
