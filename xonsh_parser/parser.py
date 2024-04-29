@@ -13,6 +13,8 @@ def get_parser_cls(version: tuple[int, ...] | None = None) -> type["BaseParser"]
     """Returns the parser class for the given Python version."""
     if version is None:
         version = PYTHON_VERSION_INFO
+        if version > (3, 10):
+            version = (3, 10)
     module = "v" + "".join(str(v) for v in version[:2])
     module = __package__ + ".parsers." + module
 
