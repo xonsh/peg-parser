@@ -32,14 +32,9 @@ def nodes_equal(x, y):
 
 
 def build_parser(name: str):
-    from pegen.build import build_parser
-    from pegen.utils import generate_parser, import_file
+    from pegen.utils import import_file
 
-    grammar_path = Path(__file__).parent.parent / "parser/full.gram"
-    source_path = grammar_path.with_name("parser.py")
-    if not source_path.exists():
-        grammar = build_parser(str(grammar_path))[0]
-        generate_parser(grammar, str(source_path))
+    source_path = Path(__file__).parent.parent / "parser/parser.py"
     mod = import_file("xsh_parser", str(source_path))
     return getattr(mod, name)
 
@@ -50,18 +45,18 @@ def python_parser_cls():
 
 
 @pytest.fixture(scope="session")
-def python_parse_file():
-    return build_parser("parse_file")
+def python_parse_file(python_parser_cls):
+    return python_parser_cls.parse_file
 
 
 @pytest.fixture(scope="session")
-def python_parse_str():
-    return build_parser("parse_string")
+def python_parse_str(python_parser_cls):
+    return python_parser_cls.parse_string
 
 
 @pytest.fixture(scope="session")
-def parse_str():
-    return build_parser("parse_string")
+def parse_str(python_parser_cls):
+    return python_parser_cls.parse_string
 
 
 @pytest.fixture
