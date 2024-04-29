@@ -1836,7 +1836,7 @@ def test_path_fstring_literal(inp, expanded, unparse_diff):
     ],
 )
 def test_dollars(inp, expanded, unparse_diff):
-    unparse_diff(inp, expanded)
+    unparse_diff(inp, expanded, mode="exec")
 
 
 @pytest.mark.xfail

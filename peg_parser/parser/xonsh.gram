@@ -4,13 +4,11 @@
 
 @header'''\
 import ast
-import io
 import itertools
-import os
 import sys
 from typing import *
 
-from peg_parser.parser.subheader import memoize, memoize_left_rec, logger, Parser, Load, Store, Del, tokenize, Tokenizer
+from peg_parser.parser.subheader import memoize, memoize_left_rec, logger, Parser, Load, Store, Del
 '''
 
 # STARTING RULES
@@ -89,6 +87,7 @@ assignment:
             LOCATIONS,
         )
      }
+    | a=ENVNAME b=['=' d=annotated_rhs { d }] { self.expand_env_name(a, b) }
     | a=('(' b=single_target ')' { b }
          | single_subscript_attribute_target) ':' b=expression c=['=' d=annotated_rhs { d }] {
         ast.AnnAssign(
@@ -866,16 +865,12 @@ atom:
     | &STRING strings
     | a=NUMBER {
         ast.Constant(value=ast.literal_eval(a.string), LOCATIONS)
-        if sys.version_info >= (3, 9) else
-        ast.Constant(value=ast.literal_eval(a.string), kind=None, LOCATIONS)
      }
     | &'(' (tuple | group | genexp)
     | &'[' (list | listcomp)
     | &'{' (dict | set | dictcomp | setcomp)
     | '...' {
         ast.Constant(value=Ellipsis, LOCATIONS)
-        if sys.version_info >= (3, 9) else
-        ast.Constant(value=Ellipsis, kind=None, LOCATIONS)
      }
 
 group:

@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 from typing import NewType
 
-from peg_parser.parser import token, tokenize
+from . import token, tokenize
 
 Mark = NewType("Mark", int)
 
