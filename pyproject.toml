@@ -36,6 +36,8 @@ fixable = ["ALL"]
 addopts = ""
 
 
+
+[tool.pdm]
 [project.optional-dependencies]
 test = [
     "pytest",
@@ -52,6 +54,8 @@ profile = [
     "guppy3>=3.1.2",
 ]
 dev = [
+    "flask>=3.0.3",
+    "flask-wtf>=1.2.1",
 ]
 
 [tool.hatch.envs.default.scripts]
