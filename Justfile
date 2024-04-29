@@ -21,6 +21,11 @@ pegen-add:
     git fetch cpython main:cpython-main --no-tags --depth 1
     git read-tree --prefix=pegen -u cpython-main:Tools/peg_generator/pegen
 
+we-pegen-add:
+    # add remote if not exists
+    git fetch https://github.com/we-like-parsers/pegen.git main:pegen-main --no-tags --depth 1
+    git read-tree --prefix=pegen -u pegen-main:src/pegen
+
 pegen-update:
     ## In future, you can merge in additional changes as follows: - https://stackoverflow.com/questions/23937436/add-subdirectory-of-remote-repo-with-git-subtree
     git checkout gitgit/master
