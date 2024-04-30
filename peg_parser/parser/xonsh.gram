@@ -11,6 +11,8 @@ from typing import *
 from peg_parser.parser.subheader import memoize, memoize_left_rec, logger, Parser, Load, Store, Del
 '''
 
+@trailer''
+
 # STARTING RULES
 # ==============
 
@@ -946,7 +948,7 @@ lambda_param[ast.arg]: a=NAME {
 # LITERALS
 # ========
 
-strings[ast.Str] (memo): a=STRING+ { self.generate_ast_for_string(a) }
+strings[ast.Constant] (memo): a=STRING+ { self.generate_ast_for_string(a) }
 
 list[ast.List]:
     | '[' a=[star_named_expressions] ']' { ast.List(elts=a or [], ctx=Load, LOCATIONS) }
