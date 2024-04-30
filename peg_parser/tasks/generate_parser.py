@@ -9,9 +9,10 @@ def main():
     grammar_file = Path(__file__).parent.parent / "parser" / "xonsh.gram"
     output_file = grammar_file.with_name("parser.py")
 
-    grammar, parser, tokenizer = build_parser(str(grammar_file))
+    grammar, _, _ = build_parser(str(grammar_file))
+    tokens = {name: num for num, name in token.tok_name.items()}
     with output_file.open("w") as file:
-        gen = PythonParserGenerator(grammar, file, tokens=set(token.tok_name.values()))
+        gen = PythonParserGenerator(grammar, file, token_map=tokens)
         gen.generate(str(grammar_file))
     return gen
 

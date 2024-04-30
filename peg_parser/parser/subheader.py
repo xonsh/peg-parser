@@ -261,30 +261,9 @@ class Parser:
         return None
 
     @memoize
-    def number(self) -> Optional[tokenize.TokenInfo]:
+    def token(self, typ: int) -> Optional[tokenize.TokenInfo]:
         tok = self._tokenizer.peek()
-        if tok.type == token.NUMBER:
-            return self._tokenizer.getnext()
-        return None
-
-    @memoize
-    def string(self) -> Optional[tokenize.TokenInfo]:
-        tok = self._tokenizer.peek()
-        if tok.type == token.STRING:
-            return self._tokenizer.getnext()
-        return None
-
-    @memoize
-    def op(self) -> Optional[tokenize.TokenInfo]:
-        tok = self._tokenizer.peek()
-        if tok.type == token.OP:
-            return self._tokenizer.getnext()
-        return None
-
-    @memoize
-    def type_comment(self) -> Optional[tokenize.TokenInfo]:
-        tok = self._tokenizer.peek()
-        if tok.type == token.TYPE_COMMENT:
+        if tok.type == typ:
             return self._tokenizer.getnext()
         return None
 
