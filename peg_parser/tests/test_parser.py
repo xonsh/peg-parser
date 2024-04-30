@@ -3,7 +3,7 @@
 import ast
 import itertools
 import textwrap
-from ast import AST, Call, Pass, Str, With
+from ast import AST, Call, Pass, With
 
 import pytest
 
