@@ -501,7 +501,7 @@ class Parser:
 
     def expand_env_name(self, a: tokenize.TokenInfo, b: ast.AST = None):
         xenv = load_attribute_chain("__xonsh__.env", lineno=a.start[0], col=a.start[1])
-        idx = ast.Index(value=ast.Constant(s=a.string[1:], lineno=a.start[0], col_offset=a.start[1] + 1))
+        idx = ast.Index(value=ast.Constant(value=a.string[1:], lineno=a.start[0], col_offset=a.start[1] + 1))
         a_node = ast.Subscript(
             value=xenv, slice=idx, ctx=ast.Load(), lineno=a.start[0], col_offset=a.start[1]
         )
