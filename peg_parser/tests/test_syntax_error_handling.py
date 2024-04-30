@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-pytestmark = pytest.mark.xfail("the location is not matching")
+pytestmark = pytest.mark.xfail
 
 
 def parse_invalid_syntax(
