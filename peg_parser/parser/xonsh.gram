@@ -164,8 +164,6 @@ import_from[ast.ImportFrom]:
      }
     | 'from' a=('.' | '...')+ 'import' b=import_from_targets {
         ast.ImportFrom(names=b, level=self.extract_import_level(a), LOCATIONS)
-        if sys.version_info >= (3, 9) else
-        ast.ImportFrom(module=None, names=b, level=self.extract_import_level(a), LOCATIONS)
      }
 import_from_targets[List[ast.alias]]:
     | '(' a=import_from_as_names [','] ')' { a }
@@ -199,7 +197,7 @@ decorators: decorator+
 decorator:
     | a=('@' f=dec_maybe_call NEWLINE { f }) { a }
     | a=('@' f=named_expression NEWLINE { f }) {
-        self.check_version((3, 9), "Generic decorator are",  a)
+        a
      }
 dec_maybe_call:
     | dn=dec_primary '(' z=[arguments] ')' {
@@ -368,21 +366,13 @@ for_stmt[Union[ast.For, ast.AsyncFor]]:
 with_stmt[Union[ast.With, ast.AsyncWith]]:
     | invalid_with_stmt_indent
     | 'with' '(' a=','.with_item+ ','? ')' ':' b=block {
-        self.check_version(
-           (3, 9),
-           "Parenthesized with items",
-            ast.With(items=a, body=b, LOCATIONS)
-        )
+        ast.With(items=a, body=b, LOCATIONS)
      }
     | 'with' a=','.with_item+ ':' tc=[TYPE_COMMENT] b=block {
         ast.With(items=a, body=b, type_comment=tc, LOCATIONS)
      }
     | 'async' 'with' '(' a=','.with_item+ ','? ')' ':' b=block {
-       self.check_version(
-           (3, 9),
-           "Parenthesized with items",
-           ast.AsyncWith(items=a, body=b, LOCATIONS)
-        )
+       ast.AsyncWith(items=a, body=b, LOCATIONS)
      }
     | 'async' 'with' a=','.with_item+ ':' tc=[TYPE_COMMENT] b=block {
        ast.AsyncWith(items=a, body=b, type_comment=tc, LOCATIONS) }
@@ -823,12 +813,6 @@ slices:
     | a=slice !',' { a }
     | a=','.slice+ [','] {
         ast.Tuple(elts=a, ctx=Load, LOCATIONS)
-        if sys.version_info >= (3, 9) else
-        (
-            ast.ExtSlice(dims=a, LOCATIONS)
-            if any(isinstance(e, ast.Slice) for e in a) else
-            ast.Index(value=ast.Tuple(elts=[e.value for e in a], ctx=Load, LOCATIONS), LOCATIONS)
-        )
      }
 
 slice:
@@ -837,32 +821,16 @@ slice:
      }
     | a=named_expression {
         a
-        if sys.version_info >= (3, 9) or isinstance(a, ast.Slice) else
-        ast.Index(
-            value=a,
-            lineno=a.lineno,
-            col_offset=a.col_offset,
-            end_lineno=a.end_lineno,
-            end_col_offset=a.end_col_offset
-        )
      }
 
 atom:
     | a=NAME { ast.Name(id=a.string, ctx=Load, LOCATIONS) }
-    | 'True' {
-        ast.Constant(value=True, LOCATIONS)
-        if sys.version_info >= (3, 9) else
-        ast.Constant(value=True, kind=None, LOCATIONS)
-     }
+    | 'True' { ast.Constant(value=True, LOCATIONS) }
     | 'False' {
         ast.Constant(value=False, LOCATIONS)
-        if sys.version_info >= (3, 9) else
-        ast.Constant(value=False, kind=None, LOCATIONS)
      }
     | 'None' {
         ast.Constant(value=None, LOCATIONS)
-        if sys.version_info >= (3, 9) else
-        ast.Constant(value=None, kind=None, LOCATIONS)
      }
     | &STRING strings
     | a=NUMBER {
@@ -941,8 +909,6 @@ lambda_param_maybe_default[Tuple[ast.arg, Any]]:
     | a=lambda_param c=default? &':' { (a, c) }
 lambda_param[ast.arg]: a=NAME {
     ast.arg(arg=a.string, annotation=None, LOCATIONS)
-    if sys.version_info >= (3, 9) else
-    ast.arg(arg=a.string, annotation=None, type_comment=None, LOCATIONS)
 }
 
 # LITERALS
