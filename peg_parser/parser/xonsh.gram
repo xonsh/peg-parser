@@ -650,6 +650,7 @@ expression (memo):
         ast.IfExp(body=a, test=b, orelse=c, LOCATIONS)
      }
     | disjunction
+    | a=ENVNAME { self.expand_env_name(a) }
     | lambdef
 
 yield_expr:

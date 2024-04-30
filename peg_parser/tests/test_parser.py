@@ -1832,6 +1832,8 @@ def test_path_fstring_literal(inp, expanded, unparse_diff):
     "inp,expanded",
     [
         ("$WAKKA", "__xonsh__.env['WAKKA']"),
+        ("$y = 'one'", "__xonsh__.env['y'] = 'one'"),
+        ("y = $x", "y = __xonsh__.env['x']"),
         # ("y = ${x}", "y = __xonsh__.env['x']"),
     ],
 )
@@ -2669,7 +2671,7 @@ def test_subproc_raw_str_literal(check_xonsh_ast):
     tree = check_xonsh_ast({}, "!(echo r'$foo')", run=False, return_obs=True)
     assert isinstance(tree, AST)
     subproc = tree.body
-    assert isinstance(subproc.args[0].elts[1], Str)
+    assert isinstance(subproc.args[0].elts[1], ast.Constant)
     assert subproc.args[0].elts[1].s == "$foo"
 
 
