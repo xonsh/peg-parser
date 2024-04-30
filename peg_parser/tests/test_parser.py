@@ -7,9 +7,6 @@ from ast import AST, Call, Pass, With
 
 import pytest
 
-# from xonsh_parser.parsers.fstring_adaptor import FStringAdaptor
-# from xonsh_parser.xast import AST, Call, Pass, Str, With
-
 #
 # Tests
 #
@@ -173,8 +170,6 @@ def test_subscription_special_syntaxes(arr_container, eval_code):
     assert eval_code('arr[["a", "b"]]', arr=arr_container) == ["a", "b"]
 
 
-# todo: enable this test
-@pytest.mark.xfail
 def test_subscription_special_syntaxes_2(arr_container, eval_code):
     # aliases
     d = {}
@@ -185,95 +180,95 @@ def test_subscription_special_syntaxes_2(arr_container, eval_code):
 
 
 def test_str_2slice_all(check_ast):
-    check_ast('"hello"[:,:]', False)
+    check_ast('"hello"[:,:]')
 
 
 def test_str_2slice_upper(check_ast):
-    check_ast('"hello"[5:,5:]', False)
+    check_ast('"hello"[5:,5:]')
 
 
 def test_str_2slice_lower(check_ast):
-    check_ast('"hello"[:3,:3]', False)
+    check_ast('"hello"[:3,:3]')
 
 
 def test_str_2slice_lowerupper(check_ast):
-    check_ast('"hello"[5:,:3]', False)
+    check_ast('"hello"[5:,:3]')
 
 
 def test_str_2slice_other(check_ast):
-    check_ast('"hello"[::2,::2]', False)
+    check_ast('"hello"[::2,::2]')
 
 
 def test_str_2slice_lower_other(check_ast):
-    check_ast('"hello"[:3:2,:3:2]', False)
+    check_ast('"hello"[:3:2,:3:2]')
 
 
 def test_str_2slice_upper_other(check_ast):
-    check_ast('"hello"[3::2,3::2]', False)
+    check_ast('"hello"[3::2,3::2]')
 
 
 def test_str_3slice(check_ast):
-    check_ast('"hello"[0:3,0:3,0:3]', False)
+    check_ast('"hello"[0:3,0:3,0:3]')
 
 
 def test_str_3step(check_ast):
-    check_ast('"hello"[0:3:1,0:4:2,1:3:2]', False)
+    check_ast('"hello"[0:3:1,0:4:2,1:3:2]')
 
 
 def test_str_3slice_all(check_ast):
-    check_ast('"hello"[:,:,:]', False)
+    check_ast('"hello"[:,:,:]')
 
 
 def test_str_3slice_upper(check_ast):
-    check_ast('"hello"[5:,5:,5:]', False)
+    check_ast('"hello"[5:,5:,5:]')
 
 
 def test_str_3slice_lower(check_ast):
-    check_ast('"hello"[:3,:3,:3]', False)
+    check_ast('"hello"[:3,:3,:3]')
 
 
 def test_str_3slice_lowerlowerupper(check_ast):
-    check_ast('"hello"[:3,:3,:3]', False)
+    check_ast('"hello"[:3,:3,:3]')
 
 
 def test_str_3slice_lowerupperlower(check_ast):
-    check_ast('"hello"[:3,5:,:3]', False)
+    check_ast('"hello"[:3,5:,:3]')
 
 
 def test_str_3slice_lowerupperupper(check_ast):
-    check_ast('"hello"[:3,5:,5:]', False)
+    check_ast('"hello"[:3,5:,5:]')
 
 
 def test_str_3slice_upperlowerlower(check_ast):
-    check_ast('"hello"[5:,5:,:3]', False)
+    check_ast('"hello"[5:,5:,:3]')
 
 
 def test_str_3slice_upperlowerupper(check_ast):
-    check_ast('"hello"[5:,:3,5:]', False)
+    check_ast('"hello"[5:,:3,5:]')
 
 
 def test_str_3slice_upperupperlower(check_ast):
-    check_ast('"hello"[5:,5:,:3]', False)
+    check_ast('"hello"[5:,5:,:3]')
 
 
 def test_str_3slice_other(check_ast):
-    check_ast('"hello"[::2,::2,::2]', False)
+    check_ast('"hello"[::2,::2,::2]')
 
 
 def test_str_3slice_lower_other(check_ast):
-    check_ast('"hello"[:3:2,:3:2,:3:2]', False)
+    check_ast('"hello"[:3:2,:3:2,:3:2]')
 
 
 def test_str_3slice_upper_other(check_ast):
-    check_ast('"hello"[3::2,3::2,3::2]', False)
+    check_ast('"hello"[3::2,3::2,3::2]')
 
 
 def test_str_slice_true(check_ast):
-    check_ast('"hello"[0:3,True]', False)
+    check_ast('"hello"[0:3,True]')
 
 
 def test_str_true_slice(check_ast):
-    check_ast('"hello"[True,0:3]', False)
+    check_ast('"hello"[True,0:3]')
 
 
 def test_list_empty(check_ast):
@@ -882,19 +877,19 @@ def test_call_list_many_starstar_args(check_ast):
 
 
 def test_call_list_many_star_and_starstar_args(check_ast):
-    check_ast('x(*[("a", 2)], *[("v", 3)], **{"c": 5})', False)
+    check_ast('x(*[("a", 2)], *[("v", 3)], **{"c": 5})')
 
 
 def test_call_alot(check_ast):
-    check_ast("x(1, *args, **kwargs)", False)
+    check_ast("x(1, *args, **kwargs)")
 
 
 def test_call_alot_next(check_ast):
-    check_ast("x(x=1, *args, **kwargs)", False)
+    check_ast("x(x=1, *args, **kwargs)")
 
 
 def test_call_alot_next_next(check_ast):
-    check_ast("x(x=1, *args, y=42, **kwargs)", False)
+    check_ast("x(x=1, *args, y=42, **kwargs)")
 
 
 def test_getattr(check_ast):
@@ -1027,7 +1022,7 @@ def test_times_eq(check_stmts):
 
 
 def test_matmult_eq(check_stmts):
-    check_stmts("x @= y", False)
+    check_stmts("x @= y")
 
 
 def test_div_eq(check_stmts):
@@ -1171,179 +1166,179 @@ def test_del_with_parens(check_stmts):
 
 
 def test_raise(check_stmts):
-    check_stmts("raise", False)
+    check_stmts("raise")
 
 
 def test_raise_x(check_stmts):
-    check_stmts("raise TypeError", False)
+    check_stmts("raise TypeError")
 
 
 def test_raise_x_from(check_stmts):
-    check_stmts("raise TypeError from x", False)
+    check_stmts("raise TypeError from x")
 
 
 def test_import_x(check_stmts):
-    check_stmts("import x", False)
+    check_stmts("import x")
 
 
 def test_import_xy(check_stmts):
-    check_stmts("import x.y", False)
+    check_stmts("import x.y")
 
 
 def test_import_xyz(check_stmts):
-    check_stmts("import x.y.z", False)
+    check_stmts("import x.y.z")
 
 
 def test_from_x_import_y(check_stmts):
-    check_stmts("from x import y", False)
+    check_stmts("from x import y")
 
 
 def test_from_dot_import_y(check_stmts):
-    check_stmts("from . import y", False)
+    check_stmts("from . import y")
 
 
 def test_from_dotx_import_y(check_stmts):
-    check_stmts("from .x import y", False)
+    check_stmts("from .x import y")
 
 
 def test_from_dotdotx_import_y(check_stmts):
-    check_stmts("from ..x import y", False)
+    check_stmts("from ..x import y")
 
 
 def test_from_dotdotdotx_import_y(check_stmts):
-    check_stmts("from ...x import y", False)
+    check_stmts("from ...x import y")
 
 
 def test_from_dotdotdotdotx_import_y(check_stmts):
-    check_stmts("from ....x import y", False)
+    check_stmts("from ....x import y")
 
 
 def test_from_import_x_y(check_stmts):
-    check_stmts("import x, y", False)
+    check_stmts("import x, y")
 
 
 def test_from_import_x_y_z(check_stmts):
-    check_stmts("import x, y, z", False)
+    check_stmts("import x, y, z")
 
 
 def test_from_dot_import_x_y(check_stmts):
-    check_stmts("from . import x, y", False)
+    check_stmts("from . import x, y")
 
 
 def test_from_dot_import_x_y_z(check_stmts):
-    check_stmts("from . import x, y, z", False)
+    check_stmts("from . import x, y, z")
 
 
 def test_from_dot_import_group_x_y(check_stmts):
-    check_stmts("from . import (x, y)", False)
+    check_stmts("from . import (x, y)")
 
 
 def test_import_x_as_y(check_stmts):
-    check_stmts("import x as y", False)
+    check_stmts("import x as y")
 
 
 def test_import_xy_as_z(check_stmts):
-    check_stmts("import x.y as z", False)
+    check_stmts("import x.y as z")
 
 
 def test_import_x_y_as_z(check_stmts):
-    check_stmts("import x, y as z", False)
+    check_stmts("import x, y as z")
 
 
 def test_import_x_as_y_z(check_stmts):
-    check_stmts("import x as y, z", False)
+    check_stmts("import x as y, z")
 
 
 def test_import_x_as_y_z_as_a(check_stmts):
-    check_stmts("import x as y, z as a", False)
+    check_stmts("import x as y, z as a")
 
 
 def test_from_dot_import_x_as_y(check_stmts):
-    check_stmts("from . import x as y", False)
+    check_stmts("from . import x as y")
 
 
 def test_from_x_import_star(check_stmts):
-    check_stmts("from x import *", False)
+    check_stmts("from x import *")
 
 
 def test_from_x_import_group_x_y_z(check_stmts):
-    check_stmts("from x import (x, y, z)", False)
+    check_stmts("from x import (x, y, z)")
 
 
 def test_from_x_import_group_x_y_z_comma(check_stmts):
-    check_stmts("from x import (x, y, z,)", False)
+    check_stmts("from x import (x, y, z,)")
 
 
 def test_from_x_import_y_as_z(check_stmts):
-    check_stmts("from x import y as z", False)
+    check_stmts("from x import y as z")
 
 
 def test_from_x_import_y_as_z_a_as_b(check_stmts):
-    check_stmts("from x import y as z, a as b", False)
+    check_stmts("from x import y as z, a as b")
 
 
 def test_from_dotx_import_y_as_z_a_as_b_c_as_d(check_stmts):
-    check_stmts("from .x import y as z, a as b, c as d", False)
+    check_stmts("from .x import y as z, a as b, c as d")
 
 
 def test_continue(check_stmts):
-    check_stmts("continue", False)
+    check_stmts("continue")
 
 
 def test_break(check_stmts):
-    check_stmts("break", False)
+    check_stmts("break")
 
 
 def test_global(check_stmts):
-    check_stmts("global x", False)
+    check_stmts("global x")
 
 
 def test_global_xy(check_stmts):
-    check_stmts("global x, y", False)
+    check_stmts("global x, y")
 
 
 def test_nonlocal_x(check_stmts):
-    check_stmts("nonlocal x", False)
+    check_stmts("nonlocal x")
 
 
 def test_nonlocal_xy(check_stmts):
-    check_stmts("nonlocal x, y", False)
+    check_stmts("nonlocal x, y")
 
 
 def test_yield(check_stmts):
-    check_stmts("yield", False)
+    check_stmts("yield")
 
 
 def test_yield_x(check_stmts):
-    check_stmts("yield x", False)
+    check_stmts("yield x")
 
 
 def test_yield_x_comma(check_stmts):
-    check_stmts("yield x,", False)
+    check_stmts("yield x,")
 
 
 def test_yield_x_y(check_stmts):
-    check_stmts("yield x, y", False)
+    check_stmts("yield x, y")
 
 
 def test_yield_from_x(check_stmts):
-    check_stmts("yield from x", False)
+    check_stmts("yield from x")
 
 
 def test_return(check_stmts):
-    check_stmts("return", False)
+    check_stmts("return")
 
 
 def test_return_x(check_stmts):
-    check_stmts("return x", False)
+    check_stmts("return x")
 
 
 def test_return_x_comma(check_stmts):
-    check_stmts("return x,", False)
+    check_stmts("return x,")
 
 
 def test_return_x_y(check_stmts):
-    check_stmts("return x, y", False)
+    check_stmts("return x, y")
 
 
 def test_if_true(check_stmts):
@@ -1413,11 +1408,11 @@ def test_for_zip_idx(check_stmts):
 
 
 def test_for_attr(check_stmts):
-    check_stmts("for x.a in range(3):\n  pass", False)
+    check_stmts("for x.a in range(3):\n  pass")
 
 
 def test_for_zip_attr(check_stmts):
-    check_stmts('for x.a, y in zip(range(6), "123456"):\n  pass', False)
+    check_stmts('for x.a, y in zip(range(6), "123456"):\n  pass')
 
 
 def test_for_else(check_stmts):
@@ -1425,27 +1420,27 @@ def test_for_else(check_stmts):
 
 
 def test_async_for(check_stmts):
-    check_stmts("async def f():\n    async for x in y:\n        pass\n", False)
+    check_stmts("async def f():\n    async for x in y:\n        pass\n")
 
 
 def test_with(check_stmts):
-    check_stmts("with x:\n  pass", False)
+    check_stmts("with x:\n  pass")
 
 
 def test_with_as(check_stmts):
-    check_stmts("with x as y:\n  pass", False)
+    check_stmts("with x as y:\n  pass")
 
 
 def test_with_xy(check_stmts):
-    check_stmts("with x, y:\n  pass", False)
+    check_stmts("with x, y:\n  pass")
 
 
 def test_with_x_as_y_z(check_stmts):
-    check_stmts("with x as y, z:\n  pass", False)
+    check_stmts("with x as y, z:\n  pass")
 
 
 def test_with_x_as_y_a_as_b(check_stmts):
-    check_stmts("with x as y, a as b:\n  pass", False)
+    check_stmts("with x as y, a as b:\n  pass")
 
 
 def test_with_in_func(check_stmts):
@@ -1453,50 +1448,49 @@ def test_with_in_func(check_stmts):
 
 
 def test_async_with(check_stmts):
-    check_stmts("async def f():\n    async with x as y:\n        pass\n", False)
+    check_stmts("async def f():\n    async with x as y:\n        pass\n")
 
 
 def test_try(check_stmts):
-    check_stmts("try:\n  pass\nexcept:\n  pass", False)
+    check_stmts("try:\n  pass\nexcept:\n  pass")
 
 
 def test_try_except_t(check_stmts):
-    check_stmts("try:\n  pass\nexcept TypeError:\n  pass", False)
+    check_stmts("try:\n  pass\nexcept TypeError:\n  pass")
 
 
 def test_try_except_t_as_e(check_stmts):
-    check_stmts("try:\n  pass\nexcept TypeError as e:\n  pass", False)
+    check_stmts("try:\n  pass\nexcept TypeError as e:\n  pass")
 
 
 def test_try_except_t_u(check_stmts):
-    check_stmts("try:\n  pass\nexcept (TypeError, SyntaxError):\n  pass", False)
+    check_stmts("try:\n  pass\nexcept (TypeError, SyntaxError):\n  pass")
 
 
 def test_try_except_t_u_as_e(check_stmts):
-    check_stmts("try:\n  pass\nexcept (TypeError, SyntaxError) as e:\n  pass", False)
+    check_stmts("try:\n  pass\nexcept (TypeError, SyntaxError) as e:\n  pass")
 
 
 def test_try_except_t_except_u(check_stmts):
     check_stmts(
         "try:\n  pass\nexcept TypeError:\n  pass\n" "except SyntaxError as f:\n  pass",
-        False,
     )
 
 
 def test_try_except_else(check_stmts):
-    check_stmts("try:\n  pass\nexcept:\n  pass\nelse:  pass", False)
+    check_stmts("try:\n  pass\nexcept:\n  pass\nelse:  pass")
 
 
 def test_try_except_finally(check_stmts):
-    check_stmts("try:\n  pass\nexcept:\n  pass\nfinally:  pass", False)
+    check_stmts("try:\n  pass\nexcept:\n  pass\nfinally:  pass")
 
 
 def test_try_except_else_finally(check_stmts):
-    check_stmts("try:\n  pass\nexcept:\n  pass\nelse:\n  pass" "\nfinally:  pass", False)
+    check_stmts("try:\n  pass\nexcept:\n  pass\nelse:\n  pass" "\nfinally:  pass")
 
 
 def test_try_finally(check_stmts):
-    check_stmts("try:\n  pass\nfinally:  pass", False)
+    check_stmts("try:\n  pass\nfinally:  pass")
 
 
 def test_func(check_stmts):
@@ -1713,36 +1707,36 @@ def test_class_int_flt(check_stmts):
 
 def test_class_obj_kw(check_stmts):
     # technically valid syntax, though it will fail to compile
-    check_stmts("class X(object=5):\n  pass", False)
+    check_stmts("class X(object=5):\n  pass")
 
 
 def test_decorator(check_stmts):
-    check_stmts("@g\ndef f():\n  pass", False)
+    check_stmts("@g\ndef f():\n  pass")
 
 
 def test_decorator_2(check_stmts):
-    check_stmts("@h\n@g\ndef f():\n  pass", False)
+    check_stmts("@h\n@g\ndef f():\n  pass")
 
 
 def test_decorator_call(check_stmts):
-    check_stmts("@g()\ndef f():\n  pass", False)
+    check_stmts("@g()\ndef f():\n  pass")
 
 
 def test_decorator_call_args(check_stmts):
-    check_stmts("@g(x, y=10)\ndef f():\n  pass", False)
+    check_stmts("@g(x, y=10)\ndef f():\n  pass")
 
 
 def test_decorator_dot_call_args(check_stmts):
-    check_stmts("@h.g(x, y=10)\ndef f():\n  pass", False)
+    check_stmts("@h.g(x, y=10)\ndef f():\n  pass")
 
 
 def test_decorator_dot_dot_call_args(check_stmts):
-    check_stmts("@i.h.g(x, y=10)\ndef f():\n  pass", False)
+    check_stmts("@i.h.g(x, y=10)\ndef f():\n  pass")
 
 
 def test_broken_prompt_func(check_stmts):
     code = "def prompt():\n" "    return '{user}'.format(\n" "       user='me')\n"
-    check_stmts(code, False)
+    check_stmts(code)
 
 
 def test_class_with_methods(check_stmts):
@@ -1753,12 +1747,12 @@ def test_class_with_methods(check_stmts):
         "   def msg(self, m):\n"
         "      print(m)\n"
     )
-    check_stmts(code, False)
+    check_stmts(code)
 
 
 def test_nested_functions(check_stmts):
     code = "def test(x):\n" "    def test2(y):\n" "        return y+x\n" "    return test2\n"
-    check_stmts(code, False)
+    check_stmts(code)
 
 
 def test_function_blank_line(check_stmts):
@@ -1777,7 +1771,7 @@ def test_function_blank_line(check_stmts):
         '    print("    Get to work!")\n'
         "    print(ascii_art[i])\n"
     )
-    check_stmts(code, False)
+    check_stmts(code)
 
 
 def test_async_func(check_stmts):
@@ -1785,11 +1779,11 @@ def test_async_func(check_stmts):
 
 
 def test_async_decorator(check_stmts):
-    check_stmts("@g\nasync def f():\n  pass", False)
+    check_stmts("@g\nasync def f():\n  pass")
 
 
 def test_async_await(check_stmts):
-    check_stmts("async def f():\n    await fut\n", False)
+    check_stmts("async def f():\n    await fut\n")
 
 
 #
@@ -1835,30 +1829,20 @@ def test_path_fstring_literal(inp, expanded, unparse_diff):
         ("$y = 'one'", "__xonsh__.env['y'] = 'one'"),
         ("y = $x", "y = __xonsh__.env['x']"),
         # ("y = ${x}", "y = __xonsh__.env['x']"),
+        ('${None or "WAKKA"}', "__xonsh__.env[None or 'WAKKA']"),
+        ("${$JAWAKA}", "__xonsh__.env[__xonsh__.env['JAWAKA']]"),
     ],
 )
 def test_dollars(inp, expanded, unparse_diff):
     unparse_diff(inp, expanded, mode="exec")
 
 
-@pytest.mark.xfail
-def test_dollar_py_test(check_xonsh_ast):
-    check_xonsh_ast({"WAKKA": 42}, '${None or "WAKKA"}')
+def test_dollar_py_test_recursive_name(unparse_diff):
+    unparse_diff("${None or $JAWAKA}", "__xonsh__.env[None or __xonsh__.env['JAWAKA']]")
 
 
-@pytest.mark.xfail
-def test_dollar_py_recursive_name(check_xonsh_ast):
-    check_xonsh_ast({"WAKKA": 42, "JAWAKA": "WAKKA"}, "${$JAWAKA}")
-
-
-@pytest.mark.xfail
-def test_dollar_py_test_recursive_name(check_xonsh_ast):
-    check_xonsh_ast({"WAKKA": 42, "JAWAKA": "WAKKA"}, "${None or $JAWAKA}")
-
-
-@pytest.mark.xfail
-def test_dollar_py_test_recursive_test(check_xonsh_ast):
-    check_xonsh_ast({"WAKKA": 42, "JAWAKA": "WAKKA"}, '${${"JAWA" + $JAWAKA[-2:]}}')
+def test_dollar_py_test_recursive_test(unparse_diff):
+    unparse_diff('${${"JAWA" + $JAWAKA[-2:]}}')
 
 
 @pytest.mark.xfail
@@ -2757,51 +2741,51 @@ def test_syntax_error_assign_ifexp(parse_str):
         "{k:v for k,v in d.items()}",
     ],
 )
-def test_syntax_error_assign_comps(parser, exp):
+def test_syntax_error_assign_comps(parse_str, exp):
     with pytest.raises(SyntaxError):
-        parser.parse(f"{exp} = z")
+        parse_str(f"{exp} = z")
 
 
 @pytest.mark.parametrize("exp", ["x + y", "x and y", "-x"])
-def test_syntax_error_assign_ops(parser, exp):
+def test_syntax_error_assign_ops(parse_str, exp):
     with pytest.raises(SyntaxError):
-        parser.parse(f"{exp} = z")
+        parse_str(f"{exp} = z")
 
 
 @pytest.mark.parametrize("exp", ["x > y", "x > y == z"])
-def test_syntax_error_assign_cmp(parser, exp):
+def test_syntax_error_assign_cmp(parse_str, exp):
     with pytest.raises(SyntaxError):
-        parser.parse(f"{exp} = a")
+        parse_str(f"{exp} = a")
 
 
-def test_syntax_error_augassign_literal(parser):
+def test_syntax_error_augassign_literal(parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse("7 += x")
+        parse_str("7 += x")
 
 
-def test_syntax_error_augassign_constant(parser):
+def test_syntax_error_augassign_constant(parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse("True += 8")
+        parse_str("True += 8")
 
 
-def test_syntax_error_augassign_emptytuple(parser):
+def test_syntax_error_augassign_emptytuple(parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse("() += x")
+        parse_str("() += x")
 
 
-def test_syntax_error_augassign_call(parser):
+def test_syntax_error_augassign_call(parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse("foo() += x")
+        parse_str("foo() += x")
 
 
-def test_syntax_error_augassign_lambda(parser):
+def test_syntax_error_augassign_lambda(parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse('lambda x: "yay" += y')
+        parse_str('lambda x: "yay" += y')
 
 
-def test_syntax_error_augassign_ifexp(parser):
+def test_syntax_error_augassign_ifexp(parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse("x if y else z += 8")
+        parse_str("x if y else z += 8")
 
 
 @pytest.mark.parametrize(
@@ -2813,46 +2797,46 @@ def test_syntax_error_augassign_ifexp(parser):
         "{k:v for k,v in d.items()}",
     ],
 )
-def test_syntax_error_augassign_comps(parser, exp):
+def test_syntax_error_augassign_comps(parse_str, exp):
     with pytest.raises(SyntaxError):
-        parser.parse(f"{exp} += z")
+        parse_str(f"{exp} += z")
 
 
 @pytest.mark.parametrize("exp", ["x + y", "x and y", "-x"])
-def test_syntax_error_augassign_ops(parser, exp):
+def test_syntax_error_augassign_ops(parse_str, exp):
     with pytest.raises(SyntaxError):
-        parser.parse(f"{exp} += z")
+        parse_str(f"{exp} += z")
 
 
 @pytest.mark.parametrize("exp", ["x > y", "x > y +=+= z"])
-def test_syntax_error_augassign_cmp(parser, exp):
+def test_syntax_error_augassign_cmp(parse_str, exp):
     with pytest.raises(SyntaxError):
-        parser.parse(f"{exp} += a")
+        parse_str(f"{exp} += a")
 
 
-def test_syntax_error_bar_kwonlyargs(parser):
+def test_syntax_error_bar_kwonlyargs(parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse("def spam(*):\n   pass\n", mode="exec")
+        parse_str("def spam(*):\n   pass\n", mode="exec")
 
 
-def test_syntax_error_nondefault_follows_default(parser):
+def test_syntax_error_nondefault_follows_default(parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse("def spam(x=1, y):\n   pass\n", mode="exec")
+        parse_str("def spam(x=1, y):\n   pass\n", mode="exec")
 
 
-def test_syntax_error_lambda_nondefault_follows_default(parser):
+def test_syntax_error_lambda_nondefault_follows_default(parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse("lambda x=1, y: x", mode="exec")
+        parse_str("lambda x=1, y: x", mode="exec")
 
 
 @pytest.mark.parametrize("first_prefix, second_prefix", itertools.permutations(["", "p", "b"], 2))
-def test_syntax_error_literal_concat_different(first_prefix, second_prefix, parser):
+def test_syntax_error_literal_concat_different(first_prefix, second_prefix, parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse(f"{first_prefix}'hello' {second_prefix}'world'")
+        parse_str(f"{first_prefix}'hello' {second_prefix}'world'")
 
 
-def test_get_repo_url(parser):
-    parser.parse(
+def test_get_repo_url(parse_str):
+    parse_str(
         "def get_repo_url():\n"
         "    raw = $(git remote get-url --push origin).rstrip()\n"
         "    return raw.replace('https://github.com/', '')\n"

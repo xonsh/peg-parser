@@ -75,6 +75,26 @@ def check_ast(parse_str):
 
 
 @pytest.fixture
+def check_stmts(check_ast):
+    def factory(inp, mode="exec", verbose=False):
+        if not inp.endswith("\n"):
+            inp += "\n"
+        check_ast(inp, mode=mode, verbose=verbose)
+
+    return factory
+
+
+@pytest.fixture
+def eval_code(parse_str):
+    def factory(text: str, mode="eval", **vars):
+        obs = parse_str(text, mode=mode)
+        bytecode = compile(obs, "<test-xonsh-ast>", mode)
+        return eval(bytecode, vars)
+
+    return factory
+
+
+@pytest.fixture
 def unparse_diff(parse_str):
     def factory(text: str, right: str | None = None, mode="eval"):
         import ast
@@ -93,5 +113,42 @@ def unparse_diff(parse_str):
             right = ast.parse(text).body[0]
             right = ast.unparse(right)
         assert left == right
+
+    return factory
+
+
+@pytest.fixture
+def check_xonsh_ast(parse_str):
+    """compatibility fixture"""
+
+    def factory(
+        xenv: dict,
+        inp,
+        run=True,
+        mode="eval",
+        debug_level=0,
+        return_obs=False,
+        globals=None,
+        locals=None,
+    ):
+        obs = parse_str(inp)
+        if obs is None:
+            return  # comment only
+        bytecode = compile(obs, "<test-xonsh-ast>", mode)
+        if run:
+            exec(bytecode, globals, locals)
+        return obs if return_obs else True
+
+    return factory
+
+
+@pytest.fixture
+def check_xonsh(check_xonsh_ast):
+    """compatibility fixture"""
+
+    def factory(xenv, inp, run=True, mode="exec"):
+        if not inp.endswith("\n"):
+            inp += "\n"
+        check_xonsh_ast(xenv, inp, run=run, mode=mode)
 
     return factory
