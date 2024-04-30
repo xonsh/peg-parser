@@ -1,6 +1,5 @@
 import ast
 import re
-import token
 from typing import IO, Any, Dict, List, Optional, Sequence, Set, Text, Tuple
 
 from pegen import grammar
@@ -92,7 +91,7 @@ class InvalidNodeVisitor(GrammarVisitor):
 
 
 class PythonCallMakerVisitor(GrammarVisitor):
-    def __init__(self, parser_generator: ParserGenerator):
+    def __init__(self, parser_generator: "PythonParserGenerator"):
         self.gen = parser_generator
         self.cache: Dict[Any, Any] = {}
         self.keywords: Set[str] = set()
@@ -104,19 +103,17 @@ class PythonCallMakerVisitor(GrammarVisitor):
             return "soft_keyword", "self.soft_keyword()"
         if name in (
             "NAME",
-            "NUMBER",
-            "STRING",
             "FSTRING_START",
             "FSTRING_MIDDLE",
             "FSTRING_END",
-            "OP",
-            "TYPE_COMMENT",
         ):
             name = name.lower()
             return name, f"self.{name}()"
         if name in ("NEWLINE", "DEDENT", "INDENT", "ENDMARKER", "ASYNC", "AWAIT"):
             # Avoid using names that can be Python keywords
             return "_" + name.lower(), f"self.expect({name!r})"
+        if name.isupper() and (token_num := self.gen.token_map.get(name)):
+            return name.lower(), f"self.token({token_num!r})"
         return name, f"self.{name}()"
 
     def visit_StringLeaf(self, node: StringLeaf) -> Tuple[str, str]:
@@ -228,10 +225,12 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
         self,
         grammar: grammar.Grammar,
         file: Optional[IO[Text]],
-        tokens: Set[str] = set(token.tok_name.values()),
+        token_map: dict[str, int],
         location_formatting: Optional[str] = None,
         unreachable_formatting: Optional[str] = None,
     ):
+        self.token_map = token_map
+        tokens = set(token_map)
         tokens.add("SOFT_KEYWORD")
         tokens.update(
             ["FSTRING_START", "FSTRING_MIDDLE", "FSTRING_END"]
