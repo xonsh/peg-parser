@@ -32,14 +32,14 @@ def display_top(snapshot, key_type="lineno", limit=10):
         )
         line = linecache.getline(frame.filename, frame.lineno).strip()
         if line:
-            print("    %s" % line)
+            print(f"    {line}")
 
     other = top_stats[limit:]
     if other:
         size = sum(stat.size for stat in other)
         print(f"{len(other)} other: {size / 1024:.1f} KiB")
     total = sum(stat.size for stat in top_stats) / 1024
-    print("Total allocated size: %.1f KiB" % (total))
+    print(f"Total allocated size: {total:.1f} KiB")
 
 
 @contextmanager
@@ -49,7 +49,7 @@ def timeit():
     print(f"Took: {time.time() - t : 0.2f}s")
 
 
-def get_file(name: str, out_path: Path = None, ts: str = None):
+def get_file(name: str, out_path: Path | None = None, ts: str | None = None):
     ts = ts or get_timestamp()
     out_path = (out_path or Path.cwd()) / name
     out_path.mkdir(exist_ok=True)

@@ -23,7 +23,7 @@ class Tokenizer:
     def __init__(self, tokengen: Iterator[tokenize.TokenInfo], *, path: str = "", verbose: bool = False):
         self._tokengen = tokengen
         self._tokens = []
-        self._index = 0
+        self._index = Mark(0)
         self._verbose = verbose
         self._lines: dict[int, str] = {}
         self._path = path
@@ -34,7 +34,7 @@ class Tokenizer:
         """Return the next token and updates the index."""
         cached = not self._index == len(self._tokens)
         tok = self.peek()
-        self._index += 1
+        self._index = Mark(self._index + Mark(1))
         if self._verbose:
             self.report(cached, False)
         return tok
@@ -43,7 +43,7 @@ class Tokenizer:
         """Return the next token *without* updating the index."""
         while self._index == len(self._tokens):
             tok = next(self._tokengen)
-            if tok.type in (tokenize.NL, tokenize.COMMENT):
+            if tok.type in (token.NL, token.COMMENT):
                 continue
             if tok.type == token.ERRORTOKEN and tok.string.isspace():
                 continue
@@ -61,7 +61,7 @@ class Tokenizer:
 
     def get_last_non_whitespace_token(self) -> tokenize.TokenInfo:
         for tok in reversed(self._tokens[: self._index]):
-            if tok.type != tokenize.ENDMARKER and (tok.type < tokenize.NEWLINE or tok.type > tokenize.DEDENT):
+            if tok.type != token.ENDMARKER and (tok.type < token.NEWLINE or tok.type > token.DEDENT):
                 break
         return tok
 

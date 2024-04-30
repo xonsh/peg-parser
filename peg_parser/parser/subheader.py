@@ -54,7 +54,7 @@ def logger(method: F) -> F:
     """
     method_name = method.__name__
 
-    def logger_wrapper(self: P, *args: object) -> T:
+    def logger_wrapper(self: P, *args: object) -> Any:
         if not self._verbose:
             return method(self, *args)
         argsr = ",".join(repr(arg) for arg in args)
@@ -74,7 +74,7 @@ def memoize(method: F) -> F:
     """Memoize a symbol method."""
     method_name = method.__name__
 
-    def memoize_wrapper(self: P, *args: object) -> T:
+    def memoize_wrapper(self: P, *args: object) -> Any:
         mark = self._mark()
         key = mark, method_name, args
         # Fast path: cache hit, and not verbose.
@@ -399,7 +399,7 @@ class Parser:
         text = token.string
         if not text.startswith(("'", '"')):
             prefix = text[:2].lower()
-            return prefix and "p" in prefix
+            return bool(prefix and ("p" in prefix))
         return False
 
     def generate_ast_for_string(self, tokens: list[tokenize.TokenInfo]):
@@ -422,12 +422,17 @@ class Parser:
 
         try:
             # ast.Module
-            m = ast.parse(source)
+            m: ast.Module = ast.parse(source)
         except SyntaxError as err:
             line_offset = tokens[0].start[0]
-            args = (err.filename, err.lineno + line_offset - 2, err.offset, err.text)
+            args: tuple[str | int | None, ...] = (
+                err.filename,
+                (err.lineno or 0) + line_offset - 2,
+                err.offset,
+                err.text,
+            )
             if sys.version_info >= (3, 10):
-                args += (err.end_lineno + line_offset - 2, err.end_offset)
+                args += (err.end_lineno + line_offset - 2, err.end_offset)  # type: ignore
             err_args = (err.msg, args)
 
         # Avoid getting a triple nesting in the error report that does not
@@ -435,7 +440,7 @@ class Parser:
         if err_args:
             raise SyntaxError(*err_args)
 
-        return m.body[0].value
+        return m.body[0].value  # type: ignore
 
     def extract_import_level(self, tokens: list[tokenize.TokenInfo]) -> int:
         """Extract the relative import level from the tokens preceding the module name.
@@ -483,7 +488,7 @@ class Parser:
 
         # Because we need to combine pos only with and without default even
         # the version with no default is a tuple
-        pos_only = [p for p, _ in pos_only]
+        pos_only = [p for p, _ in pos_only]  # type: ignore
         params = (param_no_default or []) + ([p for p, _ in param_default] if param_default else [])
 
         # If after_star is None, make a default tuple
@@ -499,7 +504,7 @@ class Parser:
             kwarg=after_star[2],
         )
 
-    def expand_env_name(self, a: tokenize.TokenInfo, b: ast.AST = None):
+    def expand_env_name(self, a: tokenize.TokenInfo, b: ast.AST | None = None):
         xenv = load_attribute_chain("__xonsh__.env", lineno=a.start[0], col=a.start[1])
         idx = ast.Index(value=ast.Constant(value=a.string[1:], lineno=a.start[0], col_offset=a.start[1] + 1))
         a_node = ast.Subscript(
@@ -515,7 +520,7 @@ class Parser:
         message: str,
         start: Optional[tuple[int, int]] = None,
         end: Optional[tuple[int, int]] = None,
-    ) -> None:
+    ) -> SyntaxError:
         line_from_token = start is None and end is None
         if start is None or end is None:
             tok = self._tokenizer.diagnose()
@@ -538,7 +543,7 @@ class Parser:
     ) -> None:
         raise self._build_syntax_error(message, start, end)
 
-    def make_syntax_error(self, message: str) -> None:
+    def make_syntax_error(self, message: str) -> SyntaxError:
         return self._build_syntax_error(message)
 
     def raise_syntax_error(self, message: str) -> None:
@@ -567,12 +572,13 @@ class Parser:
         else:
             start = start_node.lineno, start_node.col_offset
 
-        if isinstance(end_node, tokenize.TokenInfo):
-            end = end_node.end
-        else:
-            end = end_node.end_lineno, end_node.end_col_offset
+        end = (
+            end_node.end
+            if isinstance(end_node, tokenize.TokenInfo)
+            else (end_node.end_lineno, end_node.end_col_offset)
+        )
 
-        raise self._build_syntax_error(message, start, end)
+        raise self._build_syntax_error(message, start, end)  # type: ignore
 
     def raise_syntax_error_starting_from(
         self, message: str, start_node: Union[ast.AST, tokenize.TokenInfo]
@@ -590,7 +596,7 @@ class Parser:
         path: Path,
         py_version: Optional[tuple] = None,
         verbose: bool = False,
-    ) -> ast.Module:
+    ) -> ast.Module | None:
         """Parse a file or string."""
         with open(path) as f:
             tok_stream = tokenize.generate_tokens(f.readline)
@@ -601,7 +607,7 @@ class Parser:
                 filename=path.name,
                 py_version=py_version,
             )
-            return parser.parse("file")
+            return parser.parse("file")  # type: ignore
 
     @classmethod
     def parse_string(

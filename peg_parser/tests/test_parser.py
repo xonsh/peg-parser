@@ -2678,34 +2678,23 @@ def test_subproc_raw_str_literal(check_xonsh_ast):
 # test invalid expressions
 
 
-def test_syntax_error_del_literal(parser):
+@pytest.mark.parametrize(
+    "inp",
+    [
+        "del 7",
+        "del True",
+        "del ()",
+        "del foo()",
+        "del lambda x: 'yay'",
+        "del x if y else z",
+        "del x + y",
+        "del x and y",
+        "del -x",
+    ],
+)
+def test_syntax_error_del(inp, parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse("del 7")
-
-
-def test_syntax_error_del_constant(parser):
-    with pytest.raises(SyntaxError):
-        parser.parse("del True")
-
-
-def test_syntax_error_del_emptytuple(parser):
-    with pytest.raises(SyntaxError):
-        parser.parse("del ()")
-
-
-def test_syntax_error_del_call(parser):
-    with pytest.raises(SyntaxError):
-        parser.parse("del foo()")
-
-
-def test_syntax_error_del_lambda(parser):
-    with pytest.raises(SyntaxError):
-        parser.parse('del lambda x: "yay"')
-
-
-def test_syntax_error_del_ifexp(parser):
-    with pytest.raises(SyntaxError):
-        parser.parse("del x if y else z")
+        parse_str(inp)
 
 
 @pytest.mark.parametrize(
@@ -2715,58 +2704,48 @@ def test_syntax_error_del_ifexp(parser):
         "{i for i in foo}",
         "(i for i in foo)",
         "{k:v for k,v in d.items()}",
+        "x > y",
+        "x > y == z",
     ],
 )
-def test_syntax_error_del_comps(parser, exp):
+def test_syntax_error_del_inp(parse_str, exp):
     with pytest.raises(SyntaxError):
-        parser.parse(f"del {exp}")
+        parse_str(f"del {exp}")
 
 
-@pytest.mark.parametrize("exp", ["x + y", "x and y", "-x"])
-def test_syntax_error_del_ops(parser, exp):
+def test_syntax_error_lonely_del(parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse(f"del {exp}")
+        parse_str("del")
 
 
-@pytest.mark.parametrize("exp", ["x > y", "x > y == z"])
-def test_syntax_error_del_cmp(parser, exp):
+def test_syntax_error_assign_literal(parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse(f"del {exp}")
+        parse_str("7 = x")
 
 
-def test_syntax_error_lonely_del(parser):
+def test_syntax_error_assign_constant(parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse("del")
+        parse_str("True = 8")
 
 
-def test_syntax_error_assign_literal(parser):
+def test_syntax_error_assign_emptytuple(parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse("7 = x")
+        parse_str("() = x")
 
 
-def test_syntax_error_assign_constant(parser):
+def test_syntax_error_assign_call(parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse("True = 8")
+        parse_str("foo() = x")
 
 
-def test_syntax_error_assign_emptytuple(parser):
+def test_syntax_error_assign_lambda(parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse("() = x")
+        parse_str('lambda x: "yay" = y')
 
 
-def test_syntax_error_assign_call(parser):
+def test_syntax_error_assign_ifexp(parse_str):
     with pytest.raises(SyntaxError):
-        parser.parse("foo() = x")
-
-
-def test_syntax_error_assign_lambda(parser):
-    with pytest.raises(SyntaxError):
-        parser.parse('lambda x: "yay" = y')
-
-
-def test_syntax_error_assign_ifexp(parser):
-    with pytest.raises(SyntaxError):
-        parser.parse("x if y else z = 8")
+        parse_str("x if y else z = 8")
 
 
 @pytest.mark.parametrize(
