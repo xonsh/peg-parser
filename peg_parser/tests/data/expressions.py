@@ -48,11 +48,6 @@ more lines
 """
 
 
-rf"""
-some long lines
-more line
-"""
-
 
 r"""
 some long lines
