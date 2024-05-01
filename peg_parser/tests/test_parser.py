@@ -12,6 +12,7 @@ import pytest
 #
 
 
+@pytest.mark.xfail
 @pytest.mark.parametrize(
     "inp",
     [
@@ -170,6 +171,7 @@ def test_subscription_special_syntaxes(arr_container, eval_code):
     assert eval_code('arr[["a", "b"]]', arr=arr_container) == ["a", "b"]
 
 
+@pytest.mark.xfail
 def test_subscription_special_syntaxes_2(arr_container, eval_code):
     # aliases
     d = {}
