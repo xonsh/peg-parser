@@ -30,12 +30,26 @@ import functools
 import io
 import itertools as _itertools
 import re
-from builtins import open as _builtin_open
 from codecs import BOM_UTF8, lookup
-from typing import NamedTuple
+from typing import Callable, NamedTuple
 
-from peg_parser.parser.token import *  # noqa
-from peg_parser.parser.token import EXACT_TOKEN_TYPES
+from peg_parser.parser.token import (
+    COMMENT,
+    DEDENT,
+    ENCODING,
+    ENDMARKER,
+    ENVNAME,
+    ERRORTOKEN,
+    EXACT_TOKEN_TYPES,
+    INDENT,
+    NAME,
+    NEWLINE,
+    NL,
+    NUMBER,
+    OP,
+    STRING,
+    tok_name,
+)
 
 cookie_re = re.compile(r"^[ \t\f]*#.*?coding[:=][ \t]*([-\w.]+)", re.ASCII)
 blank_re = re.compile(rb"^[ \t\f]*(?:[#\r\n]|$)", re.ASCII)
@@ -193,7 +207,7 @@ def _get_normal_name(orig_enc):
     return orig_enc
 
 
-def detect_encoding(readline):
+def detect_encoding(readline: Callable[[], bytes]) -> tuple[str, list[bytes]]:
     """
     The detect_encoding() function is used to detect the encoding that should
     be used to decode a Python source file.  It requires one argument, readline,
@@ -211,7 +225,7 @@ def detect_encoding(readline):
     If no encoding is specified, then the default of 'utf-8' will be returned.
     """
     try:
-        filename = readline.__self__.name
+        filename = readline.__self__.name  # type: ignore
     except AttributeError:
         filename = None
     bom_found = False
@@ -286,22 +300,6 @@ def detect_encoding(readline):
     return default, [first, second]
 
 
-def open(filename):
-    """Open a file in read only mode using the encoding detected by
-    detect_encoding().
-    """
-    buffer = _builtin_open(filename, "rb")
-    try:
-        encoding, lines = detect_encoding(buffer.readline)
-        buffer.seek(0)
-        text = io.TextIOWrapper(buffer, encoding, line_buffering=True)
-        text.mode = "r"
-        return text
-    except:
-        buffer.close()
-        raise
-
-
 def tokenize(readline):
     """
     The tokenize() generator requires one argument, readline, which
@@ -327,172 +325,252 @@ def tokenize(readline):
     return _tokenize(rl_gen.__next__, encoding)
 
 
+class TokenizerState:
+    def __init__(self):
+        self.lnum = 0
+        self.parenlev = 0
+        self.continued = False
+        self.indents = [0]
+        self.last_line = ""
+        self.line = ""
+        self.pos = 0
+        self.max = 0
+
+    def move_next_line(self, readline, encoding):
+        self.last_line = self.line
+        try:
+            # We capture the value of the line variable here because
+            # readline uses the empty string '' to signal end of input,
+            # hence `line` itself will always be overwritten at the end
+            # of this loop.
+            self.line = readline()
+        except StopIteration:
+            return b""
+        if encoding is not None:
+            self.line = self.line.decode(encoding)
+        self.lnum += 1
+        self.pos = 0
+        self.max = len(self.line)
+
+
+class ContStrState:
+    def __init__(self):
+        self.contstr = ""
+        self.needcont = 0
+        self.contline = None
+        self.strstart = None
+        self.endprog = None
+
+    def reset(self):
+        self.contline = None
+        self.contstr = None
+
+    def reset_cont(self):
+        self.reset()
+        self.needcont = 0
+
+    def join(self, state: TokenizerState):
+        self.contstr += state.line
+        self.contline += state.line
+
+
+def next_statement(state: TokenizerState):
+    if not state.line:
+        return False  # break parent loop
+    column = 0
+    while state.pos < state.max:  # measure leading whitespace
+        if state.line[state.pos] == " ":
+            column += 1
+        elif state.line[state.pos] == "\t":
+            column = (column // tabsize + 1) * tabsize
+        elif state.line[state.pos] == "\f":
+            column = 0
+        else:
+            break
+        state.pos += 1
+
+    if state.pos == state.max:
+        return False  # break parent loop
+
+    if state.line[state.pos] in "#\r\n":  # skip comments or blank lines
+        if state.line[state.pos] == "#":
+            comment_token = state.line[state.pos :].rstrip("\r\n")
+            yield TokenInfo(
+                COMMENT,
+                comment_token,
+                (state.lnum, state.pos),
+                (state.lnum, state.pos + len(comment_token)),
+                state.line,
+            )
+            state.pos += len(comment_token)
+
+        yield TokenInfo(
+            NL, state.line[state.pos :], (state.lnum, state.pos), (state.lnum, len(state.line)), state.line
+        )
+        return True  # continue
+
+    if column > state.indents[-1]:  # count indents or dedents
+        state.indents.append(column)
+        yield TokenInfo(INDENT, state.line[: state.pos], (state.lnum, 0), (state.lnum, state.pos), state.line)
+    while column < state.indents[-1]:
+        if column not in state.indents:
+            raise IndentationError(
+                "unindent does not match any outer indentation level",
+                ("<tokenize>", state.lnum, state.pos, state.line),
+            )
+        state.indents = state.indents[:-1]
+
+        yield TokenInfo(DEDENT, "", (state.lnum, state.pos), (state.lnum, state.pos), state.line)
+
+
+def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrState):
+    start, end = pseudomatch.span(1)
+    spos, epos, state.pos = (state.lnum, start), (state.lnum, end), end
+    if start == end:
+        return True  # continue
+    cap_groups: dict[str, str | None] = pseudomatch.groupdict()
+    token, initial = state.line[start:end], state.line[start]
+
+    if (
+        cap_groups.get("Number")  # ordinary number
+        or (initial == "." and token != "." and token != "...")
+    ):
+        yield TokenInfo(NUMBER, token, spos, epos, state.line)
+    elif initial in "\r\n":
+        if state.parenlev > 0:
+            yield TokenInfo(NL, token, spos, epos, state.line)
+        else:
+            yield TokenInfo(NEWLINE, token, spos, epos, state.line)
+
+    elif cap_groups.get("Comment"):
+        assert not token.endswith("\n")
+        yield TokenInfo(COMMENT, token, spos, epos, state.line)
+
+    elif cap_groups.get("Triple"):
+        cont_str.endprog = _compile(endpats[cap_groups["tquote"] or "'''"])
+        endmatch = cont_str.endprog.match(state.line, state.pos)
+        if endmatch:  # all on one line
+            state.pos = endmatch.end(0)
+            token = state.line[start : state.pos]
+            yield TokenInfo(STRING, token, spos, (state.lnum, state.pos), state.line)
+        else:
+            cont_str.strstart = (state.lnum, start)  # multiple lines
+            cont_str.contstr = state.line[start:]
+            cont_str.contline = state.line
+            return False
+
+    # Also note that single quote checking must come after
+    #  triple quote checking (above).
+    elif cap_groups.get("ContStr"):
+        if token[-1] == "\n":  # continued string
+            cont_str.strstart = (state.lnum, start)
+            # check for matching quote
+            quote = (cap_groups["Str2"] or "")[0]
+            cont_str.endprog = _compile(endpats[quote])
+            cont_str.contstr, cont_str.needcont = state.line[start:], 1
+            cont_str.contline = state.line
+            return False
+        else:  # ordinary string
+            yield TokenInfo(STRING, token, spos, epos, state.line)
+
+    elif cap_groups.get("Name"):  # ordinary name
+        yield TokenInfo(NAME, token, spos, epos, state.line)
+    elif cap_groups.get("EnvName"):  # ordinary name
+        yield TokenInfo(ENVNAME, token, spos, epos, state.line)
+    elif initial == "\\":  # continued stmt
+        state.continued = True
+    else:
+        if initial in "([{":
+            state.parenlev += 1
+        elif initial in ")]}":
+            state.parenlev -= 1
+        yield TokenInfo(OP, token, spos, epos, state.line)
+
+
 def _tokenize(readline, encoding):
-    lnum = parenlev = continued = 0
-    contstr, needcont = "", 0
-    contline = None
-    indents = [0]
+    state = TokenizerState()
+    cont_str = ContStrState()
 
     if encoding is not None:
         if encoding == "utf-8-sig":
             # BOM will already have been stripped.
             encoding = "utf-8"
         yield TokenInfo(ENCODING, encoding, (0, 0), (0, 0), "")
-    last_line = b""
-    line = b""
+
     while True:  # loop over lines in stream
-        try:
-            # We capture the value of the line variable here because
-            # readline uses the empty string '' to signal end of input,
-            # hence `line` itself will always be overwritten at the end
-            # of this loop.
-            last_line = line
-            line = readline()
-        except StopIteration:
-            line = b""
+        state.move_next_line(readline, encoding)
 
-        if encoding is not None:
-            line = line.decode(encoding)
-        lnum += 1
-        pos, max = 0, len(line)
-
-        if contstr:  # continued string
-            if not line:
-                raise TokenError("EOF in multi-line string", strstart)
-            endmatch = endprog.match(line)
+        if cont_str.contstr:  # continued string
+            if not state.line:
+                raise TokenError("EOF in multi-line string", cont_str.strstart)
+            endmatch = cont_str.endprog.match(state.line)
             if endmatch:
-                pos = end = endmatch.end(0)
-                yield TokenInfo(STRING, contstr + line[:end], strstart, (lnum, end), contline + line)
-                contstr, needcont = "", 0
-                contline = None
-            elif needcont and line[-2:] != "\\\n" and line[-3:] != "\\\r\n":
-                yield TokenInfo(ERRORTOKEN, contstr + line, strstart, (lnum, len(line)), contline)
-                contstr = ""
-                contline = None
+                state.pos = end = endmatch.end(0)
+                yield TokenInfo(
+                    STRING,
+                    cont_str.contstr + state.line[:end],
+                    cont_str.strstart,
+                    (state.lnum, end),
+                    cont_str.contline + state.line,
+                )
+                cont_str.reset_cont()
+            elif cont_str.needcont and state.line[-2:] != "\\\n" and state.line[-3:] != "\\\r\n":
+                yield TokenInfo(
+                    ERRORTOKEN,
+                    cont_str.contstr + state.line,
+                    cont_str.strstart,
+                    (state.lnum, len(state.line)),
+                    cont_str.contline,
+                )
+                cont_str.reset()
                 continue
             else:
-                contstr = contstr + line
-                contline = contline + line
+                cont_str.join(state)
                 continue
 
-        elif parenlev == 0 and not continued:  # new statement
-            if not line:
-                break
-            column = 0
-            while pos < max:  # measure leading whitespace
-                if line[pos] == " ":
-                    column += 1
-                elif line[pos] == "\t":
-                    column = (column // tabsize + 1) * tabsize
-                elif line[pos] == "\f":
-                    column = 0
-                else:
-                    break
-                pos += 1
-            if pos == max:
-                break
-
-            if line[pos] in "#\r\n":  # skip comments or blank lines
-                if line[pos] == "#":
-                    comment_token = line[pos:].rstrip("\r\n")
-                    yield TokenInfo(
-                        COMMENT, comment_token, (lnum, pos), (lnum, pos + len(comment_token)), line
-                    )
-                    pos += len(comment_token)
-
-                yield TokenInfo(NL, line[pos:], (lnum, pos), (lnum, len(line)), line)
+        elif state.parenlev == 0 and not state.continued:  # new statement
+            loop_action = yield from next_statement(state)
+            if loop_action is True:
                 continue
-
-            if column > indents[-1]:  # count indents or dedents
-                indents.append(column)
-                yield TokenInfo(INDENT, line[:pos], (lnum, 0), (lnum, pos), line)
-            while column < indents[-1]:
-                if column not in indents:
-                    raise IndentationError(
-                        "unindent does not match any outer indentation level", ("<tokenize>", lnum, pos, line)
-                    )
-                indents = indents[:-1]
-
-                yield TokenInfo(DEDENT, "", (lnum, pos), (lnum, pos), line)
+            elif loop_action is False:
+                break
+            # None has no effect
 
         else:  # continued statement
-            if not line:
-                raise TokenError("EOF in multi-line statement", (lnum, 0))
-            continued = 0
+            if not state.line:
+                raise TokenError("EOF in multi-line statement", (state.lnum, 0))
+            state.continued = False
 
-        while pos < max:
-            pseudomatch = _compile(PseudoToken).match(line, pos)
+        while state.pos < state.max:
+            pseudomatch = _compile(PseudoToken).match(state.line, state.pos)
             if pseudomatch:  # scan for tokens
-                start, end = pseudomatch.span(1)
-                spos, epos, pos = (lnum, start), (lnum, end), end
-                if start == end:
+                loop_action = yield from next_psuedo_matches(pseudomatch, state, cont_str)
+                if loop_action is True:
                     continue
-                cap_groups: dict[str, str | None] = pseudomatch.groupdict()
-                token, initial = line[start:end], line[start]
-
-                if (
-                    cap_groups.get("Number")  # ordinary number
-                    or (initial == "." and token != "." and token != "...")
-                ):
-                    yield TokenInfo(NUMBER, token, spos, epos, line)
-                elif initial in "\r\n":
-                    if parenlev > 0:
-                        yield TokenInfo(NL, token, spos, epos, line)
-                    else:
-                        yield TokenInfo(NEWLINE, token, spos, epos, line)
-
-                elif cap_groups.get("Comment"):
-                    assert not token.endswith("\n")
-                    yield TokenInfo(COMMENT, token, spos, epos, line)
-
-                elif cap_groups.get("Triple"):
-                    endprog = _compile(endpats[cap_groups.get("tquote")])
-                    endmatch = endprog.match(line, pos)
-                    if endmatch:  # all on one line
-                        pos = endmatch.end(0)
-                        token = line[start:pos]
-                        yield TokenInfo(STRING, token, spos, (lnum, pos), line)
-                    else:
-                        strstart = (lnum, start)  # multiple lines
-                        contstr = line[start:]
-                        contline = line
-                        break
-
-                # Also note that single quote checking must come after
-                #  triple quote checking (above).
-                elif cap_groups.get("ContStr"):
-                    if token[-1] == "\n":  # continued string
-                        strstart = (lnum, start)
-                        # check for matching quote
-                        endprog = _compile(endpats[cap_groups["Str2"][0]])
-                        contstr, needcont = line[start:], 1
-                        contline = line
-                        break
-                    else:  # ordinary string
-                        yield TokenInfo(STRING, token, spos, epos, line)
-
-                elif cap_groups.get("Name"):  # ordinary name
-                    yield TokenInfo(NAME, token, spos, epos, line)
-                elif cap_groups.get("EnvName"):  # ordinary name
-                    yield TokenInfo(ENVNAME, token, spos, epos, line)
-                elif initial == "\\":  # continued stmt
-                    continued = 1
-                else:
-                    if initial in "([{":
-                        parenlev += 1
-                    elif initial in ")]}":
-                        parenlev -= 1
-                    yield TokenInfo(OP, token, spos, epos, line)
+                elif loop_action is False:
+                    break
             else:
-                yield TokenInfo(ERRORTOKEN, line[pos], (lnum, pos), (lnum, pos + 1), line)
-                pos += 1
+                yield TokenInfo(
+                    ERRORTOKEN,
+                    state.line[state.pos],
+                    (state.lnum, state.pos),
+                    (state.lnum, state.pos + 1),
+                    state.line,
+                )
+                state.pos += 1
 
     # Add an implicit NEWLINE if the input doesn't end in one
-    if last_line and last_line[-1] not in "\r\n" and not last_line.strip().startswith("#"):
-        yield TokenInfo(NEWLINE, "", (lnum - 1, len(last_line)), (lnum - 1, len(last_line) + 1), "")
-    for _ in indents[1:]:  # pop remaining indent levels
-        yield TokenInfo(DEDENT, "", (lnum, 0), (lnum, 0), "")
-    yield TokenInfo(ENDMARKER, "", (lnum, 0), (lnum, 0), "")
+    if state.last_line and state.last_line[-1] not in "\r\n" and not state.last_line.strip().startswith("#"):
+        yield TokenInfo(
+            NEWLINE,
+            "",
+            (state.lnum - 1, len(state.last_line)),
+            (state.lnum - 1, len(state.last_line) + 1),
+            "",
+        )
+    for _ in state.indents[1:]:  # pop remaining indent levels
+        yield TokenInfo(DEDENT, "", (state.lnum, 0), (state.lnum, 0), "")
+    yield TokenInfo(ENDMARKER, "", (state.lnum, 0), (state.lnum, 0), "")
 
 
 def generate_tokens(readline):
