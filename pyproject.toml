@@ -8,22 +8,6 @@ fixable = ["ALL"]
 
 # ruff ignore file "xonsh_parser/ply/yacc.py"
 [tool.ruff.lint.per-file-ignores]
-"xonsh_parser/ply/*.py" = [
-    "F401", # [*] `ast.Or` imported but unused
-    "E501", # Line too long (98 > 88 characters)
-    "E731", #  [*] Do not assign a `lambda` expression, use a `def`
-    "B007", # Loop control variable `rule` not used within loop body
-    "B904", # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
-]
-"xonsh_parser/xast.py" = [
-    "F401", # [*] `ast.Add` imported but unused
-]
-"xonsh_parser/parsers/*.py" = [
-    "E501", # Line too long (121 > 88 characters)
-]
-"xonsh_parser/*.py" = [
-    "E741" # Ambiguous variable name: `l` -- todo: fix this
-]
 "*/tokenize.py" = [
     "F405", #
     "F821", # Undefined name `strstart`
@@ -34,8 +18,6 @@ fixable = ["ALL"]
 
 [tool.pytest.ini_options]
 addopts = ""
-
-
 
 [tool.pdm]
 [project.optional-dependencies]
@@ -62,27 +44,12 @@ dev = [
 [tool.hatch.envs.default.scripts]
 test = "pytest"
 test-cov-xml = "pytest --cov=xonsh_parser/ --cov-report=term-missing --cov-report=xml"
-lint = [
-  "black .",
-  "ruff --fix .",
-  "mypy xonsh_parser/",
-]
-lint-check = [
-  "black --check .",
-  "ruff .",
-  "mypy xonsh_parser/",
-]
 bench = [
     "asv run --python=same --show-stderr", # quickly run benchmarks
 ]
 bench-view = [
     "asv publish",
     "asv preview",
-]
-type = [
-    "monkeytype run tests/sample.py",
-    "monkeytype list-modules",
-    'echo "monkeytype apply xonsh_parser"',
 ]
 docs-serve = "mkdocs serve"
 docs-build = "mkdocs build"
