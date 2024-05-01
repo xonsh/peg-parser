@@ -3,6 +3,7 @@
 import ast
 import difflib
 import io
+import sys
 import textwrap
 import tokenize as pytokenize
 from pathlib import Path
@@ -30,6 +31,7 @@ def dump_diff(**trees: ast.AST):
         "call.py",
         "comprehensions.py",
         "expressions.py",
+        "fstrings.py",
         "function_def.py",
         "imports.py",
         "lambdas.py",
@@ -40,6 +42,19 @@ def dump_diff(**trees: ast.AST):
         "simple_decorators.py",
         "statements.py",
         "with_statement_multi_items.py",
+        pytest.param(
+            "try_except_group.py",
+            marks=pytest.mark.skipif(
+                sys.version_info <= (3, 11), reason="except* allowed only in Python 3.11+"
+            ),
+        ),
+        pytest.param(
+            "type_params.py",
+            marks=pytest.mark.skipif(
+                sys.version_info <= (3, 12),
+                reason="type declarations allowed only in Python 3.12+",
+            ),
+        ),
     ],
 )
 def test_parser(python_parse_file, python_parse_str, filename):
