@@ -1095,7 +1095,8 @@ fstring:
      }
 
 strings (memo): a=(fstring|STRING)+ {
-    self.concatenate_strings(a) if sys.version_info >= (3, 12) else self.generate_ast_for_string(a)
+    # self.concatenate_strings(a) if sys.version_info >= (3, 12) else
+    self.generate_ast_for_string(a)
  }
 
 list[ast.List]:
