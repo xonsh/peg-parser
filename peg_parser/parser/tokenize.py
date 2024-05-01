@@ -30,13 +30,11 @@ import functools
 import io
 import itertools as _itertools
 import re
-from codecs import BOM_UTF8, lookup
-from typing import Callable, NamedTuple
+from typing import NamedTuple
 
 from peg_parser.parser.token import (
     COMMENT,
     DEDENT,
-    ENCODING,
     ENDMARKER,
     ENVNAME,
     ERRORTOKEN,
@@ -207,124 +205,6 @@ def _get_normal_name(orig_enc):
     return orig_enc
 
 
-def detect_encoding(readline: Callable[[], bytes]) -> tuple[str, list[bytes]]:
-    """
-    The detect_encoding() function is used to detect the encoding that should
-    be used to decode a Python source file.  It requires one argument, readline,
-    in the same way as the tokenize() generator.
-
-    It will call readline a maximum of twice, and return the encoding used
-    (as a string) and a list of any lines (left as bytes) it has read in.
-
-    It detects the encoding from the presence of a utf-8 bom or an encoding
-    cookie as specified in pep-0263.  If both a bom and a cookie are present,
-    but disagree, a SyntaxError will be raised.  If the encoding cookie is an
-    invalid charset, raise a SyntaxError.  Note that if a utf-8 bom is found,
-    'utf-8-sig' is returned.
-
-    If no encoding is specified, then the default of 'utf-8' will be returned.
-    """
-    try:
-        filename = readline.__self__.name  # type: ignore
-    except AttributeError:
-        filename = None
-    bom_found = False
-    encoding = None
-    default = "utf-8"
-
-    def read_or_stop():
-        try:
-            return readline()
-        except StopIteration:
-            return b""
-
-    def find_cookie(line):
-        try:
-            # Decode as UTF-8. Either the line is an encoding declaration,
-            # in which case it should be pure ASCII, or it must be UTF-8
-            # per default encoding.
-            line_string = line.decode("utf-8")
-        except UnicodeDecodeError:
-            msg = "invalid or missing encoding declaration"
-            if filename is not None:
-                msg = f"{msg} for {filename!r}"
-            raise SyntaxError(msg)
-
-        match = cookie_re.match(line_string)
-        if not match:
-            return None
-        encoding = _get_normal_name(match.group(1))
-        try:
-            lookup(encoding)
-        except LookupError:
-            # This behaviour mimics the Python interpreter
-            if filename is None:
-                msg = "unknown encoding: " + encoding
-            else:
-                msg = f"unknown encoding for {filename!r}: {encoding}"
-            raise SyntaxError(msg)
-
-        if bom_found:
-            if encoding != "utf-8":
-                # This behaviour mimics the Python interpreter
-                if filename is None:
-                    msg = "encoding problem: utf-8"
-                else:
-                    msg = f"encoding problem for {filename!r}: utf-8"
-                raise SyntaxError(msg)
-            encoding += "-sig"
-        return encoding
-
-    first = read_or_stop()
-    if first.startswith(BOM_UTF8):
-        bom_found = True
-        first = first[3:]
-        default = "utf-8-sig"
-    if not first:
-        return default, []
-
-    encoding = find_cookie(first)
-    if encoding:
-        return encoding, [first]
-    if not blank_re.match(first):
-        return default, [first]
-
-    second = read_or_stop()
-    if not second:
-        return default, [first]
-
-    encoding = find_cookie(second)
-    if encoding:
-        return encoding, [first, second]
-
-    return default, [first, second]
-
-
-def tokenize(readline):
-    """
-    The tokenize() generator requires one argument, readline, which
-    must be a callable object which provides the same interface as the
-    readline() method of built-in file objects.  Each call to the function
-    should return one line of input as bytes.  Alternatively, readline
-    can be a callable function terminating with StopIteration:
-        readline = open(myfile, 'rb').__next__  # Example of alternate readline
-
-    The generator produces 5-tuples with these members: the token type; the
-    token string; a 2-tuple (srow, scol) of ints specifying the row and
-    column where the token begins in the source; a 2-tuple (erow, ecol) of
-    ints specifying the row and column where the token ends in the source;
-    and the line on which the token was found.  The line passed is the
-    physical line.
-
-    The first token sequence will always be an ENCODING token
-    which tells you which encoding was used to decode the bytes stream.
-    """
-    encoding, consumed = detect_encoding(readline)
-    empty = _itertools.repeat(b"")
-    rl_gen = _itertools.chain(consumed, iter(readline, b""), empty)
-    return _tokenize(rl_gen.__next__, encoding)
-
-
 class TokenizerState:
     def __init__(self):
         self.lnum = 0
@@ -336,7 +216,7 @@ class TokenizerState:
         self.pos = 0
         self.max = 0
 
-    def move_next_line(self, readline, encoding):
+    def move_next_line(self, readline):
         self.last_line = self.line
         try:
             # We capture the value of the line variable here because
@@ -345,9 +225,7 @@ class TokenizerState:
             # of this loop.
             self.line = readline()
         except StopIteration:
-            return b""
-        if encoding is not None:
-            self.line = self.line.decode(encoding)
+            self.line = ""
         self.lnum += 1
         self.pos = 0
         self.max = len(self.line)
@@ -356,10 +234,10 @@ class TokenizerState:
 class ContStrState:
     def __init__(self):
         self.contstr = ""
-        self.needcont = 0
-        self.contline = None
-        self.strstart = None
-        self.endprog = None
+        self.needcont = False
+        self.contline = None  # str
+        self.strstart = None  # tuple[int, int]
+        self.endprog = None  # re.Pattern[str]
 
     def reset(self):
         self.contline = None
@@ -367,11 +245,45 @@ class ContStrState:
 
     def reset_cont(self):
         self.reset()
-        self.needcont = 0
+        self.needcont = False
 
     def join(self, state: TokenizerState):
         self.contstr += state.line
         self.contline += state.line
+
+    def start(self, state: TokenizerState, start: int):
+        self.strstart = (state.lnum, start)  # multiple lines
+        self.contstr = state.line[start:]
+        self.contline = state.line
+
+
+def next_cont_string(cont_str: ContStrState, state: TokenizerState):
+    if not state.line:
+        raise TokenError("EOF in multi-line string", cont_str.strstart)
+    endmatch = cont_str.endprog.match(state.line)
+    if endmatch:
+        state.pos = end = endmatch.end(0)
+        yield TokenInfo(
+            STRING,
+            cont_str.contstr + state.line[:end],
+            cont_str.strstart,
+            (state.lnum, end),
+            cont_str.contline + state.line,
+        )
+        cont_str.reset_cont()
+    elif cont_str.needcont and state.line[-2:] != "\\\n" and state.line[-3:] != "\\\r\n":
+        yield TokenInfo(
+            ERRORTOKEN,
+            cont_str.contstr + state.line,
+            cont_str.strstart,
+            (state.lnum, len(state.line)),
+            cont_str.contline,
+        )
+        cont_str.reset()
+        return True
+    else:
+        cont_str.join(state)
+        return True
 
 
 def next_statement(state: TokenizerState):
@@ -454,21 +366,18 @@ def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrSta
             token = state.line[start : state.pos]
             yield TokenInfo(STRING, token, spos, (state.lnum, state.pos), state.line)
         else:
-            cont_str.strstart = (state.lnum, start)  # multiple lines
-            cont_str.contstr = state.line[start:]
-            cont_str.contline = state.line
+            cont_str.start(state, start)
             return False
 
     # Also note that single quote checking must come after
     #  triple quote checking (above).
     elif cap_groups.get("ContStr"):
         if token[-1] == "\n":  # continued string
-            cont_str.strstart = (state.lnum, start)
+            cont_str.start(state, start)
             # check for matching quote
             quote = (cap_groups["Str2"] or "")[0]
             cont_str.endprog = _compile(endpats[quote])
-            cont_str.contstr, cont_str.needcont = state.line[start:], 1
-            cont_str.contline = state.line
+            cont_str.needcont = True
             return False
         else:  # ordinary string
             yield TokenInfo(STRING, token, spos, epos, state.line)
@@ -487,46 +396,34 @@ def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrSta
         yield TokenInfo(OP, token, spos, epos, state.line)
 
 
-def _tokenize(readline, encoding):
+def next_end_tokens(state: TokenizerState):
+    # Add an implicit NEWLINE if the input doesn't end in one
+    if state.last_line and state.last_line[-1] not in "\r\n" and not state.last_line.strip().startswith("#"):
+        yield TokenInfo(
+            NEWLINE,
+            "",
+            (state.lnum - 1, len(state.last_line)),
+            (state.lnum - 1, len(state.last_line) + 1),
+            "",
+        )
+    for _ in state.indents[1:]:  # pop remaining indent levels
+        yield TokenInfo(DEDENT, "", (state.lnum, 0), (state.lnum, 0), "")
+    yield TokenInfo(ENDMARKER, "", (state.lnum, 0), (state.lnum, 0), "")
+
+
+def _tokenize(readline):
     state = TokenizerState()
     cont_str = ContStrState()
 
-    if encoding is not None:
-        if encoding == "utf-8-sig":
-            # BOM will already have been stripped.
-            encoding = "utf-8"
-        yield TokenInfo(ENCODING, encoding, (0, 0), (0, 0), "")
-
     while True:  # loop over lines in stream
-        state.move_next_line(readline, encoding)
+        state.move_next_line(readline)
 
         if cont_str.contstr:  # continued string
-            if not state.line:
-                raise TokenError("EOF in multi-line string", cont_str.strstart)
-            endmatch = cont_str.endprog.match(state.line)
-            if endmatch:
-                state.pos = end = endmatch.end(0)
-                yield TokenInfo(
-                    STRING,
-                    cont_str.contstr + state.line[:end],
-                    cont_str.strstart,
-                    (state.lnum, end),
-                    cont_str.contline + state.line,
-                )
-                cont_str.reset_cont()
-            elif cont_str.needcont and state.line[-2:] != "\\\n" and state.line[-3:] != "\\\r\n":
-                yield TokenInfo(
-                    ERRORTOKEN,
-                    cont_str.contstr + state.line,
-                    cont_str.strstart,
-                    (state.lnum, len(state.line)),
-                    cont_str.contline,
-                )
-                cont_str.reset()
+            loop_action = yield from next_cont_string(cont_str, state)
+            if loop_action is True:
                 continue
-            else:
-                cont_str.join(state)
-                continue
+            elif loop_action is False:
+                break
 
         elif state.parenlev == 0 and not state.continued:  # new statement
             loop_action = yield from next_statement(state)
@@ -559,18 +456,7 @@ def _tokenize(readline, encoding):
                 )
                 state.pos += 1
 
-    # Add an implicit NEWLINE if the input doesn't end in one
-    if state.last_line and state.last_line[-1] not in "\r\n" and not state.last_line.strip().startswith("#"):
-        yield TokenInfo(
-            NEWLINE,
-            "",
-            (state.lnum - 1, len(state.last_line)),
-            (state.lnum - 1, len(state.last_line) + 1),
-            "",
-        )
-    for _ in state.indents[1:]:  # pop remaining indent levels
-        yield TokenInfo(DEDENT, "", (state.lnum, 0), (state.lnum, 0), "")
-    yield TokenInfo(ENDMARKER, "", (state.lnum, 0), (state.lnum, 0), "")
+    yield from next_end_tokens(state)
 
 
 def generate_tokens(readline):
@@ -581,4 +467,4 @@ def generate_tokens(readline):
     """
     if isinstance(readline, str):
         readline = io.StringIO(readline).readline
-    return _tokenize(readline, None)
+    return _tokenize(readline)
