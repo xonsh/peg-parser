@@ -103,9 +103,6 @@ class PythonCallMakerVisitor(GrammarVisitor):
             return "soft_keyword", "self.soft_keyword()"
         if name in (
             "NAME",
-            "FSTRING_START",
-            "FSTRING_MIDDLE",
-            "FSTRING_END",
         ):
             name = name.lower()
             return name, f"self.{name}()"

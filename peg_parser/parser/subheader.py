@@ -1,7 +1,8 @@
 import ast
+import enum
 import sys
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Literal, Optional, TypeVar, Union, cast
+from typing import Any, Callable, ClassVar, Literal, NoReturn, Optional, TypeVar, Union, cast
 
 from peg_parser.parser import token, tokenize
 from peg_parser.parser.tokenizer import Mark, Tokenizer, exact_token_types
@@ -215,6 +216,12 @@ def xonsh_call(name, args, lineno=None, col=None) -> ast.Call:
     )
 
 
+class Target(enum.Enum):
+    FOR_TARGETS = enum.auto()
+    STAR_TARGETS = enum.auto()
+    DEL_TARGETS = enum.auto()
+
+
 class Parser:
     KEYWORDS: ClassVar[tuple[str, ...]]
     SOFT_KEYWORDS: ClassVar[tuple[str, ...]]
@@ -289,11 +296,6 @@ class Parser:
             return self._tokenizer.getnext()
         return None
 
-    def expect_forced(self, res: Any, expectation: str) -> Optional[tokenize.TokenInfo]:
-        if res is None:
-            raise self.make_syntax_error(f"expected {expectation}")
-        return res
-
     def positive_lookahead(self, func: Callable[..., T], *args: object) -> T:
         mark = self._mark()
         ok = func(*args)
@@ -325,7 +327,7 @@ class Parser:
 
                 res = getattr(self, rule)()
 
-            self.raise_syntax_error_starting_from("invalid syntax", last_token)
+            self.raise_raw_syntax_error("invalid syntax", last_token.start, last_token.end)
 
         return res
 
@@ -336,9 +338,13 @@ class Parser:
         else:
             raise SyntaxError(f"{error_msg} is only supported in Python {min_version} and above.")
 
-    def raise_indentation_error(self, msg) -> None:
+    def raise_indentation_error(self, msg: str) -> None:
         """Raise an indentation error."""
-        raise IndentationError(msg)
+        last_token = self._tokenizer.diagnose()
+        args = (self.filename, last_token.start[0], last_token.start[1] + 1, last_token.line)
+        if sys.version_info >= (3, 10):
+            args += (last_token.end[0], last_token.end[1] + 1)  # type: ignore
+        raise IndentationError(msg, args)
 
     def get_expr_name(self, node) -> str:
         """Get a descriptive name for an expression."""
@@ -347,34 +353,152 @@ class Parser:
         node_t = type(node)
         if node_t is ast.Constant:
             v = node.value
-            if v in (None, True, False, Ellipsis):
+            if v is Ellipsis:
+                return "ellipsis"
+            elif v is None:
+                return str(v)
+            # Avoid treating 1 as True through == comparison
+            elif v is True:
+                return str(v)
+            elif v is False:
                 return str(v)
             else:
                 return "literal"
 
         try:
-            return EXPR_NAME_MAPPING[node_t]
+            name = EXPR_NAME_MAPPING[node_t]
         except KeyError as e:
             raise ValueError(
                 f"unexpected expression in assignment {type(node).__name__} " f"(line {node.lineno})."
             ) from e
+        return name
+
+    def get_invalid_target(self, target: Target, node: Optional[ast.AST]) -> Optional[ast.AST]:
+        """Get the meaningful invalid target for different assignment type."""
+        if node is None:
+            return None
+
+        # We only need to visit List and Tuple nodes recursively as those
+        # are the only ones that can contain valid names in targets when
+        # they are parsed as expressions. Any other kind of expression
+        # that is a container (like Sets or Dicts) is directly invalid and
+        # we do not need to visit it recursively.
+        if isinstance(node, (ast.List, ast.Tuple)):
+            for e in node.elts:
+                if (inv := self.get_invalid_target(target, e)) is not None:
+                    return inv
+        elif isinstance(node, ast.Starred):
+            if target is Target.DEL_TARGETS:
+                return node
+            return self.get_invalid_target(target, node.value)
+        elif isinstance(node, ast.Compare):
+            # This is needed, because the `a in b` in `for a in b` gets parsed
+            # as a comparison, and so we need to search the left side of the comparison
+            # for invalid targets.
+            if target is Target.FOR_TARGETS:
+                if isinstance(node.ops[0], ast.In):
+                    return self.get_invalid_target(target, node.left)
+                return None
+
+            return node
+        elif isinstance(node, (ast.Name, ast.Subscript, ast.Attribute)):
+            return None
+        return node
 
     def set_expr_context(self, node, context):
         """Set the context (Load, Store, Del) of an ast node."""
         node.ctx = context
         return node
 
-    def ensure_real(self, number_str: str):
-        number = ast.literal_eval(number_str)
-        if isinstance(number, complex):
-            self.raise_syntax_error("real number required in complex literal")
-        return number
+    def ensure_real(self, number: tokenize.TokenInfo) -> float:
+        value = ast.literal_eval(number.string)
+        if isinstance(value, complex):
+            self.raise_syntax_error_known_location("real number required in complex literal", number)
+        return value
 
-    def ensure_imaginary(self, number_str: str):
-        number = ast.literal_eval(number_str)
-        if not isinstance(number, complex):
-            self.raise_syntax_error("imaginary number required in complex literal")
-        return number
+    def ensure_imaginary(self, number: tokenize.TokenInfo) -> complex:
+        value = ast.literal_eval(number.string)
+        if not isinstance(value, complex):
+            self.raise_syntax_error_known_location("imaginary number required in complex literal", number)
+        return value
+
+    def check_fstring_conversion(
+        self, mark: tokenize.TokenInfo, name: tokenize.TokenInfo
+    ) -> tokenize.TokenInfo:
+        if mark.lineno != name.lineno or mark.col_offset != name.col_offset:  # type: ignore
+            self.raise_syntax_error_known_range(
+                "f-string: conversion type must come right after the exclamanation mark", mark, name
+            )
+
+        s = name.string
+        if len(s) > 1 or s not in ("s", "r", "a"):
+            self.raise_syntax_error_known_location(
+                f"f-string: invalid conversion character '{s}': expected 's', 'r', or 'a'",
+                name,
+            )
+
+        return name
+
+    def _concat_strings_in_constant(self, parts) -> ast.Constant:
+        s = ast.literal_eval(parts[0].string)
+        for ss in parts[1:]:
+            s += ast.literal_eval(ss.string)
+        args = dict(
+            value=s,
+            lineno=parts[0].start[0],
+            col_offset=parts[0].start[1],
+            end_lineno=parts[-1].end[0],
+            end_col_offset=parts[0].end[1],
+        )
+        if parts[0].string.startswith("u"):
+            args["kind"] = "u"
+        return ast.Constant(**args)
+
+    def concatenate_strings(self, parts):
+        """Concatenate multiple tokens and ast.JoinedStr"""
+        # Get proper start and stop
+        start = end = None
+        if isinstance(parts[0], ast.JoinedStr):
+            start = parts[0].lineno, parts[0].col_offset
+        if isinstance(parts[-1], ast.JoinedStr):
+            end = parts[-1].end_lineno, parts[-1].end_col_offset
+
+        # Combine the different parts
+        seen_joined = False
+        values = []
+        ss = []
+        for p in parts:
+            if isinstance(p, ast.JoinedStr):
+                seen_joined = True
+                if ss:
+                    values.append(self._concat_strings_in_constant(ss))
+                    ss.clear()
+                values.extend(p.values)
+            else:
+                ss.append(p)
+
+        if ss:
+            values.append(self._concat_strings_in_constant(ss))
+
+        consolidated = []
+        for p in values:
+            if consolidated and isinstance(consolidated[-1], ast.Constant) and isinstance(p, ast.Constant):
+                consolidated[-1].value += p.value
+                consolidated[-1].end_lineno = p.end_lineno
+                consolidated[-1].end_col_offset = p.end_col_offset
+            else:
+                consolidated.append(p)
+
+        if not seen_joined and len(values) == 1 and isinstance(values[0], ast.Constant):
+            return values[0]
+        else:
+            return ast.JoinedStr(
+                values=consolidated,
+                lineno=start[0] if start else values[0].lineno,
+                col_offset=start[1] if start else values[0].col_offset,
+                end_lineno=end[0] if end else values[-1].end_lineno,
+                end_col_offset=end[1] if end else values[-1].end_col_offset,
+            )
 
     @staticmethod
     def _join_str_tokens(tokens: list[tokenize.TokenInfo]) -> str:
@@ -434,6 +558,10 @@ class Parser:
             if sys.version_info >= (3, 10):
                 args += (err.end_lineno + line_offset - 2, err.end_offset)  # type: ignore
             err_args = (err.msg, args)
+            # Ensure we do not keep the frame alive longer than necessary
+            # by explicitly deleting the error once we got what we needed out
+            # of it
+            del err
 
         # Avoid getting a triple nesting in the error report that does not
         # bring anything relevant to the traceback.
@@ -533,7 +661,14 @@ class Parser:
             # End is used only to get the proper text
             line = "\\n".join(self._tokenizer.get_lines(list(range(start[0], end[0] + 1))))
 
-        return SyntaxError(message, (self.filename, start[0], start[1], line))
+        # tokenize.py index column offset from 0 while Cpython index column
+        # offset at 1 when reporting SyntaxError, so we need to increment
+        # the column offset when reporting the error.
+        args = (self.filename, start[0], start[1] + 1, line)
+        if sys.version_info >= (3, 10):
+            args += (end[0], end[1] + 1)  # type: ignore
+
+        return SyntaxError(message, args)
 
     def raise_raw_syntax_error(
         self,
@@ -546,18 +681,34 @@ class Parser:
     def make_syntax_error(self, message: str) -> SyntaxError:
         return self._build_syntax_error(message)
 
-    def raise_syntax_error(self, message: str) -> None:
-        """Raise a syntax error."""
-        raise self._build_syntax_error(message)
+    def expect_forced(self, res: Any, expectation: str) -> Optional[tokenize.TokenInfo]:
+        if res is None:
+            last_token = self._tokenizer.diagnose()
+            end = last_token.start
+            if sys.version_info >= (3, 12) or (
+                sys.version_info >= (3, 11) and last_token.type != 4
+            ):  # i.e. not a \n
+                end = last_token.end
+            self.raise_raw_syntax_error(f"expected {expectation}", last_token.start, end)
+        return res
 
-    def raise_syntax_error_known_location(self, message: str, node) -> None:
+    def raise_syntax_error(self, message: str) -> NoReturn:
+        """Raise a syntax error."""
+        tok = self._tokenizer.diagnose()
+        raise self._build_syntax_error(
+            message, tok.start, tok.end if sys.version_info >= (3, 12) or tok.type != 4 else tok.start
+        )
+
+    def raise_syntax_error_known_location(
+        self, message: str, node: Union[ast.AST, tokenize.TokenInfo]
+    ) -> NoReturn:
         """Raise a syntax error that occured at a given AST node."""
         if isinstance(node, tokenize.TokenInfo):
             start = node.start
             end = node.end
         else:
             start = node.lineno, node.col_offset
-            end = node.end_lineno, node.end_col_offset
+            end = node.end_lineno, node.end_col_offset  # type: ignore
 
         raise self._build_syntax_error(message, start, end)
 
@@ -566,29 +717,47 @@ class Parser:
         message: str,
         start_node: Union[ast.AST, tokenize.TokenInfo],
         end_node: Union[ast.AST, tokenize.TokenInfo],
-    ) -> None:
+    ) -> NoReturn:
         if isinstance(start_node, tokenize.TokenInfo):
             start = start_node.start
         else:
-            start = start_node.lineno, start_node.col_offset
+            start = start_node.lineno, start_node.col_offset  # type: ignore
 
-        end = (
-            end_node.end
-            if isinstance(end_node, tokenize.TokenInfo)
-            else (end_node.end_lineno, end_node.end_col_offset)
-        )
+        if isinstance(end_node, tokenize.TokenInfo):
+            end = end_node.end
+        else:
+            end = end_node.end_lineno, end_node.end_col_offset  # type: ignore
 
         raise self._build_syntax_error(message, start, end)  # type: ignore
 
     def raise_syntax_error_starting_from(
         self, message: str, start_node: Union[ast.AST, tokenize.TokenInfo]
-    ) -> None:
+    ) -> NoReturn:
         if isinstance(start_node, tokenize.TokenInfo):
             start = start_node.start
         else:
             start = start_node.lineno, start_node.col_offset
 
-        raise self._build_syntax_error(message, start, None)
+        last_token = self._tokenizer.diagnose()
+
+        raise self._build_syntax_error(message, start, last_token.start)
+
+    def raise_syntax_error_invalid_target(self, target: Target, node: Optional[ast.AST]) -> None:
+        invalid_target = self.get_invalid_target(target, node)
+
+        if invalid_target is None:
+            return None
+
+        if target in (Target.STAR_TARGETS, Target.FOR_TARGETS):
+            msg = f"cannot assign to {self.get_expr_name(invalid_target)}"
+        else:
+            msg = f"cannot delete {self.get_expr_name(invalid_target)}"
+
+        self.raise_syntax_error_known_location(msg, invalid_target)
+
+    def raise_syntax_error_on_next_token(self, message: str) -> NoReturn:
+        next_token = self._tokenizer.peek()
+        raise self._build_syntax_error(message, next_token.start, next_token.end)
 
     @classmethod
     def parse_file(
