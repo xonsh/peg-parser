@@ -1,2 +1,0 @@
-# p"/tmp"
-Path("/tmp")
