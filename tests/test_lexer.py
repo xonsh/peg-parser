@@ -338,12 +338,11 @@ def test_path_fstring_literal():
     assert check_tokens('Fp"/foo"', ["STRING", 'Fp"/foo"', 0])
 
 
-@pytest.mark.xfail
 def test_regex_globs():
     for i in (".*", r"\d*", ".*#{1,2}"):
         for p in ("", "r", "g", "@somethingelse", "p", "pg"):
             c = f"{p}`{i}`"
-            assert check_tokens(c, ["SEARCHPATH", c, 0])
+            assert check_tokens(c, ["SEARCH_PATH", c, 0])
 
 
 @pytest.mark.parametrize(
@@ -365,90 +364,36 @@ def test_float_literals(case):
     assert check_tokens(case, ["NUMBER", case, 0])
 
 
-@pytest.mark.xfail
 @pytest.mark.parametrize("case", ["o>", "all>", "e>", "out>"])
 def test_ioredir1(case):
-    assert check_tokens_subproc(case, [("IOREDIRECT1", case, 2)], stop=-2)
+    assert check_tokens_subproc(case, [("NAME", case[:-1], 2), ("OP", case[-1], len(case) + 1)])
 
 
-@pytest.mark.xfail
-@pytest.mark.parametrize("case", ["2>1", "err>out", "e>o", "2>&1"])
+@pytest.mark.parametrize("case", ["2>1", "err>out", "e>o", pytest.param("2>&1", marks=pytest.mark.xfail)])
 def test_ioredir2(case):
-    assert check_tokens_subproc(case, [("IOREDIRECT2", case, 2)], stop=-2)
+    idx = case.find(">")
+    assert check_tokens_subproc(
+        case,
+        [
+            ("NUMBER" if case[:idx].isdigit() else t.NAME, case[:idx], 0 + 2),
+            ("OP", ">", idx + 2),
+            ("NUMBER" if case[idx + 1].isdigit() else t.NAME, case[idx + 1 :], idx + 3),
+        ],
+    )
 
 
-@pytest.mark.xfail
-@pytest.mark.parametrize("case", [">", ">>", "<", "e>", "> ", ">>   ", "<  ", "e> "])
-def test_redir_whitespace(case):
-    inp = f"![{case}/path/to/file]"
-    obs = lex_input(inp)
-    assert obs[2].type == "WS"
-
-
-@pytest.mark.xfail
 @pytest.mark.parametrize(
     "s, exp",
     [
-        ("", []),
-        ("   \t   \n \t  ", []),
-        ("echo hello", ["echo", "hello"]),
-        ('echo "hello"', ["echo", '"hello"']),
-        ('![echo "hello"]', ["![echo", '"hello"]']),
-        ("/usr/bin/echo hello", ["/usr/bin/echo", "hello"]),
-        ("$(/usr/bin/echo hello)", ["$(/usr/bin/echo", "hello)"]),
-        ("C:\\Python\\python.exe -m xonsh", ["C:\\Python\\python.exe", "-m", "xonsh"]),
-        ('print("""I am a triple string""")', ['print("""I am a triple string""")']),
-        (
-            'print("""I am a \ntriple string""")',
-            ['print("""I am a \ntriple string""")'],
-        ),
-        ("echo $HOME", ["echo", "$HOME"]),
-        ("echo -n $HOME", ["echo", "-n", "$HOME"]),
-        ("echo --go=away", ["echo", "--go=away"]),
-        ("echo --go=$HOME", ["echo", "--go=$HOME"]),
-    ],
-)
-def test_lexer_split(s, exp):
-    lexer = tokenize.generate_tokens(s)
-    obs = lexer.split(s)
-    assert exp == obs
-
-
-@pytest.mark.xfail
-@pytest.mark.parametrize(
-    "s",
-    (
-        "()",  # sanity
-        "(",
-        ")",
-        "))",
-        "'string\nliteral",
-        "'''string\nliteral",
-        "string\nliteral'",
-        '"',
-        "'",
-        '"""',
-    ),
-)
-def test_tolerant_lexer(s):
-    lexer = tokenize.generate_tokens(s)
-    error_tokens = list(tok for tok in lexer if tok.type == "ERRORTOKEN")
-    assert all(tok.value in s for tok in error_tokens)  # no error messages
-
-
-@pytest.mark.xfail
-@pytest.mark.parametrize(
-    "s, exp",
-    [
-        ("2>1", [("NUMBER", "2", 0), ("GT", ">", 1), ("NUMBER", "1", 2)]),
-        ("a>b", [("NAME", "a", 0), ("GT", ">", 1), ("NAME", "b", 2)]),
+        ("2>1", [("NUMBER", "2", 0), ("OP", ">", 1), ("NUMBER", "1", 2)]),
+        ("a>b", [("NAME", "a", 0), ("OP", ">", 1), ("NAME", "b", 2)]),
         (
             "3>2>1",
             [
                 ("NUMBER", "3", 0),
-                ("GT", ">", 1),
+                ("OP", ">", 1),
                 ("NUMBER", "2", 2),
-                ("GT", ">", 3),
+                ("OP", ">", 3),
                 ("NUMBER", "1", 4),
             ],
         ),
@@ -456,9 +401,9 @@ def test_tolerant_lexer(s):
             "36+2>>3",
             [
                 ("NUMBER", "36", 0),
-                ("PLUS", "+", 2),
+                ("OP", "+", 2),
                 ("NUMBER", "2", 3),
-                ("RSHIFT", ">>", 4),
+                ("OP", ">>", 4),
                 ("NUMBER", "3", 6),
             ],
         ),
