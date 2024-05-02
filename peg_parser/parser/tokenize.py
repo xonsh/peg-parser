@@ -155,10 +155,7 @@ String = group(StringPrefix + r"'[^\n'\\]*(?:\\.[^\n'\\]*)*'", StringPrefix + r'
 # Otherwise if = came before ==, == would get recognized as two instances
 # of =.
 Special = group(*map(re.escape, sorted(EXACT_TOKEN_TYPES, reverse=True)))
-Funny = group(r"\r?\n", Special)
-
-PlainToken = group(Number, Funny, String, Name)
-Token = Ignore + PlainToken
+Funny = group(r"\r?\n", Special=Special)
 
 # First (or only) line of ' or " string.
 ContStr = capname("pre2", StringPrefix) + group(
@@ -388,8 +385,8 @@ def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrSta
         yield TokenInfo(ENVNAME, token, spos, epos, state.line)
     elif initial == "\\":  # continued stmt
         state.continued = True
-    else:
-        if initial in "([{":
+    else:  # Special
+        if (initial in "([{") or (token in {"@(", "!(", "![", "$(", "$[", "${", "@$("}):
             state.parenlev += 1
         elif initial in ")]}":
             state.parenlev -= 1
