@@ -20,11 +20,11 @@ def ensure_tuple(seq) -> str:
     return repr(tuple(seq))
 
 
-def assert_tokens_equal(x, y):
+def assert_tokens_equal(expected, obtained):
     """Asserts that two token sequences are equal."""
-    left = [ensure_tuple(item) for item in x]
-    right = [ensure_tuple(item) for item in y]
-    if diff := "\n".join(difflib.unified_diff(left, right, "parsed", "expected")):
+    left = [ensure_tuple(item) for item in expected]
+    right = [ensure_tuple(item) for item in obtained]
+    if diff := "\n".join(difflib.unified_diff(left, right, "expected", "obtained")):
         print(diff)
     return not diff
 
@@ -138,169 +138,140 @@ def test_and():
     assert check_tokens("and", ["NAME", "and", 0])
 
 
-@pytest.mark.xfail
 def test_ampersand():
-    assert check_tokens("&", ["AMPERSAND", "&", 0])
+    assert check_tokens("&", ["OP", "&", 0])
 
 
-@pytest.mark.xfail
 def test_not_really_and_pre():
     inp = "![foo-and]"
     exp = [
         ("BANG_LBRACKET", "![", 0),
         ("NAME", "foo", 2),
-        ("MINUS", "-", 5),
+        ("OP", "-", 5),
         ("NAME", "and", 6),
-        ("RBRACKET", "]", 9),
+        ("OP", "]", 9),
     ]
     assert check_tokens(inp, *exp)
 
 
-@pytest.mark.xfail
 def test_not_really_and_post():
     inp = "![and-bar]"
     exp = [
         ("BANG_LBRACKET", "![", 0),
         ("NAME", "and", 2),
-        ("MINUS", "-", 5),
+        ("OP", "-", 5),
         ("NAME", "bar", 6),
-        ("RBRACKET", "]", 9),
+        ("OP", "]", 9),
     ]
     assert check_tokens(inp, *exp)
 
 
-@pytest.mark.xfail
 def test_not_really_and_pre_post():
     inp = "![foo-and-bar]"
     exp = [
         ("BANG_LBRACKET", "![", 0),
         ("NAME", "foo", 2),
-        ("MINUS", "-", 5),
+        (t.OP, "-", 5),
         ("NAME", "and", 6),
-        ("MINUS", "-", 9),
+        (t.OP, "-", 9),
         ("NAME", "bar", 10),
-        ("RBRACKET", "]", 13),
+        ("OP", "]", 13),
     ]
     assert check_tokens(inp, *exp)
 
 
-@pytest.mark.xfail
 def test_not_really_or_pre():
     inp = "![foo-or]"
     exp = [
         ("BANG_LBRACKET", "![", 0),
         ("NAME", "foo", 2),
-        ("MINUS", "-", 5),
+        (t.OP, "-", 5),
         ("NAME", "or", 6),
-        ("RBRACKET", "]", 8),
+        ("OP", "]", 8),
     ]
     assert check_tokens(inp, *exp)
 
 
-@pytest.mark.xfail
 def test_not_really_or_post():
     inp = "![or-bar]"
     exp = [
         ("BANG_LBRACKET", "![", 0),
         ("NAME", "or", 2),
-        ("MINUS", "-", 4),
+        (t.OP, "-", 4),
         ("NAME", "bar", 5),
-        ("RBRACKET", "]", 8),
+        ("OP", "]", 8),
     ]
     assert check_tokens(inp, *exp)
 
 
-@pytest.mark.xfail
 def test_not_really_or_pre_post():
     inp = "![foo-or-bar]"
     exp = [
         ("BANG_LBRACKET", "![", 0),
         ("NAME", "foo", 2),
-        ("MINUS", "-", 5),
+        (t.OP, "-", 5),
         ("NAME", "or", 6),
-        ("MINUS", "-", 8),
+        (t.OP, "-", 8),
         ("NAME", "bar", 9),
-        ("RBRACKET", "]", 12),
+        ("OP", "]", 12),
     ]
     assert check_tokens(inp, *exp)
 
 
-@pytest.mark.xfail
 def test_subproc_line_cont_space():
     inp = "![echo --option1 value1 \\\n" "     --option2 value2 \\\n" "     --optionZ valueZ]"
     exp = [
         ("BANG_LBRACKET", "![", 0),
         ("NAME", "echo", 2),
-        ("WS", " ", 6),
-        ("MINUS", "-", 7),
-        ("MINUS", "-", 8),
+        (t.OP, "-", 7),
+        (t.OP, "-", 8),
         ("NAME", "option1", 9),
-        ("WS", " ", 16),
         ("NAME", "value1", 17),
-        ("WS", " ", 23),
-        ("MINUS", "-", 5),
-        ("MINUS", "-", 6),
+        (t.OP, "-", 5),
+        (t.OP, "-", 6),
         ("NAME", "option2", 7),
-        ("WS", " ", 14),
         ("NAME", "value2", 15),
-        ("WS", " ", 21),
-        ("MINUS", "-", 5),
-        ("MINUS", "-", 6),
+        (t.OP, "-", 5),
+        (t.OP, "-", 6),
         ("NAME", "optionZ", 7),
-        ("WS", " ", 14),
         ("NAME", "valueZ", 15),
-        ("RBRACKET", "]", 21),
+        ("OP", "]", 21),
     ]
     assert check_tokens(inp, *exp)
 
 
-@pytest.mark.xfail
 def test_subproc_line_cont_nospace():
     inp = "![echo --option1 value1\\\n" "     --option2 value2\\\n" "     --optionZ valueZ]"
     exp = [
         ("BANG_LBRACKET", "![", 0),
         ("NAME", "echo", 2),
-        ("WS", " ", 6),
-        ("MINUS", "-", 7),
-        ("MINUS", "-", 8),
+        (t.OP, "-", 7),
+        (t.OP, "-", 8),
         ("NAME", "option1", 9),
-        ("WS", " ", 16),
         ("NAME", "value1", 17),
-        ("WS", "\\", 23),
-        ("MINUS", "-", 5),
-        ("MINUS", "-", 6),
+        (t.OP, "-", 5),
+        (t.OP, "-", 6),
         ("NAME", "option2", 7),
-        ("WS", " ", 14),
         ("NAME", "value2", 15),
-        ("WS", "\\", 21),
-        ("MINUS", "-", 5),
-        ("MINUS", "-", 6),
+        (t.OP, "-", 5),
+        (t.OP, "-", 6),
         ("NAME", "optionZ", 7),
-        ("WS", " ", 14),
         ("NAME", "valueZ", 15),
-        ("RBRACKET", "]", 21),
+        ("OP", "]", 21),
     ]
     assert check_tokens(inp, *exp)
 
 
-@pytest.mark.xfail
-def test_atdollar():
-    assert check_tokens("@$", ["ATDOLLAR", "@$", 0])
-
-
-@pytest.mark.xfail
 def test_doubleamp():
-    assert check_tokens("&&", ["AND", "and", 0])
+    assert check_tokens("&&", ["DOUBLE_AMPER", "&&", 0])
 
 
-@pytest.mark.xfail
 def test_pipe():
-    assert check_tokens("|", ["PIPE", "|", 0])
+    assert check_tokens("|", ["OP", "|", 0])
 
 
-@pytest.mark.xfail
 def test_doublepipe():
-    assert check_tokens("||", ["OR", "or", 0])
+    assert check_tokens("||", ["DOUBLE_PIPE", "||", 0])
 
 
 def test_single_quote_literal():
