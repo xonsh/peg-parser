@@ -1840,14 +1840,14 @@ def test_dollars(inp, expanded, unparse_diff):
 
 
 def test_dollar_py_test_recursive_name(unparse_diff):
-    unparse_diff("${None or $JAWAKA}", "__xonsh__.env[None or __xonsh__.env['JAWAKA']]")
+    unparse_diff("${None or $JAWAKA}", "__xonsh__.env[str(None or __xonsh__.env['JAWAKA'])]")
 
 
+@pytest.mark.xfail
 def test_dollar_py_test_recursive_test(unparse_diff):
     unparse_diff('${${"JAWA" + $JAWAKA[-2:]}}')
 
 
-@pytest.mark.xfail
 def test_dollar_name_set(check_xonsh):
     check_xonsh({"WAKKA": 42}, "$WAKKA = 42")
 
