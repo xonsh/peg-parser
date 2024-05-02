@@ -1829,9 +1829,10 @@ def test_path_fstring_literal(inp, expanded, unparse_diff):
         ("$WAKKA", "__xonsh__.env['WAKKA']"),
         ("$y = 'one'", "__xonsh__.env['y'] = 'one'"),
         ("y = $x", "y = __xonsh__.env['x']"),
-        # ("y = ${x}", "y = __xonsh__.env['x']"),
-        ('${None or "WAKKA"}', "__xonsh__.env[None or 'WAKKA']"),
-        ("${$JAWAKA}", "__xonsh__.env[__xonsh__.env['JAWAKA']]"),
+        ("y = ${x}", "y = __xonsh__.env['x']"),
+        ("y = ${'x' + 'y'}", "y = __xonsh__.env[str('x' + 'y')]"),
+        ('${None or "WAKKA"}', "__xonsh__.env[str(None or 'WAKKA')]"),
+        ("${$JAWAKA}", "__xonsh__.env[str(__xonsh__.env['JAWAKA'])]"),
     ],
 )
 def test_dollars(inp, expanded, unparse_diff):

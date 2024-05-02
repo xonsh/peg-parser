@@ -2,6 +2,7 @@ import ast
 import enum
 import sys
 from pathlib import Path
+from tokenize import TokenInfo
 from typing import Any, Callable, ClassVar, Literal, NoReturn, Optional, TypeVar, Union, cast
 
 from peg_parser.parser import token, tokenize
@@ -190,29 +191,23 @@ def memoize_left_rec(method: Callable[[P], Optional[T]]) -> Callable[[P], Option
     return memoize_left_rec_wrapper
 
 
-def load_attribute_chain(name, lineno=None, col=None):
+def load_attribute_chain(name, **locs):
     """Creates an AST that loads variable name that may (or may not)
     have attribute chains. For example, "a.b.c"
     """
     names = name.split(".")
-    node = ast.Name(id=names.pop(0), ctx=Load, lineno=lineno, col_offset=col)
+    node = ast.Name(id=names.pop(0), ctx=Load, **locs)
     for attr in names:
-        node = ast.Attribute(value=node, attr=attr, ctx=Load, lineno=lineno, col_offset=col)
+        node = ast.Attribute(value=node, attr=attr, ctx=Load, **locs)
     return node
 
 
-def xonsh_call(name, args, lineno=None, col=None) -> ast.Call:
+def xonsh_call(name, *args, **locs) -> ast.Call:
     """Creates the AST node for calling a function of a given name.
     Functions names may contain attribute access, e.g. __xonsh__.env.
     """
     return ast.Call(
-        func=load_attribute_chain(name, lineno=lineno, col=col),
-        args=args,
-        keywords=[],
-        starargs=None,
-        kwargs=None,
-        lineno=lineno,
-        col_offset=col,
+        func=load_attribute_chain(name, **locs), args=args, keywords=[], starargs=None, kwargs=None, **locs
     )
 
 
@@ -536,7 +531,9 @@ class Parser:
 
         node = self._parse_pure_string(tokens)
         if path_literal:
-            return xonsh_call("__xonsh__.path_literal", [node], first_token.start[0], first_token.start[1])
+            return xonsh_call(
+                "__xonsh__.path_literal", node, lineno=first_token.start[0], col_offset=first_token.start[1]
+            )
 
         return node
 
@@ -632,16 +629,21 @@ class Parser:
             kwarg=after_star[2],
         )
 
-    def expand_env_name(self, a: tokenize.TokenInfo, b: ast.AST | None = None):
-        xenv = load_attribute_chain("__xonsh__.env", lineno=a.start[0], col=a.start[1])
-        idx = ast.Index(value=ast.Constant(value=a.string[1:], lineno=a.start[0], col_offset=a.start[1] + 1))
-        a_node = ast.Subscript(
-            value=xenv, slice=idx, ctx=ast.Load(), lineno=a.start[0], col_offset=a.start[1]
+    def expand_env_name(self, name: TokenInfo, **locs):
+        return ast.Subscript(
+            value=load_attribute_chain("__xonsh__.env", **locs),
+            slice=ast.Constant(value=name.string, **locs),
+            ctx=ast.Load(),
+            **locs,
         )
-        if b is None:
-            return a_node
-        # otherwise send a = b assignment
-        return ast.Assign(targets=[a_node], value=b, lineno=a.start[0], col_offset=a.start[1])
+
+    def expand_env_expr(self, slices: ast.expr, **locs):
+        return ast.Subscript(
+            value=load_attribute_chain("__xonsh__.env", **locs),
+            slice=xonsh_call("str", slices, **locs),
+            ctx=ast.Load(),
+            **locs,
+        )
 
     def _build_syntax_error(
         self,

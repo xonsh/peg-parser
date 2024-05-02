@@ -7,15 +7,16 @@ from collections.abc import Sequence
 import pytest
 
 import peg_parser.parser.token as t
-from peg_parser.parser import token, tokenize
+from peg_parser.parser import tokenize
 from peg_parser.parser.tokenize import TokenInfo
 
 
 def ensure_tuple(seq) -> str:
     if isinstance(seq, TokenInfo):
-        seq = (seq.type, seq.string, seq.start[1])
+        seq = (t.tok_name[seq.type], seq.string, seq.start[1])
     if isinstance(seq, Sequence):
-        seq = (getattr(token, seq[0]) if isinstance(seq[0], str) else seq[0], *seq[1:])
+        typ, *rest = seq
+        seq = (t.tok_name[typ] if isinstance(typ, int) else typ, *rest)
     return repr(tuple(seq))
 
 
@@ -23,9 +24,9 @@ def assert_tokens_equal(x, y):
     """Asserts that two token sequences are equal."""
     left = [ensure_tuple(item) for item in x]
     right = [ensure_tuple(item) for item in y]
-    diff = "\n".join(difflib.unified_diff(left, right, "parsed", "expected"))
-    assert not diff
-    return True
+    if diff := "\n".join(difflib.unified_diff(left, right, "parsed", "expected")):
+        print(diff)
+    return not diff
 
 
 def lex_input(inp: str) -> list[TokenInfo]:
@@ -122,7 +123,7 @@ def test_dollar_names(inp, exp):
 def test_atdollar_expression():
     inp = "@$(which python)"
     exp = [
-        ("OP", "@$(", 0),
+        (t.AT_DOLLAR_LPAREN, "@$(", 0),
         ("NAME", "which", 3),
         ("NAME", "python", 9),
         ("OP", ")", 15),
