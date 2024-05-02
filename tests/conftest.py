@@ -69,11 +69,11 @@ def parse_str(python_parse_str):
             print("Source is:")
             print(text)
             if not verbose:
-                with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                log.info("Retrying with verbose=True")
+                with contextlib.redirect_stdout(io.StringIO()) as stdout, contextlib.suppress(Exception):
                     python_parse_str(text, verbose=True, mode=mode, py_version=py_version)
                 captured = stdout.getvalue()
-                log.info("Captured verbose output of the parser: ")
-                log.info(captured.out)
+                log.info(captured)
             raise e
 
     return factory
