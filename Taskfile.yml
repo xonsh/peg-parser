@@ -29,6 +29,14 @@ tasks:
       - git show tmp-pegen-main:data/python.gram > .local/python.gram
       - git read-tree --prefix=pegen -u tmp-pegen-main:src/pegen
 
+  test:
+    deps:
+      - generate
+    cmds:
+      - python -m pytest {{.CLI_ARGS}}
+    sources:
+      - '**/*.py'
+
 #pegen-update:
 #    ## In future, you can merge in additional changes as follows: - https://stackoverflow.com/questions/23937436/add-subdirectory-of-remote-repo-with-git-subtree
 #    git checkout gitgit/master

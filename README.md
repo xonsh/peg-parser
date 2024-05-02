@@ -27,7 +27,10 @@ We use [Hatch](https://hatch.pypa.io/latest/install/) to manage the development 
 You can run all the tests with:
 
 ```bash
-hatch run test
+task test
+
+# to watch for changes and run tests
+task test --watch -- -x --ff
 ```
 
 ### Format the code
