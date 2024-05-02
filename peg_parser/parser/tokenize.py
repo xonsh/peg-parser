@@ -32,22 +32,7 @@ import itertools as _itertools
 import re
 from typing import NamedTuple
 
-from peg_parser.parser.token import (
-    COMMENT,
-    DEDENT,
-    ENDMARKER,
-    ENVNAME,
-    ERRORTOKEN,
-    EXACT_TOKEN_TYPES,
-    INDENT,
-    NAME,
-    NEWLINE,
-    NL,
-    NUMBER,
-    OP,
-    STRING,
-    tok_name,
-)
+import peg_parser.parser.token as t
 
 cookie_re = re.compile(r"^[ \t\f]*#.*?coding[:=][ \t]*([-\w.]+)", re.ASCII)
 blank_re = re.compile(rb"^[ \t\f]*(?:[#\r\n]|$)", re.ASCII)
@@ -61,13 +46,13 @@ class TokenInfo(NamedTuple):
     line: str
 
     def __repr__(self):
-        annotated_type = "%d (%s)" % (self.type, tok_name[self.type])
+        annotated_type = "%d (%s)" % (self.type, t.tok_name[self.type])
         return f"TokenInfo(type={annotated_type}, string={self.string!r}, start={self.start!r}, end={self.end!r}, line={self.line!r})"
 
     @property
     def exact_type(self):
-        if self.type == OP and self.string in EXACT_TOKEN_TYPES:
-            return EXACT_TOKEN_TYPES[self.string]
+        if self.type == t.OP and self.string in t.EXACT_TOKEN_TYPES:
+            return t.EXACT_TOKEN_TYPES[self.string]
         else:
             return self.type
 
@@ -92,13 +77,27 @@ def maybe(*choices):
     return group(*choices) + "?"
 
 
+xsh_tokens = {
+    "$": t.DOLLAR,
+    "?": t.QUESTION,
+    "??": t.DOUBLE_QUESTION,
+    "||": t.DOUBLE_PIPE,
+    "&&": t.DOUBLE_AMPER,
+    "@(": t.AT_LPAREN,
+    "!(": t.BANG_LPAREN,
+    "![": t.BANG_LBRACKET,
+    "$(": t.DOLLAR_LPAREN,
+    "$[": t.DOLLAR_LBRACKET,
+    "${": t.DOLLAR_LBRACE,
+    "@$(": t.AT_DOLLAR_LPAREN,
+}
+
 # Note: we use unicode matching for names ("\w") but ascii matching for
 # number literals.
 Whitespace = r"[ \f\t]*"
 Comment = r"#[^\r\n]*"
 Ignore = Whitespace + any(r"\\\r?\n" + Whitespace) + maybe(Comment)
 Name = r"\w+"
-EnvName = r"\$\w+"
 
 Hexnumber = r"0[xX](?:_?[0-9a-fA-F])+"
 Binnumber = r"0[bB](?:_?[01])+"
@@ -122,10 +121,10 @@ def _all_string_prefixes():
     # if we add binary f-strings, add: ['fb', 'fbr']
     result = {""}
     for prefix in _valid_string_prefixes:
-        for t in _itertools.permutations(prefix):
+        for perm in _itertools.permutations(prefix):
             # create a list with upper and lower versions of each
             #  character
-            for u in _itertools.product(*[(c, c.upper()) for c in t]):
+            for u in _itertools.product(*[(c, c.upper()) for c in perm]):
                 result.add("".join(u))
     return result
 
@@ -154,8 +153,9 @@ String = group(StringPrefix + r"'[^\n'\\]*(?:\\.[^\n'\\]*)*'", StringPrefix + r'
 # Sorting in reverse order puts the long operators before their prefixes.
 # Otherwise if = came before ==, == would get recognized as two instances
 # of =.
-Special = group(*map(re.escape, sorted(EXACT_TOKEN_TYPES, reverse=True)))
-Funny = group(r"\r?\n", Special=Special)
+Special = group(*map(re.escape, sorted(t.EXACT_TOKEN_TYPES, reverse=True)))
+XshOps = group(*map(re.escape, sorted(xsh_tokens, reverse=True)))
+Funny = group(r"\r?\n", XshOps=XshOps, Special=Special)
 
 # First (or only) line of ' or " string.
 ContStr = capname("pre2", StringPrefix) + group(
@@ -164,9 +164,7 @@ ContStr = capname("pre2", StringPrefix) + group(
     name="Str2",
 )
 PseudoExtras = group(End=r"\\\r?\n|\Z", Comment=Comment, Triple=Triple)
-PseudoToken = Whitespace + group(
-    PseudoExtras, Number=Number, Funny=Funny, ContStr=ContStr, Name=Name, EnvName=EnvName
-)
+PseudoToken = Whitespace + group(PseudoExtras, Number=Number, Funny=Funny, ContStr=ContStr, Name=Name)
 
 # For a given string prefix plus quotes, endpats maps it to a regex
 #  to match the remainder of that string. _prefix can be empty, for
@@ -261,7 +259,7 @@ def next_cont_string(cont_str: ContStrState, state: TokenizerState):
     if endmatch:
         state.pos = end = endmatch.end(0)
         yield TokenInfo(
-            STRING,
+            t.STRING,
             cont_str.contstr + state.line[:end],
             cont_str.strstart,
             (state.lnum, end),
@@ -270,7 +268,7 @@ def next_cont_string(cont_str: ContStrState, state: TokenizerState):
         cont_str.reset_cont()
     elif cont_str.needcont and state.line[-2:] != "\\\n" and state.line[-3:] != "\\\r\n":
         yield TokenInfo(
-            ERRORTOKEN,
+            t.ERRORTOKEN,
             cont_str.contstr + state.line,
             cont_str.strstart,
             (state.lnum, len(state.line)),
@@ -305,7 +303,7 @@ def next_statement(state: TokenizerState):
         if state.line[state.pos] == "#":
             comment_token = state.line[state.pos :].rstrip("\r\n")
             yield TokenInfo(
-                COMMENT,
+                t.COMMENT,
                 comment_token,
                 (state.lnum, state.pos),
                 (state.lnum, state.pos + len(comment_token)),
@@ -314,13 +312,15 @@ def next_statement(state: TokenizerState):
             state.pos += len(comment_token)
 
         yield TokenInfo(
-            NL, state.line[state.pos :], (state.lnum, state.pos), (state.lnum, len(state.line)), state.line
+            t.NL, state.line[state.pos :], (state.lnum, state.pos), (state.lnum, len(state.line)), state.line
         )
         return True  # continue
 
     if column > state.indents[-1]:  # count indents or dedents
         state.indents.append(column)
-        yield TokenInfo(INDENT, state.line[: state.pos], (state.lnum, 0), (state.lnum, state.pos), state.line)
+        yield TokenInfo(
+            t.INDENT, state.line[: state.pos], (state.lnum, 0), (state.lnum, state.pos), state.line
+        )
     while column < state.indents[-1]:
         if column not in state.indents:
             raise IndentationError(
@@ -329,7 +329,7 @@ def next_statement(state: TokenizerState):
             )
         state.indents = state.indents[:-1]
 
-        yield TokenInfo(DEDENT, "", (state.lnum, state.pos), (state.lnum, state.pos), state.line)
+        yield TokenInfo(t.DEDENT, "", (state.lnum, state.pos), (state.lnum, state.pos), state.line)
 
 
 def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrState):
@@ -344,16 +344,16 @@ def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrSta
         cap_groups.get("Number")  # ordinary number
         or (initial == "." and token != "." and token != "...")
     ):
-        yield TokenInfo(NUMBER, token, spos, epos, state.line)
+        yield TokenInfo(t.NUMBER, token, spos, epos, state.line)
     elif initial in "\r\n":
         if state.parenlev > 0:
-            yield TokenInfo(NL, token, spos, epos, state.line)
+            yield TokenInfo(t.NL, token, spos, epos, state.line)
         else:
-            yield TokenInfo(NEWLINE, token, spos, epos, state.line)
+            yield TokenInfo(t.NEWLINE, token, spos, epos, state.line)
 
     elif cap_groups.get("Comment"):
         assert not token.endswith("\n")
-        yield TokenInfo(COMMENT, token, spos, epos, state.line)
+        yield TokenInfo(t.COMMENT, token, spos, epos, state.line)
 
     elif cap_groups.get("Triple"):
         cont_str.endprog = _compile(endpats[cap_groups["tquote"] or "'''"])
@@ -361,7 +361,7 @@ def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrSta
         if endmatch:  # all on one line
             state.pos = endmatch.end(0)
             token = state.line[start : state.pos]
-            yield TokenInfo(STRING, token, spos, (state.lnum, state.pos), state.line)
+            yield TokenInfo(t.STRING, token, spos, (state.lnum, state.pos), state.line)
         else:
             cont_str.start(state, start)
             return False
@@ -377,35 +377,37 @@ def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrSta
             cont_str.needcont = True
             return False
         else:  # ordinary string
-            yield TokenInfo(STRING, token, spos, epos, state.line)
+            yield TokenInfo(t.STRING, token, spos, epos, state.line)
 
     elif cap_groups.get("Name"):  # ordinary name
-        yield TokenInfo(NAME, token, spos, epos, state.line)
-    elif cap_groups.get("EnvName"):  # ordinary name
-        yield TokenInfo(ENVNAME, token, spos, epos, state.line)
+        yield TokenInfo(t.NAME, token, spos, epos, state.line)
+    elif cap_groups.get("XshOps"):
+        if token[-1] in "([{":
+            state.parenlev += 1
+        yield TokenInfo(xsh_tokens[token], token, spos, epos, state.line)
     elif initial == "\\":  # continued stmt
         state.continued = True
     else:  # Special
-        if (initial in "([{") or (token in {"@(", "!(", "![", "$(", "$[", "${", "@$("}):
+        if initial in "([{":
             state.parenlev += 1
         elif initial in ")]}":
             state.parenlev -= 1
-        yield TokenInfo(OP, token, spos, epos, state.line)
+        yield TokenInfo(t.OP, token, spos, epos, state.line)
 
 
 def next_end_tokens(state: TokenizerState):
     # Add an implicit NEWLINE if the input doesn't end in one
     if state.last_line and state.last_line[-1] not in "\r\n" and not state.last_line.strip().startswith("#"):
         yield TokenInfo(
-            NEWLINE,
+            t.NEWLINE,
             "",
             (state.lnum - 1, len(state.last_line)),
             (state.lnum - 1, len(state.last_line) + 1),
             "",
         )
     for _ in state.indents[1:]:  # pop remaining indent levels
-        yield TokenInfo(DEDENT, "", (state.lnum, 0), (state.lnum, 0), "")
-    yield TokenInfo(ENDMARKER, "", (state.lnum, 0), (state.lnum, 0), "")
+        yield TokenInfo(t.DEDENT, "", (state.lnum, 0), (state.lnum, 0), "")
+    yield TokenInfo(t.ENDMARKER, "", (state.lnum, 0), (state.lnum, 0), "")
 
 
 def _tokenize(readline):
@@ -445,7 +447,7 @@ def _tokenize(readline):
                     break
             else:
                 yield TokenInfo(
-                    ERRORTOKEN,
+                    t.ERRORTOKEN,
                     state.line[state.pos],
                     (state.lnum, state.pos),
                     (state.lnum, state.pos + 1),
