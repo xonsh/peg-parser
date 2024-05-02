@@ -1,8 +1,8 @@
 """Tests the xonsh lexer."""
 
+import difflib
 import io
 from collections.abc import Sequence
-from pprint import pformat
 
 import pytest
 
@@ -11,46 +11,24 @@ from peg_parser.parser import token, tokenize
 from peg_parser.parser.tokenize import TokenInfo
 
 
-def ensure_tuple(seq) -> tuple:
+def ensure_tuple(seq) -> str:
     if isinstance(seq, TokenInfo):
-        return (seq.type, seq.string, seq.start[1])
+        seq = (seq.type, seq.string, seq.start[1])
     if isinstance(seq, Sequence):
-        return (getattr(token, seq[0]) if isinstance(seq[0], str) else seq[0], *seq[1:])
-    return tuple(seq)
-
-
-def tokens_equal(x: Sequence, y: TokenInfo):
-    """Tests whether two token are equal."""
-    xtup = ensure_tuple(x)
-    ytup = ensure_tuple(y)
-    return xtup == ytup
-
-
-def assert_token_equal(x, y):
-    """Asserts that two tokens are equal."""
-    if not tokens_equal(x, y):
-        msg = f"The tokens differ: {x!r} != {y!r}"
-        pytest.fail(msg)
-    return True
+        seq = (getattr(token, seq[0]) if isinstance(seq[0], str) else seq[0], *seq[1:])
+    return repr(tuple(seq))
 
 
 def assert_tokens_equal(x, y):
     """Asserts that two token sequences are equal."""
-    if len(x) != len(y):
-        msg = "The tokens sequences have different lengths: {0!r} != {1!r}\n"
-        msg += "# x\n{2}\n\n# y\n{3}"
-        pytest.fail(msg.format(len(x), len(y), pformat(x), pformat(y)))
-    diffs = [(a, b) for a, b in zip(x, y) if not tokens_equal(a, b)]
-    if len(diffs) > 0:
-        msg = ["The token sequences differ: "]
-        for a, b in diffs:
-            msg += ["", "- " + repr(a), "+ " + repr(b)]
-        msg = "\n".join(msg)
-        pytest.fail(msg)
+    left = [ensure_tuple(item) for item in x]
+    right = [ensure_tuple(item) for item in y]
+    diff = "\n".join(difflib.unified_diff(left, right, "parsed", "expected"))
+    assert not diff
     return True
 
 
-def lex_input(inp: str):
+def lex_input(inp: str) -> list[TokenInfo]:
     # skip the NEWLINE, ENDMARKER tokens for easier testing
 
     tokens = list(tokenize.generate_tokens(io.StringIO(inp).readline))
@@ -61,16 +39,7 @@ def lex_input(inp: str):
     return tokens
 
 
-def check_token(inp, exp):
-    obs = lex_input(inp)
-    if len(obs) != 1:
-        msg = "The observed sequence does not have length-1: {0!r} != 1\n"
-        msg += "# obs\n{1}"
-        pytest.fail(msg.format(len(obs), pformat(obs)))
-    return assert_token_equal(exp, obs[0])
-
-
-def check_tokens(inp, exp):
+def check_tokens(inp: str, *exp):
     obs = lex_input(inp)
     return assert_tokens_equal(exp, obs)
 
@@ -94,24 +63,24 @@ def check_tokens_subproc(inp, exp, stop=-1):
     ],
 )
 def test_literals(inp, exp):
-    assert check_token(inp, exp)
+    assert check_tokens(inp, exp)
 
 
 def test_indent():
     exp = [("INDENT", "  \t  ", 0), ("NUMBER", "42", 5), ("NEWLINE", "", 7), ("DEDENT", "", 0)]
-    assert check_tokens("  \t  42", exp)
+    assert check_tokens("  \t  42", *exp)
 
 
 def test_post_whitespace():
     inp = "42  \t  "
-    exp = [("NUMBER", "42", 0)]
+    exp = ("NUMBER", "42", 0)
     assert check_tokens(inp, exp)
 
 
 def test_internal_whitespace():
     inp = "42  +\t65"
     exp = [("NUMBER", "42", 0), ("OP", "+", 4), ("NUMBER", "65", 6)]
-    assert check_tokens(inp, exp)
+    assert check_tokens(inp, *exp)
 
 
 def test_indent_internal_whitespace():
@@ -124,19 +93,19 @@ def test_indent_internal_whitespace():
         ("NEWLINE", "", 9),
         ("DEDENT", "", 0),
     ]
-    assert check_tokens(inp, exp)
+    assert check_tokens(inp, *exp)
 
 
 def test_assignment():
     inp = "x = 42"
     exp = [("NAME", "x", 0), ("OP", "=", 2), ("NUMBER", "42", 4)]
-    assert check_tokens(inp, exp)
+    assert check_tokens(inp, *exp)
 
 
 def test_multiline():
     inp = "x\ny"
     exp = [("NAME", "x", 0), ("NEWLINE", "\n", 1), ("NAME", "y", 0)]
-    assert check_tokens(inp, exp)
+    assert check_tokens(inp, *exp)
 
 
 @pytest.mark.parametrize(
@@ -147,32 +116,30 @@ def test_multiline():
     ],
 )
 def test_dollar_names(inp, exp):
-    assert check_tokens(inp, exp)
+    assert check_tokens(inp, *exp)
 
 
-@pytest.mark.xfail
 def test_atdollar_expression():
     inp = "@$(which python)"
     exp = [
-        ("ATDOLLAR_LPAREN", "@$(", 0),
+        ("OP", "@$(", 0),
         ("NAME", "which", 3),
-        ("WS", " ", 8),
         ("NAME", "python", 9),
-        ("RPAREN", ")", 15),
+        ("OP", ")", 15),
     ]
-    assert check_tokens(inp, exp)
+    assert check_tokens(inp, *exp)
 
 
 def test_and():
     # no preceding whitespace or other tokens, so this
     # resolves to NAME, since it doesn't make sense for
     # Python code to start with "and"
-    assert check_token("and", ["NAME", "and", 0])
+    assert check_tokens("and", ["NAME", "and", 0])
 
 
 @pytest.mark.xfail
 def test_ampersand():
-    assert check_token("&", ["AMPERSAND", "&", 0])
+    assert check_tokens("&", ["AMPERSAND", "&", 0])
 
 
 @pytest.mark.xfail
@@ -185,7 +152,7 @@ def test_not_really_and_pre():
         ("NAME", "and", 6),
         ("RBRACKET", "]", 9),
     ]
-    assert check_tokens(inp, exp)
+    assert check_tokens(inp, *exp)
 
 
 @pytest.mark.xfail
@@ -198,7 +165,7 @@ def test_not_really_and_post():
         ("NAME", "bar", 6),
         ("RBRACKET", "]", 9),
     ]
-    assert check_tokens(inp, exp)
+    assert check_tokens(inp, *exp)
 
 
 @pytest.mark.xfail
@@ -213,7 +180,7 @@ def test_not_really_and_pre_post():
         ("NAME", "bar", 10),
         ("RBRACKET", "]", 13),
     ]
-    assert check_tokens(inp, exp)
+    assert check_tokens(inp, *exp)
 
 
 @pytest.mark.xfail
@@ -226,7 +193,7 @@ def test_not_really_or_pre():
         ("NAME", "or", 6),
         ("RBRACKET", "]", 8),
     ]
-    assert check_tokens(inp, exp)
+    assert check_tokens(inp, *exp)
 
 
 @pytest.mark.xfail
@@ -239,7 +206,7 @@ def test_not_really_or_post():
         ("NAME", "bar", 5),
         ("RBRACKET", "]", 8),
     ]
-    assert check_tokens(inp, exp)
+    assert check_tokens(inp, *exp)
 
 
 @pytest.mark.xfail
@@ -254,7 +221,7 @@ def test_not_really_or_pre_post():
         ("NAME", "bar", 9),
         ("RBRACKET", "]", 12),
     ]
-    assert check_tokens(inp, exp)
+    assert check_tokens(inp, *exp)
 
 
 @pytest.mark.xfail
@@ -283,7 +250,7 @@ def test_subproc_line_cont_space():
         ("NAME", "valueZ", 15),
         ("RBRACKET", "]", 21),
     ]
-    assert check_tokens(inp, exp)
+    assert check_tokens(inp, *exp)
 
 
 @pytest.mark.xfail
@@ -312,91 +279,91 @@ def test_subproc_line_cont_nospace():
         ("NAME", "valueZ", 15),
         ("RBRACKET", "]", 21),
     ]
-    assert check_tokens(inp, exp)
+    assert check_tokens(inp, *exp)
 
 
 @pytest.mark.xfail
 def test_atdollar():
-    assert check_token("@$", ["ATDOLLAR", "@$", 0])
+    assert check_tokens("@$", ["ATDOLLAR", "@$", 0])
 
 
 @pytest.mark.xfail
 def test_doubleamp():
-    assert check_token("&&", ["AND", "and", 0])
+    assert check_tokens("&&", ["AND", "and", 0])
 
 
 @pytest.mark.xfail
 def test_pipe():
-    assert check_token("|", ["PIPE", "|", 0])
+    assert check_tokens("|", ["PIPE", "|", 0])
 
 
 @pytest.mark.xfail
 def test_doublepipe():
-    assert check_token("||", ["OR", "or", 0])
+    assert check_tokens("||", ["OR", "or", 0])
 
 
 def test_single_quote_literal():
-    assert check_token("'yo'", ["STRING", "'yo'", 0])
+    assert check_tokens("'yo'", ["STRING", "'yo'", 0])
 
 
 def test_double_quote_literal():
-    assert check_token('"yo"', ["STRING", '"yo"', 0])
+    assert check_tokens('"yo"', ["STRING", '"yo"', 0])
 
 
 def test_triple_single_quote_literal():
-    assert check_token("'''yo'''", ["STRING", "'''yo'''", 0])
+    assert check_tokens("'''yo'''", ["STRING", "'''yo'''", 0])
 
 
 def test_triple_double_quote_literal():
-    assert check_token('"""yo"""', ["STRING", '"""yo"""', 0])
+    assert check_tokens('"""yo"""', ["STRING", '"""yo"""', 0])
 
 
 def test_single_raw_string_literal():
-    assert check_token("r'yo'", ["STRING", "r'yo'", 0])
+    assert check_tokens("r'yo'", ["STRING", "r'yo'", 0])
 
 
 def test_double_raw_string_literal():
-    assert check_token('r"yo"', ["STRING", 'r"yo"', 0])
+    assert check_tokens('r"yo"', ["STRING", 'r"yo"', 0])
 
 
 def test_single_f_string_literal():
-    assert check_token("f'{yo}'", ["STRING", "f'{yo}'", 0])
+    assert check_tokens("f'{yo}'", ["STRING", "f'{yo}'", 0])
 
 
 def test_double_f_string_literal():
-    assert check_token('f"{yo}"', ["STRING", 'f"{yo}"', 0])
+    assert check_tokens('f"{yo}"', ["STRING", 'f"{yo}"', 0])
 
 
 def test_single_unicode_literal():
-    assert check_token("u'yo'", ["STRING", "u'yo'", 0])
+    assert check_tokens("u'yo'", ["STRING", "u'yo'", 0])
 
 
 def test_double_unicode_literal():
-    assert check_token('u"yo"', ["STRING", 'u"yo"', 0])
+    assert check_tokens('u"yo"', ["STRING", 'u"yo"', 0])
 
 
 def test_single_bytes_literal():
-    assert check_token("b'yo'", ["STRING", "b'yo'", 0])
+    assert check_tokens("b'yo'", ["STRING", "b'yo'", 0])
 
 
 def test_path_string_literal():
-    assert check_token("p'/foo'", ["STRING", "p'/foo'", 0])
-    assert check_token('p"/foo"', ["STRING", 'p"/foo"', 0])
-    assert check_token("pr'/foo'", ["STRING", "pr'/foo'", 0])
-    assert check_token('pr"/foo"', ["STRING", 'pr"/foo"', 0])
-    assert check_token("rp'/foo'", ["STRING", "rp'/foo'", 0])
-    assert check_token('rp"/foo"', ["STRING", 'rp"/foo"', 0])
+    assert check_tokens("p'/foo'", ["STRING", "p'/foo'", 0])
+    assert check_tokens('p"/foo"', ["STRING", 'p"/foo"', 0])
+    assert check_tokens("pr'/foo'", ["STRING", "pr'/foo'", 0])
+    assert check_tokens('pr"/foo"', ["STRING", 'pr"/foo"', 0])
+    assert check_tokens("rp'/foo'", ["STRING", "rp'/foo'", 0])
+    assert check_tokens('rp"/foo"', ["STRING", 'rp"/foo"', 0])
 
 
 def test_path_fstring_literal():
-    assert check_token("pf'/foo'", ["STRING", "pf'/foo'", 0])
-    assert check_token('pf"/foo"', ["STRING", 'pf"/foo"', 0])
-    assert check_token("fp'/foo'", ["STRING", "fp'/foo'", 0])
-    assert check_token('fp"/foo"', ["STRING", 'fp"/foo"', 0])
-    assert check_token("pF'/foo'", ["STRING", "pF'/foo'", 0])
-    assert check_token('pF"/foo"', ["STRING", 'pF"/foo"', 0])
-    assert check_token("Fp'/foo'", ["STRING", "Fp'/foo'", 0])
-    assert check_token('Fp"/foo"', ["STRING", 'Fp"/foo"', 0])
+    assert check_tokens("pf'/foo'", ["STRING", "pf'/foo'", 0])
+    assert check_tokens('pf"/foo"', ["STRING", 'pf"/foo"', 0])
+    assert check_tokens("fp'/foo'", ["STRING", "fp'/foo'", 0])
+    assert check_tokens('fp"/foo"', ["STRING", 'fp"/foo"', 0])
+    assert check_tokens("pF'/foo'", ["STRING", "pF'/foo'", 0])
+    assert check_tokens('pF"/foo"', ["STRING", 'pF"/foo"', 0])
+    assert check_tokens("Fp'/foo'", ["STRING", "Fp'/foo'", 0])
+    assert check_tokens('Fp"/foo"', ["STRING", 'Fp"/foo"', 0])
 
 
 @pytest.mark.xfail
@@ -404,7 +371,7 @@ def test_regex_globs():
     for i in (".*", r"\d*", ".*#{1,2}"):
         for p in ("", "r", "g", "@somethingelse", "p", "pg"):
             c = f"{p}`{i}`"
-            assert check_token(c, ["SEARCHPATH", c, 0])
+            assert check_tokens(c, ["SEARCHPATH", c, 0])
 
 
 @pytest.mark.parametrize(
@@ -423,7 +390,7 @@ def test_regex_globs():
     ],
 )
 def test_float_literals(case):
-    assert check_token(case, ["NUMBER", case, 0])
+    assert check_tokens(case, ["NUMBER", case, 0])
 
 
 @pytest.mark.xfail
@@ -528,7 +495,7 @@ def test_tolerant_lexer(s):
 def test_pymode_not_ioredirect(s, exp):
     # test that Python code like `2>1` is lexed correctly
     # as opposed to being recognized as an IOREDIRECT token (issue #4994)
-    assert check_tokens(s, exp)
+    assert check_tokens(s, *exp)
 
 
 @pytest.mark.xfail

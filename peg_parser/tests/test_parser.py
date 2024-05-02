@@ -155,7 +155,6 @@ def test_subscription_syntaxes(eval_code):
     assert eval_code("'string'[-1]") == "g"
 
 
-@pytest.fixture
 def arr_container():
     # like numpy.r_
     class Arr:
@@ -165,17 +164,17 @@ def arr_container():
     return Arr()
 
 
-def test_subscription_special_syntaxes(arr_container, eval_code):
-    assert eval_code("arr[1, 2, 3]", arr=arr_container) == (1, 2, 3)
+def test_subscription_special_syntaxes(eval_code):
+    assert eval_code("arr[1, 2, 3]", arr=arr_container()) == (1, 2, 3)
     # dataframe
-    assert eval_code('arr[["a", "b"]]', arr=arr_container) == ["a", "b"]
+    assert eval_code('arr[["a", "b"]]', arr=arr_container()) == ["a", "b"]
 
 
 @pytest.mark.xfail
-def test_subscription_special_syntaxes_2(arr_container, eval_code):
+def test_subscription_special_syntaxes_2(eval_code):
     # aliases
     d = {}
-    eval_code("d[arr.__name__]=True", arr=arr_container, d=d)
+    eval_code("d[arr.__name__] = True", arr=arr_container(), d=d)
     assert d == {"Arr": True}
     # extslice
     assert eval_code('arr[:, "2"]') == 2
