@@ -111,8 +111,8 @@ def test_multiline():
 @pytest.mark.parametrize(
     "inp,exp",
     [
-        ("$ENV", [[t.ENVNAME, "$ENV", 0]]),
-        ("$ENV = 'val'", [[t.ENVNAME, "$ENV", 0], [t.OP, "=", 5], [t.STRING, "'val'", 7]]),
+        ("$ENV", [[t.DOLLAR, "$", 0], [t.NAME, "ENV", 1]]),
+        ("$ENV = 'val'", [[t.DOLLAR, "$", 0], [t.NAME, "ENV", 1], [t.OP, "=", 5], [t.STRING, "'val'", 7]]),
     ],
 )
 def test_dollar_names(inp, exp):

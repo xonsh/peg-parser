@@ -86,7 +86,7 @@ DOLLAR_LBRACE = 88
 DOUBLE_QUESTION = 89
 AT_DOLLAR_LPAREN = 90
 QUESTION = 91
-ENVNAME = 92
+DOLLAR = 92
 
 N_TOKENS = 80
 # Special definitions for cooperation with parser
@@ -145,18 +145,6 @@ EXACT_TOKEN_TYPES = {
     "|=": VBAREQUAL,
     "}": RBRACE,
     "~": TILDE,
-    # xonsh tokens
-    "?": QUESTION,
-    "||": DOUBLE_PIPE,
-    "&&": DOUBLE_AMPER,
-    "@(": AT_LPAREN,
-    "!(": BANG_LPAREN,
-    "![": BANG_LBRACKET,
-    "$(": DOLLAR_LPAREN,
-    "$[": DOLLAR_LBRACKET,
-    "${": DOLLAR_LBRACE,
-    "??": DOUBLE_QUESTION,
-    "@$(": AT_DOLLAR_LPAREN,
 }
 
 
