@@ -629,11 +629,13 @@ class Parser:
             kwarg=after_star[2],
         )
 
-    def expand_env_name(self, name: TokenInfo, **locs):
+    def expand_env_name(self, name: TokenInfo, ctx=None, **locs):
+        if ctx is None:
+            ctx = Load
         return ast.Subscript(
             value=load_attribute_chain("__xonsh__.env", **locs),
             slice=ast.Constant(value=name.string, **locs),
-            ctx=ast.Load(),
+            ctx=ctx,
             **locs,
         )
 
