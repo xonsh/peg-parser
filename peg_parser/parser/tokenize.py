@@ -56,6 +56,15 @@ class TokenInfo(NamedTuple):
         else:
             return self.type
 
+    def loc(self):
+        """helper method to construct AST node location"""
+        return {
+            "lineno": self.start[0],
+            "col_offset": self.start[1],
+            "end_lineno": self.end[0],
+            "end_col_offset": self.end[1],
+        }
+
 
 def capname(name: str, pattern: str) -> str:
     return f"(?P<{name}>{pattern})"
@@ -390,9 +399,12 @@ def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrSta
     else:  # Special
         if initial in "([{":
             state.parenlev += 1
-        elif initial in ")]}":
+
+        if token in ")]}":
             state.parenlev -= 1
-        yield TokenInfo(t.OP, token, spos, epos, state.line)
+            yield TokenInfo(t.EXACT_TOKEN_TYPES[token], token, spos, epos, state.line)
+        else:
+            yield TokenInfo(t.OP, token, spos, epos, state.line)
 
 
 def next_end_tokens(state: TokenizerState):

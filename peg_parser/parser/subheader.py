@@ -2,10 +2,10 @@ import ast
 import enum
 import sys
 from pathlib import Path
-from tokenize import TokenInfo
 from typing import Any, Callable, ClassVar, Literal, NoReturn, Optional, TypeVar, Union, cast
 
 from peg_parser.parser import token, tokenize
+from peg_parser.parser.tokenize import TokenInfo
 from peg_parser.parser.tokenizer import Mark, Tokenizer, exact_token_types
 
 # Singleton ast nodes, created once for efficiency
@@ -207,7 +207,12 @@ def xonsh_call(name, *args, **locs) -> ast.Call:
     Functions names may contain attribute access, e.g. __xonsh__.env.
     """
     return ast.Call(
-        func=load_attribute_chain(name, **locs), args=args, keywords=[], starargs=None, kwargs=None, **locs
+        func=load_attribute_chain(name, **locs),
+        args=list(args),
+        keywords=[],
+        starargs=None,
+        kwargs=None,
+        **locs,
     )
 
 
@@ -256,28 +261,28 @@ class Parser:
         return f"{tok.start[0]}.{tok.start[1]}: {token.tok_name[tok.type]}:{tok.string!r}"
 
     @memoize
-    def name(self) -> Optional[tokenize.TokenInfo]:
+    def name(self) -> Optional[TokenInfo]:
         tok = self._tokenizer.peek()
         if tok.type == token.NAME and tok.string not in self.KEYWORDS:
             return self._tokenizer.getnext()
         return None
 
     @memoize
-    def token(self, typ: int) -> Optional[tokenize.TokenInfo]:
+    def token(self, typ: int) -> Optional[TokenInfo]:
         tok = self._tokenizer.peek()
         if tok.type == typ:
             return self._tokenizer.getnext()
         return None
 
     @memoize
-    def soft_keyword(self) -> Optional[tokenize.TokenInfo]:
+    def soft_keyword(self) -> Optional[TokenInfo]:
         tok = self._tokenizer.peek()
         if tok.type == token.NAME and tok.string in self.SOFT_KEYWORDS:
             return self._tokenizer.getnext()
         return None
 
     @memoize
-    def expect(self, type: str) -> Optional[tokenize.TokenInfo]:
+    def expect(self, type: str) -> Optional[TokenInfo]:
         tok = self._tokenizer.peek()
         if tok.string == type:
             return self._tokenizer.getnext()
@@ -405,21 +410,19 @@ class Parser:
         node.ctx = context
         return node
 
-    def ensure_real(self, number: tokenize.TokenInfo) -> float:
+    def ensure_real(self, number: TokenInfo) -> float:
         value = ast.literal_eval(number.string)
         if isinstance(value, complex):
             self.raise_syntax_error_known_location("real number required in complex literal", number)
         return value
 
-    def ensure_imaginary(self, number: tokenize.TokenInfo) -> complex:
+    def ensure_imaginary(self, number: TokenInfo) -> complex:
         value = ast.literal_eval(number.string)
         if not isinstance(value, complex):
             self.raise_syntax_error_known_location("imaginary number required in complex literal", number)
         return value
 
-    def check_fstring_conversion(
-        self, mark: tokenize.TokenInfo, name: tokenize.TokenInfo
-    ) -> tokenize.TokenInfo:
+    def check_fstring_conversion(self, mark: TokenInfo, name: TokenInfo) -> TokenInfo:
         if mark.lineno != name.lineno or mark.col_offset != name.col_offset:  # type: ignore
             self.raise_syntax_error_known_range(
                 "f-string: conversion type must come right after the exclamanation mark", mark, name
@@ -496,7 +499,7 @@ class Parser:
             )
 
     @staticmethod
-    def _join_str_tokens(tokens: list[tokenize.TokenInfo]) -> str:
+    def _join_str_tokens(tokens: list[TokenInfo]) -> str:
         line = 1
         col_offset = 0
         source = ""
@@ -514,14 +517,14 @@ class Parser:
         return source
 
     @staticmethod
-    def _has_path_prefix(token: tokenize.TokenInfo) -> bool:
+    def _has_path_prefix(token: TokenInfo) -> bool:
         text = token.string
         if not text.startswith(("'", '"')):
             prefix = text[:2].lower()
             return bool(prefix and ("p" in prefix))
         return False
 
-    def generate_ast_for_string(self, tokens: list[tokenize.TokenInfo]):
+    def generate_ast_for_string(self, tokens: list[TokenInfo]):
         """Generate AST nodes for strings."""
         first_token = tokens[0]
         if path_literal := self._has_path_prefix(first_token):
@@ -531,13 +534,11 @@ class Parser:
 
         node = self._parse_pure_string(tokens)
         if path_literal:
-            return xonsh_call(
-                "__xonsh__.path_literal", node, lineno=first_token.start[0], col_offset=first_token.start[1]
-            )
+            return xonsh_call("__xonsh__.path_literal", node, **first_token.loc())
 
         return node
 
-    def _parse_pure_string(self, tokens: list[tokenize.TokenInfo]):
+    def _parse_pure_string(self, tokens: list[TokenInfo]):
         err_args = None
         source = self._join_str_tokens(tokens)
 
@@ -567,7 +568,7 @@ class Parser:
 
         return m.body[0].value  # type: ignore
 
-    def extract_import_level(self, tokens: list[tokenize.TokenInfo]) -> int:
+    def extract_import_level(self, tokens: list[TokenInfo]) -> int:
         """Extract the relative import level from the tokens preceding the module name.
 
         '.' count for one and '...' for 3.
@@ -647,6 +648,10 @@ class Parser:
             **locs,
         )
 
+    def subproc_captured(self, args: list[TokenInfo], **locs) -> ast.Call:
+        cmd_args = [ast.Constant(value=arg.string, **arg.loc()) for arg in args]
+        return xonsh_call("__xonsh__.subproc_captured", ast.List(elts=cmd_args, ctx=Load, **locs), **locs)
+
     def _build_syntax_error(
         self,
         message: str,
@@ -685,7 +690,7 @@ class Parser:
     def make_syntax_error(self, message: str) -> SyntaxError:
         return self._build_syntax_error(message)
 
-    def expect_forced(self, res: Any, expectation: str) -> Optional[tokenize.TokenInfo]:
+    def expect_forced(self, res: Any, expectation: str) -> Optional[TokenInfo]:
         if res is None:
             last_token = self._tokenizer.diagnose()
             end = last_token.start
@@ -703,11 +708,9 @@ class Parser:
             message, tok.start, tok.end if sys.version_info >= (3, 12) or tok.type != 4 else tok.start
         )
 
-    def raise_syntax_error_known_location(
-        self, message: str, node: Union[ast.AST, tokenize.TokenInfo]
-    ) -> NoReturn:
+    def raise_syntax_error_known_location(self, message: str, node: Union[ast.AST, TokenInfo]) -> NoReturn:
         """Raise a syntax error that occured at a given AST node."""
-        if isinstance(node, tokenize.TokenInfo):
+        if isinstance(node, TokenInfo):
             start = node.start
             end = node.end
         else:
@@ -719,15 +722,15 @@ class Parser:
     def raise_syntax_error_known_range(
         self,
         message: str,
-        start_node: Union[ast.AST, tokenize.TokenInfo],
-        end_node: Union[ast.AST, tokenize.TokenInfo],
+        start_node: Union[ast.AST, TokenInfo],
+        end_node: Union[ast.AST, TokenInfo],
     ) -> NoReturn:
-        if isinstance(start_node, tokenize.TokenInfo):
+        if isinstance(start_node, TokenInfo):
             start = start_node.start
         else:
             start = start_node.lineno, start_node.col_offset  # type: ignore
 
-        if isinstance(end_node, tokenize.TokenInfo):
+        if isinstance(end_node, TokenInfo):
             end = end_node.end
         else:
             end = end_node.end_lineno, end_node.end_col_offset  # type: ignore
@@ -735,9 +738,9 @@ class Parser:
         raise self._build_syntax_error(message, start, end)  # type: ignore
 
     def raise_syntax_error_starting_from(
-        self, message: str, start_node: Union[ast.AST, tokenize.TokenInfo]
+        self, message: str, start_node: Union[ast.AST, TokenInfo]
     ) -> NoReturn:
-        if isinstance(start_node, tokenize.TokenInfo):
+        if isinstance(start_node, TokenInfo):
             start = start_node.start
         else:
             start = start_node.lineno, start_node.col_offset
