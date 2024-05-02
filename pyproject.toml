@@ -1,6 +1,6 @@
 [tool.ruff]
 line-length = 110
-extend-exclude = ["tests/line-items", "peg_parser/tests/data", "pegen"]
+extend-exclude = ["tests/line-items", "tests/data", "pegen"]
 
 [tool.ruff.lint]
 extend-select = ["B", "I", "UP"]
@@ -99,7 +99,7 @@ follow_imports = 'skip'
 #strict_optional = false
 #warn_redundant_casts = true
 exclude = [
-    'peg_parser/tests',
+    'tests',
     'peg_parser/parser/parser.py',
     'pegen\/build.py',
     'pegen\/grammar_parser.py',
