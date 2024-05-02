@@ -172,7 +172,8 @@ ContStr = capname("pre2", StringPrefix) + group(
     r'"[^\n"\\]*(?:\\.[^\n"\\]*)*' + group('"', r"\\\r?\n"),
     name="Str2",
 )
-PseudoExtras = group(End=r"\\\r?\n|\Z", Comment=Comment, Triple=Triple)
+SearchPath = r"((?:[rgpf]+|@\w*)?)`([^\n`\\]*(?:\\.[^\n`\\]*)*)`"
+PseudoExtras = group(End=r"\\\r?\n|\Z", Comment=Comment, Triple=Triple, SearchPath=SearchPath)
 PseudoToken = Whitespace + group(PseudoExtras, Number=Number, Funny=Funny, ContStr=ContStr, Name=Name)
 
 # For a given string prefix plus quotes, endpats maps it to a regex
@@ -387,7 +388,8 @@ def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrSta
             return False
         else:  # ordinary string
             yield TokenInfo(t.STRING, token, spos, epos, state.line)
-
+    elif cap_groups.get("SearchPath"):
+        yield TokenInfo(t.SEARCH_PATH, token, spos, epos, state.line)
     elif cap_groups.get("Name"):  # ordinary name
         yield TokenInfo(t.NAME, token, spos, epos, state.line)
     elif cap_groups.get("XshOps"):
