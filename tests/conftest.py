@@ -130,9 +130,13 @@ def unparse_diff(parse_str):
 
 
 @pytest.fixture
-def x_locals():
+def xsh():
+    return MagicMock()
+
+
+@pytest.fixture
+def x_locals(xsh):
     def factory(xenv: dict, **locs):
-        xsh = MagicMock()
         xsh.env = xenv
         locs["__xonsh__"] = xsh
         return locs
@@ -173,6 +177,6 @@ def check_xonsh(check_xonsh_ast):
     def factory(xenv: dict, inp: str, run=True, mode="exec"):
         if not inp.endswith("\n"):
             inp += "\n"
-        check_xonsh_ast(xenv, inp, run=run, mode=mode)
+        return check_xonsh_ast(xenv, inp, run=run, mode=mode)
 
     return factory

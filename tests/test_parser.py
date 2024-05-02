@@ -1852,29 +1852,27 @@ def test_dollar_name_set(check_xonsh):
     check_xonsh({"WAKKA": 42}, "$WAKKA = 42")
 
 
-@pytest.mark.xfail
 def test_dollar_py_set(check_xonsh):
     check_xonsh({"WAKKA": 42}, 'x = "WAKKA"; ${x} = 65')
 
 
-def test_dollar_sub(check_xonsh_ast):
-    check_xonsh_ast({}, "$(ls)", False)
-
-
 @pytest.mark.parametrize(
-    "expr",
+    "inp",
     [
+        "$(ls)",
         "$(ls )",
-        "$( ls)",
         "$( ls )",
+        "$( ls)",
     ],
 )
-def test_dollar_sub_space(expr, check_xonsh_ast):
-    check_xonsh_ast({}, expr, False)
+def test_dollar_sub(inp, check_xonsh_ast, xsh):
+    check_xonsh_ast({}, inp)
+    xsh.subproc_captured.assert_called_with(["ls"])
 
 
-def test_ls_dot(check_xonsh_ast):
-    check_xonsh_ast({}, "$(ls .)", False)
+def test_ls_dot(check_xonsh_ast, xsh):
+    check_xonsh_ast({}, "$(ls .)")
+    xsh.subproc_captured.assert_called_with(["ls", "."])
 
 
 def test_lambda_in_atparens(check_xonsh_ast):

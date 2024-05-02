@@ -788,6 +788,8 @@ expressions:
 expression (memo):
     | invalid_expression
     | invalid_legacy_expression
+    # $(...)
+    | DOLLAR_LPAREN a=(NAME|OP)+ RPAR { self.subproc_captured(a, LOCATIONS) }
     | a=disjunction 'if' b=disjunction 'else' c=expression {
         ast.IfExp(body=a, test=b, orelse=c, LOCATIONS)
      }
@@ -949,8 +951,11 @@ primary:
         )
      }
     | a=primary '[' b=slices ']' { ast.Subscript(value=a, slice=b, ctx=Load, LOCATIONS) }
+    # $a
     | DOLLAR a=NAME { self.expand_env_name(a, LOCATIONS) }
+    # ${a}
     | DOLLAR_LBRACE a=NAME '}' { self.expand_env_name(a, LOCATIONS) }
+    # ${...}
     | DOLLAR_LBRACE a=slices '}' { self.expand_env_expr(a, LOCATIONS) }
     | atom
 

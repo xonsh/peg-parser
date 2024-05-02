@@ -126,7 +126,7 @@ def test_atdollar_expression():
         (t.AT_DOLLAR_LPAREN, "@$(", 0),
         ("NAME", "which", 3),
         ("NAME", "python", 9),
-        ("OP", ")", 15),
+        ("RPAR", ")", 15),
     ]
     assert check_tokens(inp, *exp)
 
@@ -149,7 +149,7 @@ def test_not_really_and_pre():
         ("NAME", "foo", 2),
         ("OP", "-", 5),
         ("NAME", "and", 6),
-        ("OP", "]", 9),
+        ("RSQB", "]", 9),
     ]
     assert check_tokens(inp, *exp)
 
@@ -161,7 +161,7 @@ def test_not_really_and_post():
         ("NAME", "and", 2),
         ("OP", "-", 5),
         ("NAME", "bar", 6),
-        ("OP", "]", 9),
+        ("RSQB", "]", 9),
     ]
     assert check_tokens(inp, *exp)
 
@@ -175,7 +175,7 @@ def test_not_really_and_pre_post():
         ("NAME", "and", 6),
         (t.OP, "-", 9),
         ("NAME", "bar", 10),
-        ("OP", "]", 13),
+        ("RSQB", "]", 13),
     ]
     assert check_tokens(inp, *exp)
 
@@ -187,7 +187,7 @@ def test_not_really_or_pre():
         ("NAME", "foo", 2),
         (t.OP, "-", 5),
         ("NAME", "or", 6),
-        ("OP", "]", 8),
+        ("RSQB", "]", 8),
     ]
     assert check_tokens(inp, *exp)
 
@@ -199,7 +199,7 @@ def test_not_really_or_post():
         ("NAME", "or", 2),
         (t.OP, "-", 4),
         ("NAME", "bar", 5),
-        ("OP", "]", 8),
+        ("RSQB", "]", 8),
     ]
     assert check_tokens(inp, *exp)
 
@@ -213,7 +213,7 @@ def test_not_really_or_pre_post():
         ("NAME", "or", 6),
         (t.OP, "-", 8),
         ("NAME", "bar", 9),
-        ("OP", "]", 12),
+        ("RSQB", "]", 12),
     ]
     assert check_tokens(inp, *exp)
 
@@ -235,7 +235,7 @@ def test_subproc_line_cont_space():
         (t.OP, "-", 6),
         ("NAME", "optionZ", 7),
         ("NAME", "valueZ", 15),
-        ("OP", "]", 21),
+        ("RSQB", "]", 21),
     ]
     assert check_tokens(inp, *exp)
 
@@ -257,7 +257,7 @@ def test_subproc_line_cont_nospace():
         (t.OP, "-", 6),
         ("NAME", "optionZ", 7),
         ("NAME", "valueZ", 15),
-        ("OP", "]", 21),
+        ("RSQB", "]", 21),
     ]
     assert check_tokens(inp, *exp)
 
