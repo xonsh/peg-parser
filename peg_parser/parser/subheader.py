@@ -640,11 +640,13 @@ class Parser:
             **locs,
         )
 
-    def expand_env_expr(self, slices: ast.expr, **locs):
+    def expand_env_expr(self, slices: ast.expr, ctx=None, **locs):
+        if ctx is None:
+            ctx = Load
         return ast.Subscript(
             value=load_attribute_chain("__xonsh__.env", **locs),
             slice=xonsh_call("str", slices, **locs),
-            ctx=ast.Load(),
+            ctx=ctx,
             **locs,
         )
 

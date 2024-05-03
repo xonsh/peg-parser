@@ -68,6 +68,10 @@ def parse_str(python_parse_str):
             print("Parsing failed:")
             print("Source is:")
             print(text)
+            from peg_parser.parser import tokenize
+
+            toks = list(tokenize.generate_tokens(text))
+            log.info("Tokens are: \n %s", "\n".join(map(str, toks)))
             if not verbose:
                 log.info("Retrying with verbose=True")
                 with contextlib.redirect_stdout(io.StringIO()) as stdout, contextlib.suppress(Exception):
