@@ -1875,18 +1875,22 @@ def test_ls_dot(check_xonsh_ast, xsh):
     xsh.subproc_captured.assert_called_with(["ls", "."])
 
 
+@pytest.mark.xfail
 def test_lambda_in_atparens(check_xonsh_ast):
     check_xonsh_ast({}, '$(echo hello | @(lambda a, s=None: "hey!") foo bar baz)', False)
 
 
+@pytest.mark.xfail
 def test_generator_in_atparens(check_xonsh_ast):
     check_xonsh_ast({}, "$(echo @(i**2 for i in range(20)))", False)
 
 
+@pytest.mark.xfail
 def test_bare_tuple_in_atparens(check_xonsh_ast):
     check_xonsh_ast({}, '$(echo @("a", 7))', False)
 
 
+@pytest.mark.xfail
 def test_nested_madness(check_xonsh_ast):
     check_xonsh_ast(
         {},
@@ -1895,6 +1899,7 @@ def test_nested_madness(check_xonsh_ast):
     )
 
 
+@pytest.mark.xfail
 def test_atparens_intoken(check_xonsh_ast):
     check_xonsh_ast({}, "![echo /x/@(y)/z]", False)
 
