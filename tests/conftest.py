@@ -131,17 +131,7 @@ def xsh():
 
 
 @pytest.fixture
-def x_locals(xsh):
-    def factory(xenv: dict, **locs):
-        xsh.env = xenv
-        locs["__xonsh__"] = xsh
-        return locs
-
-    return factory
-
-
-@pytest.fixture
-def check_xonsh_ast(parse_str, x_locals):
+def check_xonsh_ast(parse_str, xsh):
     """compatibility fixture"""
 
     def factory(
@@ -155,7 +145,9 @@ def check_xonsh_ast(parse_str, x_locals):
         if obs is None:
             return  # comment only
         bytecode = compile(obs, "<test-xonsh-ast>", mode)
-        exec(bytecode, {}, x_locals(xenv, **locs))
+        xsh.env = xenv or {}
+        locs["__xonsh__"] = xsh
+        exec(bytecode, {}, locs)
         return obs
 
     return factory
