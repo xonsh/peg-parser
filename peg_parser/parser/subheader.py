@@ -667,9 +667,15 @@ class Parser:
         if stash:
             yield Parser.toks_to_constant(stash)
 
-    def subproc_captured(self, args: list[TokenInfo | ast.AST], **locs) -> ast.Call:
+    def subproc(self, start: TokenInfo, args: list[TokenInfo | ast.AST], **locs) -> ast.Call:
+        method = {
+            token.DOLLAR_LPAREN: "subproc_captured",
+            token.DOLLAR_LBRACKET: "subproc_uncaptured",
+            token.BANG_LBRACKET: "subproc_captured_hiddenobject",
+            token.BANG_LPAREN: "subproc_captured_object",
+        }[start.type]
         cmd_args = list(self._split_by_ws_nl(args))
-        return xonsh_call("__xonsh__.subproc_captured", ast.List(elts=cmd_args, ctx=Load, **locs), **locs)
+        return xonsh_call(f"__xonsh__.{method}", ast.List(elts=cmd_args, ctx=Load, **locs), **locs)
 
     def _build_syntax_error(
         self,
