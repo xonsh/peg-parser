@@ -3,8 +3,11 @@ repos:
     rev: "v0.4.2"
     hooks:
       - id: ruff
-        args: ["--fix"]
+        args: [ ., --fix, --exit-non-zero-on-fix ]
+        pass_filenames: false
       - id: ruff-format
+        args: [.]
+        pass_filenames: false
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: "v1.10.0" # Use the sha / tag you want to point at

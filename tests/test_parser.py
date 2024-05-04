@@ -1757,21 +1757,18 @@ def test_nested_functions(check_stmts):
 
 
 def test_function_blank_line(check_stmts):
-    code = (
-        "def foo():\n"
-        "    ascii_art = [\n"
-        '        "(╯°□°）╯︵ ┻━┻",\n'
-        r'        "¯\\_(ツ)_/¯",'
-        "\n"
-        r'        "┻━┻︵ \\(°□°)/ ︵ ┻━┻",'
-        "\n"
-        "    ]\n"
-        "\n"
-        "    import random\n"
-        "    i = random.randint(0,len(ascii_art)) - 1\n"
-        '    print("    Get to work!")\n'
-        "    print(ascii_art[i])\n"
-    )
+    code = """\
+def foo():
+    ascii_art = [
+        "(╯°□°）╯︵ ┻━┻",
+        "¯\\_(ツ)_/¯",
+        "┻━┻︵ \\(°□°)/ ︵ ┻━┻",
+    ]
+    import random
+    i = random.randint(0,len(ascii_art)) - 1
+    print("    Get to work!")
+    print(ascii_art[i])
+"""
     check_stmts(code)
 
 

@@ -1,18 +1,63 @@
 [tool.ruff]
 line-length = 110
-extend-exclude = ["tests/line-items", "tests/data", "pegen"]
+extend-exclude = [
+    "tests/xonsh-data", "tests/data", "pegen", "benchmarks", "peg_parser/tasks/bench_utils.py",
+    "peg_parser/parser/untokenizer.py"
+]
 
 [tool.ruff.lint]
-extend-select = ["B", "I", "UP"]
+extend-select = ["B", "I", "UP",
+    "C90", # mccaabe complexity
+    "N", # pep8 naming
+    "YTT", # flake8-2020 sys.version
+#    "ANN", # flake8 annotations
+    "A", # flake8-builtins
+    "C4", # flake8-comprehensions
+    "FA", # flake8-future-annotations
+    "PIE", # flake8-pie
+    "PT", # pytest
+    "SIM", # simplify
+    "TCH", # type checking
+    "PL", # pylint
+    "PERF", # performance
+#    "FURB", # modernize
+    "RUF", # ruff
+]
 fixable = ["ALL"]
 
 # ruff ignore file "xonsh_parser/ply/yacc.py"
 [tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "ANN", # requiring annotations
+    "PL", # pylint
+    "PT023", # [*] Use `@pytest.mark.xfail()` over `@pytest.mark.xfail`
+    "PT001", # [*] Use `@pytest.mark.parametrize` instead of `@pytest.mark.parametrize`
+    "PT006", # need tuple
+    "PT007", # Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+    "RUF001", # similar chars
+]
+"tests/test_parser.py" = [
+    "PT014"
+]
+"*/subheader.py" = [
+    "C901",
+    "PLR0915", # too many statements
+    "PLR0912", # Too many branches"
+    "PLR0911", # Too many return statements
+    "PLR0913", # Too many arguments
+]
 "*/tokenize.py" = [
+    "A001", # Variable `any` is shadowing a Python builtin
     "F405", #
     "F821", # Undefined name `strstart`
     "F841", # [*] Local variable `strstart` is assigned to but never used
     "B904", # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+    "PLR", # pylint
+    "C901", # too complex
+    "N818", # exception naming
+]
+"*/token.py" = [
+    "N802", # function name should be lowercase
 ]
 
 
@@ -86,10 +131,6 @@ pegen = "pegen"
 [project.urls]
 Documentation = "https://jnoortheen.github.io/xonsh-parser/"
 Source = "https://github.com/jnoortheen/xonsh-parser"
-
-[tool.black]
-# exclude extend to file "xonsh_parser/ply/yacc.py"
-extend-exclude = ".+ply/yacc.py"
 
 [tool.mypy]
 # mypy ignore file "xonsh_parser/ply/yacc.py"

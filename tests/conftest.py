@@ -1,5 +1,7 @@
 """ "Conftest for pure python parser."""
 
+from __future__ import annotations
+
 import contextlib
 import io
 import logging
@@ -17,7 +19,7 @@ def nodes_equal(x, y):
     assert type(x) == type(y), f"Ast nodes do not have the same type: '{type(x)}' != '{type(y)}' "
     if isinstance(x, ast.Constant):
         assert x.value == y.value, (
-            f"Constant ast nodes do not have the same value: " f"{repr(x.value)} != {repr(y.value)}"
+            f"Constant ast nodes do not have the same value: " f"{x.value!r} != {y.value!r}"
         )
     if isinstance(x, (ast.Expr, ast.FunctionDef, ast.ClassDef)):
         assert x.lineno == y.lineno, f"Ast nodes do not have the same line number : {x.lineno} != {y.lineno}"
@@ -110,10 +112,10 @@ def check_stmts(check_ast):
 
 @pytest.fixture
 def eval_code(parse_str):
-    def factory(text: str, mode="eval", **vars):
+    def factory(text: str, mode="eval", **locs):
         obs = parse_str(text, mode=mode)
         bytecode = compile(obs, "<test-xonsh-ast>", mode)
-        return eval(bytecode, vars)
+        return eval(bytecode, locs)
 
     return factory
 

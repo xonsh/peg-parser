@@ -14,7 +14,7 @@ from peg_parser.parser import tokenize
 
 
 def dump_diff(**trees: ast.AST):
-    kwargs = dict(include_attributes=True, indent="  ")
+    kwargs = {"include_attributes": True, "indent": "  "}
     orig_name, pp_name = trees.keys()
     original, pp_ast = trees.values()
     o = ast.dump(original, **kwargs)
@@ -62,7 +62,7 @@ def test_parser(python_parse_file, python_parse_str, filename):
     with open(path) as f:
         source = f.read()
 
-    kwargs = dict(include_attributes=True)
+    kwargs = {"include_attributes": True}
     kwargs["indent"] = "  "
     for part in source.split("\n\n\n"):
         original = ast.parse(part)

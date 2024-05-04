@@ -1,12 +1,16 @@
+from __future__ import annotations
+
 import ast
 import enum
 import sys
-from pathlib import Path
-from typing import Any, Callable, ClassVar, Literal, NoReturn, Optional, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Literal, NoReturn, TypeVar, cast
 
 from peg_parser.parser import token, tokenize
 from peg_parser.parser.tokenize import TokenInfo
 from peg_parser.parser.tokenizer import Mark, Tokenizer, exact_token_types
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # Singleton ast nodes, created once for efficiency
 Load = ast.Load()
@@ -109,11 +113,11 @@ def memoize(method: F) -> F:
     return cast(F, memoize_wrapper)
 
 
-def memoize_left_rec(method: Callable[[P], Optional[T]]) -> Callable[[P], Optional[T]]:
+def memoize_left_rec(method: Callable[[P], T | None]) -> Callable[[P], T | None]:
     """Memoize a left-recursive symbol method."""
     method_name = method.__name__
 
-    def memoize_left_rec_wrapper(self: P) -> Optional[T]:
+    def memoize_left_rec_wrapper(self: P) -> T | None:
         mark = self._mark()
         key = mark, method_name, ()
         # Fast path: cache hit, and not verbose.
@@ -235,7 +239,7 @@ class Parser:
         *,
         verbose: bool = False,
         filename: str = "<unknown>",
-        py_version: Optional[tuple] = None,
+        py_version: tuple | None = None,
     ) -> None:
         self._tokenizer = tokenizer
         self._verbose = verbose
@@ -261,38 +265,36 @@ class Parser:
         return f"{tok.start[0]}.{tok.start[1]}: {token.tok_name[tok.type]}:{tok.string!r}"
 
     @memoize
-    def name(self) -> Optional[TokenInfo]:
+    def name(self) -> TokenInfo | None:
         tok = self._tokenizer.peek()
         if tok.type == token.NAME and tok.string not in self.KEYWORDS:
             return self._tokenizer.getnext()
         return None
 
     @memoize
-    def token(self, typ: int) -> Optional[TokenInfo]:
+    def token(self, typ: int) -> TokenInfo | None:
         tok = self._tokenizer.peek()
         if tok.type == typ:
             return self._tokenizer.getnext()
         return None
 
     @memoize
-    def soft_keyword(self) -> Optional[TokenInfo]:
+    def soft_keyword(self) -> TokenInfo | None:
         tok = self._tokenizer.peek()
         if tok.type == token.NAME and tok.string in self.SOFT_KEYWORDS:
             return self._tokenizer.getnext()
         return None
 
     @memoize
-    def expect(self, type: str) -> Optional[TokenInfo]:
+    def expect(self, typ: str) -> TokenInfo | None:
         tok = self._tokenizer.peek()
-        if tok.string == type:
+        if tok.string == typ:
             return self._tokenizer.getnext()
-        if type in exact_token_types:
-            if tok.type == exact_token_types[type]:
-                return self._tokenizer.getnext()
-        if type in token.__dict__:
-            if tok.type == token.__dict__[type]:
-                return self._tokenizer.getnext()
-        if tok.type == token.OP and tok.string == type:
+        if typ in exact_token_types and tok.type == exact_token_types[typ]:
+            return self._tokenizer.getnext()
+        if typ in token.__dict__ and tok.type == token.__dict__[typ]:
+            return self._tokenizer.getnext()
+        if tok.type == token.OP and tok.string == typ:
             return self._tokenizer.getnext()
         return None
 
@@ -308,7 +310,7 @@ class Parser:
         self._reset(mark)
         return not ok
 
-    def parse(self, rule: str, call_invalid_rules: bool = False) -> Optional[ast.AST]:
+    def parse(self, rule: str, call_invalid_rules: bool = False) -> ast.AST | None:
         self.call_invalid_rules = call_invalid_rules
         res = getattr(self, rule)()
 
@@ -355,12 +357,7 @@ class Parser:
             v = node.value
             if v is Ellipsis:
                 return "ellipsis"
-            elif v is None:
-                return str(v)
-            # Avoid treating 1 as True through == comparison
-            elif v is True:
-                return str(v)
-            elif v is False:
+            elif v is None or v is True or v is False:
                 return str(v)
             else:
                 return "literal"
@@ -373,7 +370,7 @@ class Parser:
             ) from e
         return name
 
-    def get_invalid_target(self, target: Target, node: Optional[ast.AST]) -> Optional[ast.AST]:
+    def get_invalid_target(self, target: Target, node: ast.AST | None) -> ast.AST | None:
         """Get the meaningful invalid target for different assignment type."""
         if node is None:
             return None
@@ -441,13 +438,13 @@ class Parser:
         s = ast.literal_eval(parts[0].string)
         for ss in parts[1:]:
             s += ast.literal_eval(ss.string)
-        args = dict(
-            value=s,
-            lineno=parts[0].start[0],
-            col_offset=parts[0].start[1],
-            end_lineno=parts[-1].end[0],
-            end_col_offset=parts[0].end[1],
-        )
+        args = {
+            "value": s,
+            "lineno": parts[0].start[0],
+            "col_offset": parts[0].start[1],
+            "end_lineno": parts[-1].end[0],
+            "end_col_offset": parts[0].end[1],
+        }
         if parts[0].string.startswith("u"):
             args["kind"] = "u"
         return ast.Constant(**args)
@@ -509,10 +506,7 @@ class Parser:
                 col_offset = 0
             source += """\n""" * n_line + " " * (t.start[1] - col_offset) + t.string
             line, col_offset = t.end
-        if source[0] == " ":
-            source = "(" + source[1:]
-        else:
-            source = "(" + source
+        source = "(" + source[1:] if source[0] == " " else "(" + source
         source += ")"
         return source
 
@@ -600,11 +594,11 @@ class Parser:
 
     def make_arguments(
         self,
-        pos_only: Optional[list[tuple[ast.arg, None]]],
+        pos_only: list[tuple[ast.arg, None]] | None,
         pos_only_with_default: list[tuple[ast.arg, Any]],
-        param_no_default: Optional[list[tuple[ast.arg, None]]],
-        param_default: Optional[list[tuple[ast.arg, Any]]],
-        after_star: Optional[tuple[Optional[ast.arg], list[tuple[ast.arg, Any]], Optional[ast.arg]]],
+        param_no_default: list[tuple[ast.arg, None]] | None,
+        param_default: list[tuple[ast.arg, Any]] | None,
+        after_star: tuple[ast.arg | None, list[tuple[ast.arg, Any]], ast.arg | None] | None,
     ) -> ast.arguments:
         """Build a function definition arguments."""
         defaults = [d for _, d in pos_only_with_default if d is not None] if pos_only_with_default else []
@@ -657,8 +651,8 @@ class Parser:
     def _build_syntax_error(
         self,
         message: str,
-        start: Optional[tuple[int, int]] = None,
-        end: Optional[tuple[int, int]] = None,
+        start: tuple[int, int] | None = None,
+        end: tuple[int, int] | None = None,
     ) -> SyntaxError:
         line_from_token = start is None and end is None
         if start is None or end is None:
@@ -684,20 +678,20 @@ class Parser:
     def raise_raw_syntax_error(
         self,
         message: str,
-        start: Optional[tuple[int, int]] = None,
-        end: Optional[tuple[int, int]] = None,
+        start: tuple[int, int] | None = None,
+        end: tuple[int, int] | None = None,
     ) -> None:
         raise self._build_syntax_error(message, start, end)
 
     def make_syntax_error(self, message: str) -> SyntaxError:
         return self._build_syntax_error(message)
 
-    def expect_forced(self, res: Any, expectation: str) -> Optional[TokenInfo]:
+    def expect_forced(self, res: Any, expectation: str) -> TokenInfo | None:
         if res is None:
             last_token = self._tokenizer.diagnose()
             end = last_token.start
             if sys.version_info >= (3, 12) or (
-                sys.version_info >= (3, 11) and last_token.type != 4
+                sys.version_info >= (3, 11) and last_token.type != token.NEWLINE
             ):  # i.e. not a \n
                 end = last_token.end
             self.raise_raw_syntax_error(f"expected {expectation}", last_token.start, end)
@@ -707,10 +701,12 @@ class Parser:
         """Raise a syntax error."""
         tok = self._tokenizer.diagnose()
         raise self._build_syntax_error(
-            message, tok.start, tok.end if sys.version_info >= (3, 12) or tok.type != 4 else tok.start
+            message,
+            tok.start,
+            tok.end if sys.version_info >= (3, 12) or tok.type != token.NEWLINE else tok.start,
         )
 
-    def raise_syntax_error_known_location(self, message: str, node: Union[ast.AST, TokenInfo]) -> NoReturn:
+    def raise_syntax_error_known_location(self, message: str, node: ast.AST | TokenInfo) -> NoReturn:
         """Raise a syntax error that occured at a given AST node."""
         if isinstance(node, TokenInfo):
             start = node.start
@@ -724,8 +720,8 @@ class Parser:
     def raise_syntax_error_known_range(
         self,
         message: str,
-        start_node: Union[ast.AST, TokenInfo],
-        end_node: Union[ast.AST, TokenInfo],
+        start_node: ast.AST | TokenInfo,
+        end_node: ast.AST | TokenInfo,
     ) -> NoReturn:
         if isinstance(start_node, TokenInfo):
             start = start_node.start
@@ -739,9 +735,7 @@ class Parser:
 
         raise self._build_syntax_error(message, start, end)  # type: ignore
 
-    def raise_syntax_error_starting_from(
-        self, message: str, start_node: Union[ast.AST, TokenInfo]
-    ) -> NoReturn:
+    def raise_syntax_error_starting_from(self, message: str, start_node: ast.AST | TokenInfo) -> NoReturn:
         if isinstance(start_node, TokenInfo):
             start = start_node.start
         else:
@@ -751,7 +745,7 @@ class Parser:
 
         raise self._build_syntax_error(message, start, last_token.start)
 
-    def raise_syntax_error_invalid_target(self, target: Target, node: Optional[ast.AST]) -> None:
+    def raise_syntax_error_invalid_target(self, target: Target, node: ast.AST | None) -> None:
         invalid_target = self.get_invalid_target(target, node)
 
         if invalid_target is None:
@@ -772,7 +766,7 @@ class Parser:
     def parse_file(
         cls,
         path: Path,
-        py_version: Optional[tuple] = None,
+        py_version: tuple | None = None,
         verbose: bool = False,
     ) -> ast.Module | None:
         """Parse a file or string."""
@@ -792,7 +786,7 @@ class Parser:
         cls,
         source: str,
         mode: Literal["eval", "exec"] = "eval",
-        py_version: Optional[tuple] = None,
+        py_version: tuple | None = None,
         verbose: bool = False,
     ) -> Any:
         """Parse a string."""
