@@ -126,3 +126,5 @@ pdm.lock
 *.out
 .pdm-python
 .task/
+
+.testmondata*
