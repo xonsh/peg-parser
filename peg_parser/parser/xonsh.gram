@@ -788,13 +788,14 @@ expressions:
 expression (memo):
     | invalid_expression
     | invalid_legacy_expression
-    # $(...)
-    | DOLLAR_LPAREN a=(NAME|OP)+ RPAR { self.subproc_captured(a, LOCATIONS) }
     | a=disjunction 'if' b=disjunction 'else' c=expression {
         ast.IfExp(body=a, test=b, orelse=c, LOCATIONS)
      }
     | disjunction
     | lambdef
+
+# @(...)
+#xsh_py_expr: AT_LPAREN a=expression RPAR { a }
 
 yield_expr:
     | 'yield' 'from' a=expression { ast.YieldFrom(value=a, LOCATIONS) }
@@ -951,6 +952,7 @@ primary:
         )
      }
     | a=primary '[' b=slices ']' { ast.Subscript(value=a, slice=b, ctx=Load, LOCATIONS) }
+    | DOLLAR_LPAREN a=(NAME|OP)+ RPAR { self.subproc_captured(a, LOCATIONS) }
     # $a
     | DOLLAR a=NAME { self.expand_env_name(a, LOCATIONS) }
     # ${...}
