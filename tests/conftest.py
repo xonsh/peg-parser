@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import contextlib
 import io
 import logging
@@ -13,9 +14,6 @@ log = logging.getLogger(__name__)
 
 
 def nodes_equal(x, y):
-    import ast
-
-    __tracebackhide__ = True
     assert type(x) == type(y), f"Ast nodes do not have the same type: '{type(x)}' != '{type(y)}' "
     if isinstance(x, ast.Constant):
         assert x.value == y.value, (
@@ -87,8 +85,6 @@ def parse_str(python_parse_str):
 
 @pytest.fixture
 def check_ast(parse_str):
-    import ast
-
     def factory(inp: str, mode="eval", verbose=False):
         # expect a Python AST
         exp = ast.parse(inp, mode=mode)
@@ -113,8 +109,6 @@ def eval_code(parse_str):
 @pytest.fixture
 def unparse_diff(parse_str):
     def factory(text: str, right: str | None = None, mode="eval"):
-        import ast
-
         left = parse_str(text, mode=mode)
         left = ast.unparse(left)
         if right is None:
@@ -127,7 +121,28 @@ def unparse_diff(parse_str):
 
 @pytest.fixture
 def xsh():
-    return MagicMock()
+    obj = MagicMock()
+
+    def list_of_strs_or_callables(x):
+        """
+        A simplified version of the xonsh function.
+        """
+        if isinstance(x, (str, bytes)):
+            return [x]
+        if callable(x):
+            return [x([])]
+        return x
+
+    def subproc_captured(cmds):
+        return "-".join([str(item) for item in cmds])
+
+    def subproc_captured_inject(cmds):
+        return cmds
+
+    obj.list_of_strs_or_callables = MagicMock(wraps=list_of_strs_or_callables)
+    obj.subproc_captured = MagicMock(wraps=subproc_captured)
+    obj.subproc_captured_inject = MagicMock(wraps=subproc_captured_inject)
+    return obj
 
 
 @pytest.fixture
