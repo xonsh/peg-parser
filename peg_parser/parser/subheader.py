@@ -10,6 +10,7 @@ from peg_parser.parser.tokenize import TokenInfo
 from peg_parser.parser.tokenizer import Mark, Tokenizer, exact_token_types
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
 # Singleton ast nodes, created once for efficiency
@@ -644,8 +645,30 @@ class Parser:
             **locs,
         )
 
-    def subproc_captured(self, args: list[TokenInfo], **locs) -> ast.Call:
-        cmd_args = [ast.Constant(value=arg.string, **arg.loc()) for arg in args]
+    @staticmethod
+    def toks_to_constant(stash: list[TokenInfo]) -> ast.Constant:
+        return ast.Constant(
+            value="".join(t.string for t in stash), **stash[0].loc_start(), **stash[-1].loc_end()
+        )
+
+    @staticmethod
+    def _split_by_ws_nl(args: list[TokenInfo | ast.AST]) -> Iterator[ast.AST]:
+        """white space and newlines are used to split tokens into arguments"""
+        stash: list[TokenInfo] = []
+        for ar in args:
+            if isinstance(ar, ast.AST):
+                yield ar
+            elif isinstance(ar, TokenInfo):  # tokens
+                if stash and not ar.is_next_to(stash[-1]):
+                    # we found a split
+                    yield Parser.toks_to_constant(stash)
+                    stash.clear()
+                stash.append(ar)
+        if stash:
+            yield Parser.toks_to_constant(stash)
+
+    def subproc_captured(self, args: list[TokenInfo | ast.AST], **locs) -> ast.Call:
+        cmd_args = list(self._split_by_ws_nl(args))
         return xonsh_call("__xonsh__.subproc_captured", ast.List(elts=cmd_args, ctx=Load, **locs), **locs)
 
     def _build_syntax_error(
