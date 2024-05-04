@@ -646,48 +646,91 @@ class Parser:
         )
 
     @staticmethod
-    def toks_to_constant(stash: list[TokenInfo]) -> ast.Constant:
-        return ast.Constant(
-            value="".join(t.string for t in stash), **stash[0].loc_start(), **stash[-1].loc_end()
+    def is_adjacent(prev: TokenInfo | ast.expr, curr: TokenInfo | ast.AST) -> bool:
+        end = prev.end if isinstance(prev, TokenInfo) else (prev.end_lineno, prev.end_col_offset)
+        start = curr.start if isinstance(curr, TokenInfo) else (curr.lineno, curr.col_offset)
+        return end == start
+
+    def _append_node_or_token(self, tree: ast.expr | None, cmd: TokenInfo | ast.expr) -> ast.expr:
+        if tree is None:
+            return ast.Constant(value=cmd.string, **cmd.loc()) if isinstance(cmd, TokenInfo) else cmd
+
+        locs = {"lineno": tree.lineno, "col_offset": tree.col_offset}
+        if isinstance(tree, ast.Constant) and isinstance(cmd, TokenInfo):
+            return ast.Constant(value=tree.value + cmd.string, **locs, **cmd.loc_end())
+
+        # prefix@(...)
+        if isinstance(tree, ast.Constant) and isinstance(cmd, ast.Starred):
+            return ast.Tuple(
+                elts=[tree, cmd],
+                ctx=Load,
+                **locs,
+                end_lineno=cmd.end_lineno,
+                end_col_offset=cmd.end_col_offset,
+            )
+        # @(...)suffix
+        if isinstance(tree, (ast.Starred, ast.Tuple)) and isinstance(cmd, TokenInfo):
+            suffix = ast.Constant(value=cmd.string, **cmd.loc())
+            elts = [*tree.elts, suffix] if isinstance(tree, ast.Tuple) else [tree, suffix]
+            return ast.Tuple(elts=elts, ctx=Load, **locs, **cmd.loc_end())
+        # prefix@(...)suffix
+        if isinstance(tree, ast.Tuple) and isinstance(cmd, TokenInfo):
+            return ast.Tuple(
+                elts=[*tree.elts, ast.Constant(value=cmd.string, **cmd.loc())],
+                ctx=Load,
+                **locs,
+                **cmd.loc_end(),
+            )
+        return ast.BinOp(
+            left=tree,
+            op=ast.Add(),
+            right=ast.Constant(value=cmd.string, **cmd.loc()) if isinstance(cmd, TokenInfo) else cmd,
+            **locs,
+            end_lineno=cmd.end_lineno if isinstance(cmd, ast.AST) else cmd.end[0],
+            end_col_offset=cmd.end_col_offset if isinstance(cmd, ast.AST) else cmd.end[1],
         )
 
-    def proc_args(self, args: list[TokenInfo | ast.AST]) -> Iterator[ast.AST]:
-        """white space and newlines are used to split tokens into arguments"""
-        stash: list[TokenInfo] = []
-        for ar in args:
-            if isinstance(ar, ast.AST):
-                if stash:
-                    yield Parser.toks_to_constant(stash)
-                    stash.clear()
-                yield ar
-            elif isinstance(ar, TokenInfo):  # tokens
-                if stash and not ar.is_next_to(stash[-1]):
-                    # we found a split
-                    yield Parser.toks_to_constant(stash)
-                    stash.clear()
-                stash.append(ar)
-        if stash:
-            yield Parser.toks_to_constant(stash)
+    def _proc_args(self, args: list[TokenInfo | ast.expr]) -> Iterator[ast.AST]:
+        """split into chunks if they are not contiguous."""
+        stash: None | ast.expr = None
 
-    def subproc(self, start: TokenInfo, args: ast.List, **locs) -> ast.Call:
+        for ar in args:
+            if not stash:
+                stash = self._append_node_or_token(stash, ar)
+                continue
+
+            if self.is_adjacent(stash, ar):
+                stash = self._append_node_or_token(stash, ar)
+            else:
+                yield stash
+                stash = self._append_node_or_token(None, ar)
+
+        if stash:
+            yield stash
+
+    def proc_args(self, args: list[TokenInfo | ast.expr]) -> list[ast.AST]:
+        cmds = list(self._proc_args(args))
+        return cmds
+
+    def subproc(self, start: TokenInfo, args: list, **locs) -> ast.Call:
         method = {
             token.DOLLAR_LPAREN: "subproc_captured",
             token.DOLLAR_LBRACKET: "subproc_uncaptured",
             token.BANG_LBRACKET: "subproc_captured_hiddenobject",
             token.BANG_LPAREN: "subproc_captured_object",
         }[start.type]
-        return xonsh_call(f"__xonsh__.{method}", args, **locs)
+        return xonsh_call(f"__xonsh__.{method}", *args, **locs)
 
-    def proc_inject(self, args: ast.List, **locs) -> ast.Starred:
+    def proc_inject(self, args: list, **locs) -> ast.Starred:
         return ast.Starred(
-            value=xonsh_call("__xonsh__.subproc_captured_inject", args, **locs),
+            value=xonsh_call("__xonsh__.subproc_captured_inject", *args, **locs),
             ctx=Load,
             **locs,
         )
 
-    def proc_pyexpr(self, args: ast.List, **locs) -> ast.Starred:
+    def proc_pyexpr(self, expr: ast.expr, **locs) -> ast.Starred:
         return ast.Starred(
-            value=xonsh_call("__xonsh__.list_of_strs_or_callables", args, **locs),
+            value=xonsh_call("__xonsh__.list_of_strs_or_callables", expr, **locs),
             ctx=Load,
             **locs,
         )

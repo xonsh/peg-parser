@@ -266,11 +266,25 @@ def test_statements(check_xonsh_ast, inp):
         ),
         ("$(ls $(ls))", ["ls", "ls"]),
         ("$(ls $(ls) -l)", ["ls", "ls", "-l"]),
+        ("$[ls]", ["ls"]),
+        ("![ls]", ["ls"]),
+        ("![echo $WAKKA/place]", ["echo", "wak/place"]),
+        ("![echo yo==yo]", ["echo", "yo==yo"]),
+        ("!(ls | grep wakka)", ["ls", "|", "grep", "wakka"]),
+        ("!(ls | grep wakka | grep jawaka)", ["ls", "|", "grep", "wakka", "|", "grep", "jawaka"]),
+        ("!(ls > x.py)", ["ls", ">", "x.py"]),
     ],
 )
 def test_captured_procs(inp, args, check_xonsh_ast, xsh):
     check_xonsh_ast(inp, mode="exec", xenv={"WAKKA": "wak"})
-    xsh.subproc_captured.assert_called_with(args)
+    method_name = {
+        "$[": "subproc_uncaptured",
+        "$(": "subproc_captured",
+        "![": "subproc_captured_hiddenobject",
+        "!(": "subproc_captured_object",
+    }[inp[:2]]
+    method = getattr(xsh, method_name)
+    method.assert_called_with(*args)
 
 
 @pytest.mark.parametrize(
@@ -347,51 +361,8 @@ def test_ls_customsearch_octothorpe(check_xonsh_ast):
 
 
 @pytest.mark.xfail
-def test_merged_injection(check_xonsh_ast):
-    tree = check_xonsh_ast("![a@$(echo 1 2)b]", False, return_obs=True)
-    assert isinstance(tree, AST)
-    func = tree.body.args[0].right.func
-    assert func.attr == "list_of_list_of_strs_outer_product"
-
-
-@pytest.mark.xfail
 def test_backtick_octothorpe(check_xonsh_ast):
     check_xonsh_ast("print(`#.*`)", False)
-
-
-@pytest.mark.xfail
-def test_uncaptured_sub(check_xonsh_ast):
-    check_xonsh_ast("$[ls]", False)
-
-
-@pytest.mark.xfail
-def test_hiddenobj_sub(check_xonsh_ast):
-    check_xonsh_ast("![ls]", False)
-
-
-@pytest.mark.xfail
-def test_slash_envarv_echo(check_xonsh_ast):
-    check_xonsh_ast("![echo $HOME/place]", False)
-
-
-@pytest.mark.xfail
-def test_echo_double_eq(check_xonsh_ast):
-    check_xonsh_ast("![echo yo==yo]", False)
-
-
-@pytest.mark.xfail
-def test_bang_two_cmds_one_pipe(check_xonsh_ast):
-    check_xonsh_ast("!(ls | grep wakka)", False)
-
-
-@pytest.mark.xfail
-def test_bang_three_cmds_two_pipes(check_xonsh_ast):
-    check_xonsh_ast("!(ls | grep wakka | grep jawaka)", False)
-
-
-@pytest.mark.xfail
-def test_bang_one_cmd_write(check_xonsh_ast):
-    check_xonsh_ast("!(ls > x.py)", False)
 
 
 @pytest.mark.xfail

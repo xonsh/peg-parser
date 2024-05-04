@@ -970,11 +970,12 @@ env_atom:
     | DOLLAR_LBRACE a=slices '}' { self.expand_env_expr(a, LOCATIONS) }
 
 proc_cmds:
-    | a=proc_cmd+ { ast.List(elts=list(self.proc_args(a)), ctx=Load, LOCATIONS) }
+    | a=proc_cmd+ { self.proc_args(a) }
 
 proc_cmd:
     | NAME
     | OP
+    | NUMBER
     | STRING
     | AT_LPAREN ~ a=(bare_genexp | expressions) ')' { self.proc_pyexpr(a, LOCATIONS) }
     | AT_DOLLAR_LPAREN ~ a=proc_cmds ')' { self.proc_inject(a, LOCATIONS) }

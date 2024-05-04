@@ -133,10 +133,10 @@ def xsh():
             return [x([])]
         return x
 
-    def subproc_captured(cmds):
+    def subproc_captured(*cmds):
         return "-".join([str(item) for item in cmds])
 
-    def subproc_captured_inject(cmds):
+    def subproc_captured_inject(*cmds):
         return cmds
 
     obj.list_of_strs_or_callables = MagicMock(wraps=list_of_strs_or_callables)
