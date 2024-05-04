@@ -200,7 +200,6 @@ def glob_data_param(pattern: str):
 
 
 @pytest.mark.parametrize("file", glob_data_param("exprs/*.py"))
-@pytest.mark.xfail
 def test_exprs(file, unparse_diff, subtests):
     for idx, (inp, exp) in enumerate(get_cases(file)):
         with subtests.test(idx=idx):
@@ -341,16 +340,6 @@ def test_ls_customsearch_octothorpe(check_xonsh_ast):
 
 
 @pytest.mark.xfail
-def test_injection(check_xonsh_ast):
-    check_xonsh_ast("$[@$(which python)]", False)
-
-
-@pytest.mark.xfail
-def test_rhs_nested_injection(check_xonsh_ast):
-    check_xonsh_ast("$[ls @$(dirname @$(which python))]", False)
-
-
-@pytest.mark.xfail
 def test_merged_injection(check_xonsh_ast):
     tree = check_xonsh_ast("![a@$(echo 1 2)b]", False, return_obs=True)
     assert isinstance(tree, AST)
@@ -421,21 +410,6 @@ def test_bang_cmd_background(check_xonsh_ast):
 @pytest.mark.xfail
 def test_bang_cmd_background_nospace(check_xonsh_ast):
     check_xonsh_ast("!(emacs ugggh&)", False)
-
-
-@pytest.mark.xfail
-def test_bang_git_quotes_no_space(check_xonsh_ast):
-    check_xonsh_ast('![git commit -am "wakka"]', False)
-
-
-@pytest.mark.xfail
-def test_bang_git_quotes_space(check_xonsh_ast):
-    check_xonsh_ast('![git commit -am "wakka jawaka"]', False)
-
-
-@pytest.mark.xfail
-def test_bang_ls_quotes_3_space(check_xonsh_ast):
-    check_xonsh_ast('![ls "wakka jawaka baraka"]', False)
 
 
 @pytest.mark.xfail

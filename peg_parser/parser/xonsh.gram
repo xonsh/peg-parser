@@ -794,9 +794,6 @@ expression (memo):
     | disjunction
     | lambdef
 
-# @(...)
-#xsh_py_expr: AT_LPAREN a=expression RPAR { a }
-
 yield_expr:
     | 'yield' 'from' a=expression { ast.YieldFrom(value=a, LOCATIONS) }
     | 'yield' a=[star_expressions] { ast.Yield(value=a, LOCATIONS) }
@@ -952,12 +949,24 @@ primary:
         )
      }
     | a=primary '[' b=slices ']' { ast.Subscript(value=a, slice=b, ctx=Load, LOCATIONS) }
-    | DOLLAR_LPAREN a=(NAME|OP)+ RPAR { self.subproc_captured(a, LOCATIONS) }
+    # $(...)
+    | a=DOLLAR_LPAREN args=proc_cmd+ ')' { self.subproc(a, args, LOCATIONS) }
+    # $[...]
+    | a=DOLLAR_LBRACKET args=proc_cmd+ ']' { self.subproc(a, args, LOCATIONS) }
+    # ![...]
+    | a=BANG_LBRACKET args=proc_cmd+ ']' { self.subproc(a, args, LOCATIONS) }
+    # !(...)
+    | a=BANG_LPAREN args=proc_cmd+ ')' { self.subproc(a, args, LOCATIONS) }
     # $a
     | DOLLAR a=NAME { self.expand_env_name(a, LOCATIONS) }
     # ${...}
     | DOLLAR_LBRACE a=slices '}' { self.expand_env_expr(a, LOCATIONS) }
     | atom
+
+proc_cmd:
+    | NAME
+    | OP
+    | STRING
 
 slices:
     | a=slice !',' { a }
