@@ -191,19 +191,15 @@ def get_cases(path, splitter="# "):
                 parts.clear()
         else:
             parts.append(line)
+    if parts:
+        yield inp, "\n".join(parts)
 
 
-#
-# Xonsh specific syntax
-#
+def glob_data_param(pattern: str):
+    return [pytest.param(path, id=path.name) for path in Path(__file__).parent.joinpath("data").glob(pattern)]
 
 
-@pytest.mark.parametrize(
-    "file",
-    Path(__file__).parent.glob(
-        "data/exprs/*.py",
-    ),
-)
+@pytest.mark.parametrize("file", glob_data_param("exprs/*.py"))
 @pytest.mark.xfail
 def test_exprs(file, unparse_diff, subtests):
     for idx, (inp, exp) in enumerate(get_cases(file)):
@@ -213,11 +209,8 @@ def test_exprs(file, unparse_diff, subtests):
 
 @pytest.mark.parametrize(
     "file",
-    Path(__file__).parent.glob(
-        "data/stmts/*.py",
-    ),
+    glob_data_param("stmts/*.py"),
 )
-@pytest.mark.xfail
 def test_stmts(file, unparse_diff, subtests):
     for idx, (inp, exp) in enumerate(get_cases(file)):
         with subtests.test(idx=idx):
@@ -695,9 +688,8 @@ def test_subproc_raw_str_literal(check_xonsh_ast):
     assert subproc.args[0].elts[1].s == "$foo"
 
 
-def test_get_repo_url(parse_str):
-    parse_str(
-        "def get_repo_url():\n"
-        "    raw = $(git remote get-url --push origin).rstrip()\n"
-        "    return raw.replace('https://github.com/', '')\n"
-    )
+def test_parsing(parse_str, subtests):
+    file = Path(__file__).parent / "data/statements.xsh"
+    for name, inp in get_cases(file):
+        with subtests.test(name=name):
+            parse_str(inp, mode="exec")
