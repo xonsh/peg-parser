@@ -58,14 +58,29 @@ class TokenInfo(NamedTuple):
         else:
             return self.type
 
-    def loc(self):
+    def loc_start(self):
         """helper method to construct AST node location"""
         return {
             "lineno": self.start[0],
             "col_offset": self.start[1],
+        }
+
+    def loc_end(self):
+        return {
             "end_lineno": self.end[0],
             "end_col_offset": self.end[1],
         }
+
+    def loc(self):
+        """helper method to construct AST node location"""
+        return {
+            **self.loc_start(),
+            **self.loc_end(),
+        }
+
+    def is_next_to(self, prev: TokenInfo) -> bool:
+        """check if there is no whitespace between the end of this token and the start of the other token"""
+        return prev.end == self.start
 
 
 def capname(name: str, pattern: str) -> str:
