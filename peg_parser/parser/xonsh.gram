@@ -950,23 +950,27 @@ primary:
      }
     | a=primary '[' b=slices ']' { ast.Subscript(value=a, slice=b, ctx=Load, LOCATIONS) }
     # $(...)
-    | a=DOLLAR_LPAREN args=proc_cmd+ ')' { self.subproc(a, args, LOCATIONS) }
+    | a=DOLLAR_LPAREN args=proc_cmds ')' { self.subproc(a, args, LOCATIONS) }
     # $[...]
-    | a=DOLLAR_LBRACKET args=proc_cmd+ ']' { self.subproc(a, args, LOCATIONS) }
+    | a=DOLLAR_LBRACKET args=proc_cmds ']' { self.subproc(a, args, LOCATIONS) }
     # ![...]
-    | a=BANG_LBRACKET args=proc_cmd+ ']' { self.subproc(a, args, LOCATIONS) }
+    | a=BANG_LBRACKET args=proc_cmds ']' { self.subproc(a, args, LOCATIONS) }
     # !(...)
-    | a=BANG_LPAREN args=proc_cmd+ ')' { self.subproc(a, args, LOCATIONS) }
+    | a=BANG_LPAREN args=proc_cmds ')' { self.subproc(a, args, LOCATIONS) }
     # $a
     | DOLLAR a=NAME { self.expand_env_name(a, LOCATIONS) }
     # ${...}
     | DOLLAR_LBRACE a=slices '}' { self.expand_env_expr(a, LOCATIONS) }
     | atom
 
+proc_cmds:
+    | a=proc_cmd+ { ast.List(elts=list(self.proc_args(a)), ctx=Load, LOCATIONS) }
+
 proc_cmd:
     | NAME
     | OP
     | STRING
+    | AT_DOLLAR_LPAREN a=proc_cmds ')' { self.proc_inject(a, LOCATIONS) }
 
 slices:
     | a=slice !',' { a }
