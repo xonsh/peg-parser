@@ -101,16 +101,6 @@ def check_ast(parse_str):
 
 
 @pytest.fixture
-def check_stmts(check_ast):
-    def factory(inp, mode="exec", verbose=False):
-        if not inp.endswith("\n"):
-            inp += "\n"
-        check_ast(inp, mode=mode, verbose=verbose)
-
-    return factory
-
-
-@pytest.fixture
 def eval_code(parse_str):
     def factory(text: str, mode="eval", **locs):
         obs = parse_str(text, mode=mode)
@@ -155,34 +145,17 @@ def check_xonsh_ast(parse_str, x_locals):
     """compatibility fixture"""
 
     def factory(
-        xenv: dict,
-        inp,
-        run=True,
+        inp: str,
+        xenv: dict | None = None,
         mode="eval",
-        debug_level=0,
         verbose=False,
-        return_obs=False,
         **locs,
     ):
-        verbose = verbose or debug_level > 0
         obs = parse_str(inp, mode=mode, verbose=verbose)
         if obs is None:
             return  # comment only
         bytecode = compile(obs, "<test-xonsh-ast>", mode)
-        if run:
-            exec(bytecode, {}, x_locals(xenv, **locs))
-        return obs if return_obs else True
-
-    return factory
-
-
-@pytest.fixture
-def check_xonsh(check_xonsh_ast):
-    """compatibility fixture"""
-
-    def factory(xenv: dict, inp: str, run=True, mode="exec"):
-        if not inp.endswith("\n"):
-            inp += "\n"
-        return check_xonsh_ast(xenv, inp, run=run, mode=mode)
+        exec(bytecode, {}, x_locals(xenv, **locs))
+        return obs
 
     return factory
