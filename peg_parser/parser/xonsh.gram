@@ -949,19 +949,25 @@ primary:
         )
      }
     | a=primary '[' b=slices ']' { ast.Subscript(value=a, slice=b, ctx=Load, LOCATIONS) }
+    | sub_procs
+    | atom
+    | env_atom
+
+sub_procs:
     # $(...)
-    | a=DOLLAR_LPAREN args=proc_cmds ')' { self.subproc(a, args, LOCATIONS) }
+    | a=DOLLAR_LPAREN ~ args=proc_cmds ')' { self.subproc(a, args, LOCATIONS) }
     # $[...]
-    | a=DOLLAR_LBRACKET args=proc_cmds ']' { self.subproc(a, args, LOCATIONS) }
+    | a=DOLLAR_LBRACKET ~ args=proc_cmds ']' { self.subproc(a, args, LOCATIONS) }
     # ![...]
-    | a=BANG_LBRACKET args=proc_cmds ']' { self.subproc(a, args, LOCATIONS) }
+    | a=BANG_LBRACKET ~ args=proc_cmds ']' { self.subproc(a, args, LOCATIONS) }
     # !(...)
-    | a=BANG_LPAREN args=proc_cmds ')' { self.subproc(a, args, LOCATIONS) }
+    | a=BANG_LPAREN ~ args=proc_cmds ')' { self.subproc(a, args, LOCATIONS) }
+
+env_atom:
     # $a
     | DOLLAR a=NAME { self.expand_env_name(a, LOCATIONS) }
     # ${...}
     | DOLLAR_LBRACE a=slices '}' { self.expand_env_expr(a, LOCATIONS) }
-    | atom
 
 proc_cmds:
     | a=proc_cmd+ { ast.List(elts=list(self.proc_args(a)), ctx=Load, LOCATIONS) }
@@ -970,7 +976,10 @@ proc_cmd:
     | NAME
     | OP
     | STRING
-    | AT_DOLLAR_LPAREN a=proc_cmds ')' { self.proc_inject(a, LOCATIONS) }
+    | AT_LPAREN ~ a=(bare_genexp | expressions) ')' { self.proc_pyexpr(a, LOCATIONS) }
+    | AT_DOLLAR_LPAREN ~ a=proc_cmds ')' { self.proc_inject(a, LOCATIONS) }
+    | env_atom
+    | sub_procs
 
 slices:
     | a=slice !',' { a }
@@ -1168,10 +1177,13 @@ setcomp[ast.SetComp]:
     | invalid_comprehension
 
 genexp[ast.GeneratorExp]:
-    | '(' a=( assignment_expression | expression !':=') b=for_if_clauses ')' {
+    | '(' bare_genexp ')' {
         ast.GeneratorExp(elt=a, generators=b, LOCATIONS)
      }
     | invalid_comprehension
+
+bare_genexp:
+    | a=( assignment_expression | expression !':=') b=for_if_clauses { ast.GeneratorExp(elt=a, generators=b, LOCATIONS) }
 
 dictcomp[ast.DictComp]:
     | '{' a=kvpair b=for_if_clauses '}' { ast.DictComp(key=a[0], value=a[1], generators=b, LOCATIONS) }

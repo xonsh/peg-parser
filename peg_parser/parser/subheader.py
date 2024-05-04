@@ -656,6 +656,9 @@ class Parser:
         stash: list[TokenInfo] = []
         for ar in args:
             if isinstance(ar, ast.AST):
+                if stash:
+                    yield Parser.toks_to_constant(stash)
+                    stash.clear()
                 yield ar
             elif isinstance(ar, TokenInfo):  # tokens
                 if stash and not ar.is_next_to(stash[-1]):
@@ -678,6 +681,13 @@ class Parser:
     def proc_inject(self, args: ast.List, **locs) -> ast.Starred:
         return ast.Starred(
             value=xonsh_call("__xonsh__.subproc_captured_inject", args, **locs),
+            ctx=Load,
+            **locs,
+        )
+
+    def proc_pyexpr(self, args: ast.List, **locs) -> ast.Starred:
+        return ast.Starred(
+            value=xonsh_call("__xonsh__.list_of_strs_or_callables", args, **locs),
             ctx=Load,
             **locs,
         )

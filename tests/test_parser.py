@@ -235,7 +235,7 @@ def test_stmts(file, unparse_diff, subtests):
 def test_statements(check_xonsh_ast, inp):
     if not inp.endswith("\n"):
         inp += "\n"
-    return check_xonsh_ast(inp, mode="exec")
+    check_xonsh_ast(inp, mode="exec")
 
 
 @pytest.mark.parametrize(
@@ -246,22 +246,30 @@ def test_statements(check_xonsh_ast, inp):
         ("$( ls )", ["ls"]),
         ("$( ls)", ["ls"]),
         ("$(ls .)", ["ls", "."]),
-        ('$(ls ".")', []),
+        ('$(ls ".")', ["ls", '"."']),
         ("$(ls -l)", ["ls", "-l"]),
-        ("$(ls $WAKKA)", []),
-        ('$(ls @(None or "."))', []),
-        ('$(echo hello | @(lambda a, s=None: "hey!") foo bar baz)', ""),
-        ("$(echo @(i**2 for i in range(20)))", ""),
-        ("$(echo @('a', 7))", ""),
-        ("$(@$(which echo) ls " "| @(lambda a, s=None: $(@(s.strip()) @(a[1]))) foo -la baz)", ""),
-        ("![echo /x/@(y)/z]", []),
-        ("$(ls $(ls))", []),
-        ("$(ls $(ls) -l)", []),
+        ("$(ls $WAKKA)", ["ls", "wak"]),
+        ('$(ls @(None or "."))', ["ls", "."]),
+        (
+            '$(echo hello | @(lambda a, s=None: "hey!") foo bar baz)',
+            ["echo", "hello", "|", "hey!", "foo", "bar", "baz"],
+        ),
+        (
+            "$(echo @(i**2 for i in range(20) ) )",
+            ["echo", 0, 1, 4, 9, 16, 25, 36, 49, 64, 81, 100, 121, 144, 169, 196, 225, 256, 289, 324, 361],
+        ),
+        ("$(echo @('a', 7))", ["echo", "a", 7]),
+        pytest.param(
+            "$(@$(which echo) ls | @(lambda a, s=None: $(@(s.strip()) @(a[1]))) foo -la baz)",
+            "",
+            marks=pytest.mark.xfail,
+        ),
+        ("$(ls $(ls))", ["ls", "ls"]),
+        ("$(ls $(ls) -l)", ["ls", "ls", "-l"]),
     ],
 )
-@pytest.mark.xfail
 def test_captured_procs(inp, args, check_xonsh_ast, xsh):
-    check_xonsh_ast(inp)
+    check_xonsh_ast(inp, mode="exec", xenv={"WAKKA": "wak"})
     xsh.subproc_captured.assert_called_with(args)
 
 
