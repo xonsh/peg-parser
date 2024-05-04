@@ -221,6 +221,7 @@ def test_stmts(file, unparse_diff, subtests):
     [
         'x = "WAKKA"; ${x} = 65',
         'x = "."; $(ls @(None or x))',
+        'x = "."; !(ls @(None or x))',
         '$[git commit -am "wakka jawaka" ]\n',
         '$[git commit -am "flock jawaka milwaka" ]\n',
         '$[git commit -am "wakka jawaka"]\n',
@@ -229,10 +230,8 @@ def test_stmts(file, unparse_diff, subtests):
         '![git commit -am "flock jawaka milwaka" ]\n',
         '![git commit -am "wakka jawaka"]\n',
         '![git commit -am "flock jawaka"]\n',
-        'x = "."; !(ls @(None or x))',
     ],
 )
-@pytest.mark.xfail
 def test_statements(check_xonsh_ast, inp):
     if not inp.endswith("\n"):
         inp += "\n"
