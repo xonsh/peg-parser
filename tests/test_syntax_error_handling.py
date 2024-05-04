@@ -302,18 +302,6 @@ def test_invalid_del_statements(python_parse_file, python_parse_str, tmp_path, s
             (1, 6),
         ),
         (
-            "[a, a for a in range(5)]",
-            "did you forget parentheses around the comprehension target?",
-            (1, 2),
-            (1, 6),
-        ),
-        (
-            "[a,  for a in range(5)]",
-            "did you forget parentheses around the comprehension target?",
-            (1, 2),
-            (1, 4),
-        ),
-        (
             "[a,  for a in range(5)]",
             "did you forget parentheses around the comprehension target?",
             (1, 2),

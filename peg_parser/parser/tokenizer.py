@@ -32,7 +32,7 @@ class Tokenizer:
 
     def getnext(self) -> tokenize.TokenInfo:
         """Return the next token and updates the index."""
-        cached = not self._index == len(self._tokens)
+        cached = self._index != len(self._tokens)
         tok = self.peek()
         self._index = Mark(self._index + Mark(1))
         if self._verbose:
