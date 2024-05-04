@@ -651,8 +651,7 @@ class Parser:
             value="".join(t.string for t in stash), **stash[0].loc_start(), **stash[-1].loc_end()
         )
 
-    @staticmethod
-    def _split_by_ws_nl(args: list[TokenInfo | ast.AST]) -> Iterator[ast.AST]:
+    def proc_args(self, args: list[TokenInfo | ast.AST]) -> Iterator[ast.AST]:
         """white space and newlines are used to split tokens into arguments"""
         stash: list[TokenInfo] = []
         for ar in args:
@@ -667,15 +666,21 @@ class Parser:
         if stash:
             yield Parser.toks_to_constant(stash)
 
-    def subproc(self, start: TokenInfo, args: list[TokenInfo | ast.AST], **locs) -> ast.Call:
+    def subproc(self, start: TokenInfo, args: ast.List, **locs) -> ast.Call:
         method = {
             token.DOLLAR_LPAREN: "subproc_captured",
             token.DOLLAR_LBRACKET: "subproc_uncaptured",
             token.BANG_LBRACKET: "subproc_captured_hiddenobject",
             token.BANG_LPAREN: "subproc_captured_object",
         }[start.type]
-        cmd_args = list(self._split_by_ws_nl(args))
-        return xonsh_call(f"__xonsh__.{method}", ast.List(elts=cmd_args, ctx=Load, **locs), **locs)
+        return xonsh_call(f"__xonsh__.{method}", args, **locs)
+
+    def proc_inject(self, args: ast.List, **locs) -> ast.Starred:
+        return ast.Starred(
+            value=xonsh_call("__xonsh__.subproc_captured_inject", args, **locs),
+            ctx=Load,
+            **locs,
+        )
 
     def _build_syntax_error(
         self,
