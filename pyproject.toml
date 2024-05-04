@@ -36,7 +36,7 @@ fixable = ["ALL"]
     "PT007", # Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
     "RUF001", # similar chars
 ]
-"tests/test_parser.py" = [
+"tests/test_subproc_macros.py" = [
     "PT014"
 ]
 "*/subheader.py" = [
