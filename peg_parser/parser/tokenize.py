@@ -83,15 +83,18 @@ class TokenInfo(NamedTuple):
         return prev.end == self.start
 
 
-def capname(name: str, pattern: str) -> str:
-    return f"(?P<{name}>{pattern})"
+def capname(**kwargs) -> str:
+    text = ""
+    for name, pattern in kwargs.items():
+        text += f"(?P<{name}>{pattern})"
+    return text
 
 
 def group(*choices, name="", **named_choices):
     choices += tuple(f"(?P<{name}>{pattern})" for name, pattern in named_choices.items())
     pattern = "(" + "|".join(choices) + ")"
     if name:
-        pattern = capname(name, pattern)
+        pattern = capname(**{name: pattern})
     return pattern
 
 
@@ -172,7 +175,7 @@ Double = r'[^"\\]*(?:\\.[^"\\]*)*"'
 Single3 = r"[^'\\]*(?:(?:\\.|'(?!''))[^'\\]*)*'''"
 # Tail end of """ string.
 Double3 = r'[^"\\]*(?:(?:\\.|"(?!""))[^"\\]*)*"""'
-Triple = capname("pre1", StringPrefix) + group("'''", '"""', name="tquote")
+Triple = capname(pre1=StringPrefix) + group("'''", '"""', name="tquote")
 # Single-line ' or " string.
 String = group(StringPrefix + r"'[^\n'\\]*(?:\\.[^\n'\\]*)*'", StringPrefix + r'"[^\n"\\]*(?:\\.[^\n"\\]*)*"')
 
@@ -184,12 +187,12 @@ XshOps = group(*map(re.escape, sorted(xsh_tokens, reverse=True)))
 Funny = group(r"\r?\n", XshOps=XshOps, Special=Special)
 
 # First (or only) line of ' or " string.
-ContStr = capname("pre2", StringPrefix) + group(
+ContStr = capname(pre2=StringPrefix) + group(
     r"'[^\n'\\]*(?:\\.[^\n'\\]*)*" + group("'", r"\\\r?\n"),
     r'"[^\n"\\]*(?:\\.[^\n"\\]*)*' + group('"', r"\\\r?\n"),
     name="Str2",
 )
-SearchPath = r"((?:[rgpf]+|@\w*)?)`([^\n`\\]*(?:\\.[^\n`\\]*)*)`"
+SearchPath = capname(search_pre=r"([rgpf]+|@\w*)?") + capname(search_path=r"`([^\n`\\]*(?:\\.[^\n`\\]*)*)`")
 PseudoExtras = group(End=r"\\\r?\n|\Z", Comment=Comment, Triple=Triple, SearchPath=SearchPath)
 PseudoToken = Whitespace + group(PseudoExtras, Number=Number, Funny=Funny, ContStr=ContStr, Name=Name)
 
