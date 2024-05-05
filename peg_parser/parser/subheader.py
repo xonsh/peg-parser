@@ -749,6 +749,9 @@ class Parser:
             **locs,
         )
 
+    def expand_search_path(self, a: TokenInfo, **locs):
+        return xonsh_call("__xonsh__.pathsearch", ast.Constant(value=a.string, **locs), **locs)
+
     def _build_syntax_error(
         self,
         message: str,
