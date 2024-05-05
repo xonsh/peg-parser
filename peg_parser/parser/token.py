@@ -89,13 +89,14 @@ QUESTION = 79
 DOLLAR = 80
 SEARCH_PATH = 81
 
-N_TOKENS = 82
 # Special definitions for cooperation with parser
 NT_OFFSET = 256
 
 tok_name = {
     value: name for name, value in globals().items() if isinstance(value, int) and not name.startswith("_")
 }
+N_TOKENS = len(tok_name)
+
 __all__.extend(tok_name.values())
 
 EXACT_TOKEN_TYPES = {
