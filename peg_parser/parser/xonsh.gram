@@ -950,8 +950,9 @@ primary:
      }
     | a=primary '[' b=slices ']' { ast.Subscript(value=a, slice=b, ctx=Load, LOCATIONS) }
     | sub_procs
-    | atom
     | env_atom
+    | a=(".".help_atom+) { self.expand_help(a, LOCATIONS) }
+    | atom
 
 sub_procs:
     # $(...)
@@ -962,6 +963,9 @@ sub_procs:
     | a=BANG_LBRACKET ~ args=proc_cmds ']' { self.subproc(a, args, LOCATIONS) }
     # !(...)
     | a=BANG_LPAREN ~ args=proc_cmds ')' { self.subproc(a, args, LOCATIONS) }
+
+help_atom:
+    | a=atom b=(DOUBLE_QUESTION | QUESTION) { (a, b) }
 
 env_atom:
     # $a

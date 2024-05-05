@@ -635,6 +635,20 @@ class Parser:
             **locs,
         )
 
+    def expand_help(self, atoms: list[tuple[ast.expr, TokenInfo]], **locs):
+        node = None
+        for atom, tok in atoms:
+            fn = "superhelp" if tok.type == token.DOUBLE_QUESTION else "help"
+            if node is None:
+                node = xonsh_call(f"__xonsh__.{fn}", atom, **tok.loc())
+            else:
+                node = xonsh_call(
+                    f"__xonsh__.{fn}",
+                    ast.Attribute(value=node, attr=atom.id, ctx=Load, **tok.loc()),
+                    **tok.loc(),
+                )
+        return node
+
     def expand_env_expr(self, slices: ast.expr, ctx=None, **locs):
         if ctx is None:
             ctx = Load
