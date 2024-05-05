@@ -187,3 +187,8 @@ def test_syntax_error_lambda_nondefault_follows_default(parse_str):
 def test_syntax_error_literal_concat_different(first_prefix, second_prefix, parse_str):
     with pytest.raises(SyntaxError):
         parse_str(f"{first_prefix}'hello' {second_prefix}'world'")
+
+
+def test_bad_quotes(check_xonsh_ast):
+    with pytest.raises(SyntaxError):
+        check_xonsh_ast('![echo """hello]')

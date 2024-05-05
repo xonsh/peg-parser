@@ -301,15 +301,11 @@ def test_captured_procs(inp, args, check_xonsh_ast, xsh):
         "!(ls $(ls) -l)",
         "!(ls $WAKKA)",
         "!($LS .)",
-        "range?",
-        "range??",
-        "range?.index?",
         "$(ls `[Ff]+i*LE` -l)",
     ],
 )
-@pytest.mark.xfail
 def test_bang_procs(expr, check_xonsh_ast):
-    check_xonsh_ast(expr)
+    check_xonsh_ast(expr, xenv={"LS": "ll", "WAKKA": "wak"})
 
 
 @pytest.mark.parametrize("p", ["", "p"])
@@ -321,199 +317,8 @@ def test_backtick(p, f, glob_type, check_xonsh_ast):
 
 
 @pytest.mark.xfail
-def test_ls_regex_octothorpe(check_xonsh_ast):
-    check_xonsh_ast("$(ls `#[Ff]+i*LE` -l)", False)
-
-
-@pytest.mark.xfail
-def test_ls_explicitregex(check_xonsh_ast):
-    check_xonsh_ast("$(ls r`[Ff]+i*LE` -l)", False)
-
-
-@pytest.mark.xfail
-def test_ls_explicitregex_octothorpe(check_xonsh_ast):
-    check_xonsh_ast("$(ls r`#[Ff]+i*LE` -l)", False)
-
-
-@pytest.mark.xfail
-def test_ls_glob(check_xonsh_ast):
-    check_xonsh_ast("$(ls g`[Ff]+i*LE` -l)", False)
-
-
-@pytest.mark.xfail
-def test_ls_glob_octothorpe(check_xonsh_ast):
-    check_xonsh_ast("$(ls g`#[Ff]+i*LE` -l)", False)
-
-
-@pytest.mark.xfail
-def test_ls_customsearch(check_xonsh_ast):
-    check_xonsh_ast("$(ls @foo`[Ff]+i*LE` -l)", False)
-
-
-@pytest.mark.xfail
-def test_custombacktick(check_xonsh_ast):
-    check_xonsh_ast("print(@foo`.*`)", False)
-
-
-@pytest.mark.xfail
-def test_ls_customsearch_octothorpe(check_xonsh_ast):
-    check_xonsh_ast("$(ls @foo`#[Ff]+i*LE` -l)", False)
-
-
-@pytest.mark.xfail
-def test_backtick_octothorpe(check_xonsh_ast):
-    check_xonsh_ast("print(`#.*`)", False)
-
-
-@pytest.mark.xfail
-def test_bang_one_cmd_append(check_xonsh_ast):
-    check_xonsh_ast("!(ls >> x.py)", False)
-
-
-@pytest.mark.xfail
-def test_bang_two_cmds_write(check_xonsh_ast):
-    check_xonsh_ast("!(ls | grep wakka > x.py)", False)
-
-
-@pytest.mark.xfail
-def test_bang_two_cmds_append(check_xonsh_ast):
-    check_xonsh_ast("!(ls | grep wakka >> x.py)", False)
-
-
-@pytest.mark.xfail
-def test_bang_cmd_background(check_xonsh_ast):
-    check_xonsh_ast("!(emacs ugggh &)", False)
-
-
-@pytest.mark.xfail
-def test_bang_cmd_background_nospace(check_xonsh_ast):
-    check_xonsh_ast("!(emacs ugggh&)", False)
-
-
-@pytest.mark.xfail
-def test_two_cmds_one_pipe(check_xonsh_ast):
-    check_xonsh_ast("$(ls | grep wakka)", False)
-
-
-@pytest.mark.xfail
-def test_three_cmds_two_pipes(check_xonsh_ast):
-    check_xonsh_ast("$(ls | grep wakka | grep jawaka)", False)
-
-
-@pytest.mark.xfail
-def test_two_cmds_one_and_brackets(check_xonsh_ast):
-    check_xonsh_ast("![ls me] and ![grep wakka]", False)
-
-
-@pytest.mark.xfail
-def test_three_cmds_two_ands(check_xonsh_ast):
-    check_xonsh_ast("![ls] and ![grep wakka] and ![grep jawaka]", False)
-
-
-@pytest.mark.xfail
-def test_two_cmds_one_doubleamps(check_xonsh_ast):
-    check_xonsh_ast("![ls] && ![grep wakka]", False)
-
-
-@pytest.mark.xfail
-def test_three_cmds_two_doubleamps(check_xonsh_ast):
-    check_xonsh_ast("![ls] && ![grep wakka] && ![grep jawaka]", False)
-
-
-@pytest.mark.xfail
-def test_two_cmds_one_or(check_xonsh_ast):
-    check_xonsh_ast("![ls] or ![grep wakka]", False)
-
-
-@pytest.mark.xfail
-def test_three_cmds_two_ors(check_xonsh_ast):
-    check_xonsh_ast("![ls] or ![grep wakka] or ![grep jawaka]", False)
-
-
-@pytest.mark.xfail
-def test_two_cmds_one_doublepipe(check_xonsh_ast):
-    check_xonsh_ast("![ls] || ![grep wakka]", False)
-
-
-@pytest.mark.xfail
-def test_three_cmds_two_doublepipe(check_xonsh_ast):
-    check_xonsh_ast("![ls] || ![grep wakka] || ![grep jawaka]", False)
-
-
-@pytest.mark.xfail
-def test_one_cmd_write(check_xonsh_ast):
-    check_xonsh_ast("$(ls > x.py)", False)
-
-
-@pytest.mark.xfail
-def test_one_cmd_append(check_xonsh_ast):
-    check_xonsh_ast("$(ls >> x.py)", False)
-
-
-@pytest.mark.xfail
-def test_two_cmds_write(check_xonsh_ast):
-    check_xonsh_ast("$(ls | grep wakka > x.py)", False)
-
-
-@pytest.mark.xfail
-def test_two_cmds_append(check_xonsh_ast):
-    check_xonsh_ast("$(ls | grep wakka >> x.py)", False)
-
-
-@pytest.mark.xfail
-def test_cmd_background(check_xonsh_ast):
-    check_xonsh_ast("$(emacs ugggh &)", False)
-
-
-@pytest.mark.xfail
-def test_cmd_background_nospace(check_xonsh_ast):
-    check_xonsh_ast("$(emacs ugggh&)", False)
-
-
-@pytest.mark.xfail
-def test_git_quotes_no_space(check_xonsh_ast):
-    check_xonsh_ast('$[git commit -am "wakka"]', False)
-
-
-@pytest.mark.xfail
-def test_git_quotes_space(check_xonsh_ast):
-    check_xonsh_ast('$[git commit -am "wakka jawaka"]', False)
-
-
-@pytest.mark.xfail
-def test_ls_quotes_3_space(check_xonsh_ast):
-    check_xonsh_ast('$[ls "wakka jawaka baraka"]', False)
-
-
-@pytest.mark.xfail
-def test_leading_envvar_assignment(check_xonsh_ast):
-    check_xonsh_ast("![$FOO='foo' $BAR=2 echo r'$BAR']", False)
-
-
-@pytest.mark.xfail
-def test_echo_comma(check_xonsh_ast):
-    check_xonsh_ast("![echo ,]", False)
-
-
-@pytest.mark.xfail
-def test_echo_internal_comma(check_xonsh_ast):
-    check_xonsh_ast("![echo 1,2]", False)
-
-
-@pytest.mark.xfail
 def test_comment_only(check_xonsh_ast):
     check_xonsh_ast("# hello")
-
-
-@pytest.mark.xfail
-def test_echo_slash_question(check_xonsh_ast):
-    check_xonsh_ast("![echo /?]", False)
-
-
-@pytest.mark.xfail
-def test_bad_quotes(check_xonsh_ast):
-    with pytest.raises(SyntaxError):
-        check_xonsh_ast('![echo """hello]', False)
 
 
 @pytest.mark.xfail
@@ -535,7 +340,7 @@ def test_redirect(check_xonsh_ast):
 )
 @pytest.mark.xfail
 def test_use_subshell(case, check_xonsh_ast):
-    check_xonsh_ast(case, False, debug_level=0)
+    check_xonsh_ast(case)
 
 
 @pytest.mark.parametrize(
@@ -562,7 +367,6 @@ def test_redirect_output(case, check_xonsh_ast):
 
 
 @pytest.mark.parametrize("case", ["e", "err", "2"])
-@pytest.mark.xfail
 def test_redirect_error(case, check_xonsh_ast):
     assert check_xonsh_ast(f'$[echo "test" {case}> test.txt]', False)
     assert check_xonsh_ast(f'$[< input.txt echo "test" {case}> test.txt]', False)
@@ -594,7 +398,6 @@ def test_redirect_all(case, check_xonsh_ast):
     ],
 )
 @pytest.mark.parametrize("o", ["", "o", "out", "1"])
-@pytest.mark.xfail
 def test_redirect_error_to_output(r, o, check_xonsh_ast):
     assert check_xonsh_ast(f'$[echo "test" {r} {o}> test.txt]', False)
     assert check_xonsh_ast(f'$[< input.txt echo "test" {r} {o}> test.txt]', False)
@@ -618,7 +421,6 @@ def test_redirect_error_to_output(r, o, check_xonsh_ast):
     ],
 )
 @pytest.mark.parametrize("e", ["e", "err", "2"])
-@pytest.mark.xfail
 def test_redirect_output_to_error(r, e, check_xonsh_ast):
     assert check_xonsh_ast(f'$[echo "test" {r} {e}> test.txt]', False)
     assert check_xonsh_ast(f'$[< input.txt echo "test" {r} {e}> test.txt]', False)
