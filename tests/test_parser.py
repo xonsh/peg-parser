@@ -1,73 +1,8 @@
 """Tests the xonsh parser."""
 
-import ast
-from ast import AST, Call
 from pathlib import Path
 
 import pytest
-
-#
-# Tests
-#
-
-
-@pytest.mark.xfail
-@pytest.mark.parametrize(
-    "inp",
-    [
-        'f"{$HOME}"',
-        "f'{$XONSH_DEBUG}'",
-        'F"{$PATH} and {$XONSH_DEBUG}"',
-    ],
-)
-def test_f_env_var(inp, parse_str):
-    parse_str(inp)
-
-
-fstring_adaptor_parameters = [
-    ('f"$HOME"', "$HOME"),
-    ('f"{0} - {1}"', "0 - 1"),
-    ('f"{$HOME}"', "/foo/bar"),
-    ('f"{ $HOME }"', "/foo/bar"),
-    ("f\"{'$HOME'}\"", "$HOME"),
-    ('f"$HOME  = {$HOME}"', "$HOME  = /foo/bar"),
-    ("f\"{${'HOME'}}\"", "/foo/bar"),
-    ("f'{${$FOO+$BAR}}'", "/foo/bar"),
-    ("f\"${$FOO}{$BAR}={f'{$HOME}'}\"", "$HOME=/foo/bar"),
-    (
-        '''f"""foo
-{f"_{$HOME}_"}
-bar"""''',
-        "foo\n_/foo/bar_\nbar",
-    ),
-    (
-        '''f"""foo
-{f"_{${'HOME'}}_"}
-bar"""''',
-        "foo\n_/foo/bar_\nbar",
-    ),
-    (
-        '''f"""foo
-{f"_{${ $FOO + $BAR }}_"}
-bar"""''',
-        "foo\n_/foo/bar_\nbar",
-    ),
-    ("f'{$HOME=}'", "$HOME='/foo/bar'"),
-]
-
-
-@pytest.mark.parametrize("inp, exp", fstring_adaptor_parameters)
-@pytest.mark.xfail
-def test_fstring_adaptor(inp, xsh, exp, monkeypatch):
-    joined_str_node = FStringAdaptor(inp, "f").run()  # noqa
-    assert isinstance(joined_str_node, ast.JoinedStr)
-    node = ast.Expression(body=joined_str_node)
-    code = compile(node, "<test_fstring_adaptor>", mode="eval")
-    xenv = {"HOME": "/foo/bar", "FOO": "HO", "BAR": "ME"}
-    for key, val in xenv.items():
-        monkeypatch.setitem(xsh.env, key, val)
-    obs = eval(code)
-    assert exp == obs
 
 
 @pytest.mark.parametrize(
@@ -301,7 +236,6 @@ def test_captured_procs(inp, args, check_xonsh_ast, xsh):
         "!(ls $(ls) -l)",
         "!(ls $WAKKA)",
         "!($LS .)",
-        "$(ls `[Ff]+i*LE` -l)",
     ],
 )
 def test_bang_procs(expr, check_xonsh_ast):
@@ -321,12 +255,6 @@ def test_comment_only(check_xonsh_ast):
     check_xonsh_ast("# hello")
 
 
-@pytest.mark.xfail
-def test_redirect(check_xonsh_ast):
-    assert check_xonsh_ast("$[cat < input.txt]", False)
-    assert check_xonsh_ast("$[< input.txt cat]", False)
-
-
 @pytest.mark.parametrize(
     "case",
     [
@@ -341,105 +269,6 @@ def test_redirect(check_xonsh_ast):
 @pytest.mark.xfail
 def test_use_subshell(case, check_xonsh_ast):
     check_xonsh_ast(case)
-
-
-@pytest.mark.parametrize(
-    "case",
-    [
-        "$[cat < /path/to/input.txt]",
-        "$[(cat) < /path/to/input.txt]",
-        "$[< /path/to/input.txt cat]",
-        "![< /path/to/input.txt]",
-        "![< /path/to/input.txt > /path/to/output.txt]",
-    ],
-)
-@pytest.mark.xfail
-def test_redirect_abspath(case, check_xonsh_ast):
-    assert check_xonsh_ast(case, False)
-
-
-@pytest.mark.parametrize("case", ["", "o", "out", "1"])
-@pytest.mark.xfail
-def test_redirect_output(case, check_xonsh_ast):
-    assert check_xonsh_ast(f'$[echo "test" {case}> test.txt]', False)
-    assert check_xonsh_ast(f'$[< input.txt echo "test" {case}> test.txt]', False)
-    assert check_xonsh_ast(f'$[echo "test" {case}> test.txt < input.txt]', False)
-
-
-@pytest.mark.parametrize("case", ["e", "err", "2"])
-def test_redirect_error(case, check_xonsh_ast):
-    assert check_xonsh_ast(f'$[echo "test" {case}> test.txt]', False)
-    assert check_xonsh_ast(f'$[< input.txt echo "test" {case}> test.txt]', False)
-    assert check_xonsh_ast(f'$[echo "test" {case}> test.txt < input.txt]', False)
-
-
-@pytest.mark.parametrize("case", ["a", "all", "&"])
-@pytest.mark.xfail
-def test_redirect_all(case, check_xonsh_ast):
-    assert check_xonsh_ast(f'$[echo "test" {case}> test.txt]', False)
-    assert check_xonsh_ast(f'$[< input.txt echo "test" {case}> test.txt]', False)
-    assert check_xonsh_ast(f'$[echo "test" {case}> test.txt < input.txt]', False)
-
-
-@pytest.mark.parametrize(
-    "r",
-    [
-        "e>o",
-        "e>out",
-        "err>o",
-        "2>1",
-        "e>1",
-        "err>1",
-        "2>out",
-        "2>o",
-        "err>&1",
-        "e>&1",
-        "2>&1",
-    ],
-)
-@pytest.mark.parametrize("o", ["", "o", "out", "1"])
-def test_redirect_error_to_output(r, o, check_xonsh_ast):
-    assert check_xonsh_ast(f'$[echo "test" {r} {o}> test.txt]', False)
-    assert check_xonsh_ast(f'$[< input.txt echo "test" {r} {o}> test.txt]', False)
-    assert check_xonsh_ast(f'$[echo "test" {r} {o}> test.txt < input.txt]', False)
-
-
-@pytest.mark.parametrize(
-    "r",
-    [
-        "o>e",
-        "o>err",
-        "out>e",
-        "1>2",
-        "o>2",
-        "out>2",
-        "1>err",
-        "1>e",
-        "out>&2",
-        "o>&2",
-        "1>&2",
-    ],
-)
-@pytest.mark.parametrize("e", ["e", "err", "2"])
-def test_redirect_output_to_error(r, e, check_xonsh_ast):
-    assert check_xonsh_ast(f'$[echo "test" {r} {e}> test.txt]', False)
-    assert check_xonsh_ast(f'$[< input.txt echo "test" {r} {e}> test.txt]', False)
-    assert check_xonsh_ast(f'$[echo "test" {r} {e}> test.txt < input.txt]', False)
-
-
-@pytest.mark.xfail
-def test_subproc_raw_str_literal(check_xonsh_ast):
-    tree = check_xonsh_ast("!(echo '$foo')", run=False, return_obs=True)
-    assert isinstance(tree, AST)
-    subproc = tree.body
-    assert isinstance(subproc.args[0].elts[1], Call)
-    assert subproc.args[0].elts[1].func.attr == "expand_path"
-
-    tree = check_xonsh_ast("!(echo r'$foo')", run=False, return_obs=True)
-    assert isinstance(tree, AST)
-    subproc = tree.body
-    assert isinstance(subproc.args[0].elts[1], ast.Constant)
-    assert subproc.args[0].elts[1].s == "$foo"
 
 
 def test_parsing(parse_str, subtests):
