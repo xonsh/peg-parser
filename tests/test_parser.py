@@ -137,17 +137,14 @@ def glob_data_param(pattern: str):
 @pytest.mark.parametrize("file", glob_data_param("exprs/*.py"))
 def test_exprs(file, unparse_diff, subtests):
     for idx, (inp, exp) in enumerate(get_cases(file)):
-        with subtests.test(idx=idx):
+        with subtests.test(idx=idx, inp=inp):
             unparse_diff(inp, exp)
 
 
-@pytest.mark.parametrize(
-    "file",
-    glob_data_param("stmts/*.py"),
-)
+@pytest.mark.parametrize("file", glob_data_param("stmts/*.py"))
 def test_stmts(file, unparse_diff, subtests):
     for idx, (inp, exp) in enumerate(get_cases(file)):
-        with subtests.test(idx=idx):
+        with subtests.test(idx=idx, inp=inp):
             unparse_diff(inp, exp, mode="exec")
 
 
@@ -250,7 +247,7 @@ def test_backtick(p, f, glob_type, check_xonsh_ast):
 
 
 def test_comment_only(check_xonsh_ast):
-    check_xonsh_ast("# hello")
+    check_xonsh_ast("# hello", mode="exec")
 
 
 @pytest.mark.parametrize(

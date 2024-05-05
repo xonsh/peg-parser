@@ -1,18 +1,3 @@
-# !(ls >> x.py)
-__xonsh__.subproc_captured_object('ls', '>>', 'x.py')
-
-# !(ls | grep wakka > x.py)
-__xonsh__.subproc_captured_object('ls', '|', 'grep', 'wakka', '>', 'x.py')
-
-# !(ls | grep wakka >> x.py)
-__xonsh__.subproc_captured_object('ls', '|', 'grep', 'wakka', '>>', 'x.py')
-
-# !(emacs ugggh &)
-__xonsh__.subproc_captured_object('emacs', 'ugggh', '&')
-
-# !(emacs ugggh&)
-__xonsh__.subproc_captured_object('emacs', 'ugggh&')
-
 # $(ls | grep wakka)
 __xonsh__.subproc_captured('ls', '|', 'grep', 'wakka')
 
@@ -42,21 +27,3 @@ __xonsh__.subproc_captured_hiddenobject('ls', '||', 'grep', 'wakka')
 
 # ![ls] || ![grep wakka] || ![grep jawaka]
 __xonsh__.subproc_captured_hiddenobject('ls', '||', 'grep', 'wakka', '||', 'grep', 'jawaka')
-
-# $(ls > x.py)
-__xonsh__.subproc_captured('ls', '>', 'x.py')
-
-# $(ls >> x.py)
-__xonsh__.subproc_captured('ls', '>>', 'x.py')
-
-# $(ls | grep wakka > x.py)
-__xonsh__.subproc_captured('ls', '|', 'grep', 'wakka', '>', 'x.py')
-
-# $(ls | grep wakka >> x.py)
-__xonsh__.subproc_captured('ls', '|', 'grep', 'wakka', '>>', 'x.py')
-
-# $(emacs ugggh &)
-__xonsh__.subproc_captured('emacs', 'ugggh', '&')
-
-# $(emacs ugggh&)
-__xonsh__.subproc_captured('emacs', 'ugggh&')

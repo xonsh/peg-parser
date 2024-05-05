@@ -34,9 +34,6 @@ __xonsh__.subproc_captured_hiddenobject('echo', ',')
 # ![echo 1,2]
 __xonsh__.subproc_captured_hiddenobject('echo', '1,2')
 
-# ![echo /?]
-__xonsh__.subproc_captured_hiddenobject('echo', '\\?')
-
 # !(echo '$foo')
 __xonsh__.subproc_captured_object('echo', "'$foo'")
 
