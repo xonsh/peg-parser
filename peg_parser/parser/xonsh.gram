@@ -984,6 +984,8 @@ proc_cmd:
     | AT_LPAREN ~ a=(bare_genexp | expressions) ')' { self.proc_pyexpr(a, LOCATIONS) }
     | AT_DOLLAR_LPAREN ~ a=proc_cmds ')' { self.proc_inject(a, LOCATIONS) }
     | env_atom
+    | help_atom
+    | search_path
     | sub_procs
 
 slices:
@@ -1001,6 +1003,7 @@ slice:
      }
 
 atom:
+    | search_path
     | a=NAME { ast.Name(id=a.string, ctx=Load, LOCATIONS) }
     | 'True' { ast.Constant(value=True, LOCATIONS) }
     | 'False' {
@@ -1019,6 +1022,8 @@ atom:
     | '...' {
         ast.Constant(value=Ellipsis, LOCATIONS)
      }
+
+search_path: a=SEARCH_PATH { self.expand_search_path(a, LOCATIONS) }
 
 group:
     | '(' a=(yield_expr | named_expression) ')' { a }

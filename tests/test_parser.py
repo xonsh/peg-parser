@@ -245,12 +245,10 @@ def test_bang_procs(expr, check_xonsh_ast):
 @pytest.mark.parametrize("p", ["", "p"])
 @pytest.mark.parametrize("f", ["", "f"])
 @pytest.mark.parametrize("glob_type", ["", "r", "g"])
-@pytest.mark.xfail
 def test_backtick(p, f, glob_type, check_xonsh_ast):
     check_xonsh_ast(f"print({p}{f}{glob_type}`.*`)", False)
 
 
-@pytest.mark.xfail
 def test_comment_only(check_xonsh_ast):
     check_xonsh_ast("# hello")
 
