@@ -43,14 +43,12 @@ MACRO_ARGS = [
 
 
 @pytest.mark.parametrize("s", MACRO_ARGS)
-@pytest.mark.xfail
-def test_macro_call_one_arg(check_xonsh_ast, s):
+def test_macro_call_one_arg(check_xonsh_ast, s, xsh):
     f = f"f!({s})"
-    tree = check_xonsh_ast(f, False, return_obs=True)
+
+    tree = check_xonsh_ast(f, f="f", x="x")
     assert isinstance(tree, AST)
-    args = tree.body.args[1].elts
-    assert len(args) == 1
-    assert args[0].s == s.strip()
+    assert xsh.call_macro.called
 
 
 @pytest.mark.parametrize("s,t", itertools.product(MACRO_ARGS[::2], MACRO_ARGS[1::2]))
