@@ -2,15 +2,18 @@
 
 import ast
 import difflib
-import io
 import sys
-import textwrap
-import tokenize as pytokenize
 from pathlib import Path
 
 import pytest
 
-from peg_parser.parser import tokenize
+
+def unparse_diff(**trees: ast.AST):
+    orig_name, pp_name = trees.keys()
+    original, pp_ast = trees.values()
+    left = ast.unparse(original)
+    right = ast.unparse(pp_ast)
+    return "\n".join(difflib.unified_diff(left.split("\n"), right.split("\n"), orig_name, pp_name))
 
 
 def dump_diff(**trees: ast.AST):
@@ -57,38 +60,26 @@ def dump_diff(**trees: ast.AST):
         ),
     ],
 )
-def test_parser(python_parse_file, python_parse_str, filename):
+def test_pure_python_parsing(python_parse_file, parse_str, filename):
     path = Path(__file__).parent / "data" / filename
     with open(path) as f:
         source = f.read()
 
-    kwargs = {"include_attributes": True}
-    kwargs["indent"] = "  "
     for part in source.split("\n\n\n"):
         original = ast.parse(part)
 
-        try:
-            pp_ast = python_parse_str(part, "exec")
-        except Exception:
-            print("Parsing failed:")
-            print("Source is:")
-            print(textwrap.indent(part, "  "))
-            print("Token stream is:")
-            for t in tokenize.generate_tokens(io.StringIO(part).readline):
-                print(t)
-            print()
-            print("CPython ast is:")
-            print(ast.dump(original, **kwargs))
-            print()
-            print("Python token stream is:")
-            for t in pytokenize.generate_tokens(io.StringIO(part).readline):
-                print(t)
-            raise
+        pp_ast = parse_str(part, mode="exec")
 
         if diff := dump_diff(cpython=original, pegen=pp_ast):
-            print(part)
+            if src_diff := unparse_diff(original=original, pp_ast=pp_ast):
+                print("Source diff")
+                print(src_diff)
+            else:
+                print("Unparsed sources are the same")
+            print("AST diff")
             print(diff)
-        assert not diff
+
+        assert not diff, "mismatch in generated AST"
 
     diff = dump_diff(cpython=ast.parse(source), pegen=python_parse_file(path))
     assert not diff

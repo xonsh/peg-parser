@@ -1187,11 +1187,10 @@ setcomp[ast.SetComp]:
     | invalid_comprehension
 
 genexp[ast.GeneratorExp]:
-    | '(' bare_genexp ')' {
-        ast.GeneratorExp(elt=a, generators=b, LOCATIONS)
-     }
+    | '(' a=( assignment_expression | expression !':=') b=for_if_clauses ')' { ast.GeneratorExp(elt=a, generators=b, LOCATIONS) }
     | invalid_comprehension
 
+# sepearate bare_genexp from genexp to support comp inside @(...)
 bare_genexp:
     | a=( assignment_expression | expression !':=') b=for_if_clauses { ast.GeneratorExp(elt=a, generators=b, LOCATIONS) }
 
