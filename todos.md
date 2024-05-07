@@ -14,3 +14,5 @@ __xonsh__.subproc_captured_hiddenobject('$FOO=foo', '$BAR=2', 'echo', "r'$BAR'")
 # ![echo /?]
 __xonsh__.subproc_captured_hiddenobject('echo', '\\?')
 ```
+
+- implement macros

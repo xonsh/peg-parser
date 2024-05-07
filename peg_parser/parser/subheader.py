@@ -752,6 +752,19 @@ class Parser:
     def expand_search_path(self, a: TokenInfo, **locs):
         return xonsh_call("__xonsh__.pathsearch", ast.Constant(value=a.string, **locs), **locs)
 
+    def macro_call(self, a, b, **locs):
+        gbl_call = xonsh_call("globals", **locs)
+        loc_call = xonsh_call("locals", **locs)
+        positionals = ast.Tuple(elts=b[0] or [], ctx=Load, **locs)
+        return xonsh_call(
+            "__xonsh__.call_macro",
+            a,
+            positionals,
+            gbl_call,
+            loc_call,
+            **locs,
+        )
+
     def _build_syntax_error(
         self,
         message: str,
