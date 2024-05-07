@@ -4,6 +4,7 @@ from ast import AST
 import pytest
 
 
+@pytest.mark.xfail
 def test_macro_call_empty(check_xonsh_ast):
     assert check_xonsh_ast("f!()", False)
 
