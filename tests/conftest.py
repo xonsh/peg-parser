@@ -60,6 +60,7 @@ def python_parse_str(python_parser_cls):
 @pytest.fixture(scope="session")
 def parse_str(python_parse_str):
     """Parse and print verbose output on failure"""
+    session = [0]
 
     def factory(text, verbose=False, mode="eval", py_version: tuple | None = None):
         try:
@@ -68,17 +69,23 @@ def parse_str(python_parse_str):
             print("Parsing failed:")
             print("Source is:")
             print(text)
-            from peg_parser.parser import tokenize
+            if (not verbose) and session[0] < 3:
+                from peg_parser.parser import tokenize
 
-            toks = list(tokenize.generate_tokens(text))
-            log.info("Tokens are: \n %s", "\n".join(map(str, toks)))
-            if not verbose:
+                toks = list(tokenize.generate_tokens(text))
+                log.info("Tokens are: \n %s", "\n".join(map(str, toks)))
+                # log verbose output of atleast 3 failures
                 log.info("Retrying with verbose=True")
-                with contextlib.redirect_stdout(io.StringIO()) as stdout, contextlib.suppress(Exception):
+                with (
+                    contextlib.redirect_stdout(io.StringIO()) as stdout,
+                    contextlib.suppress(Exception, SyntaxError),
+                ):
                     python_parse_str(text, verbose=True, mode=mode, py_version=py_version)
                 captured = stdout.getvalue()
                 log.info(captured)
-            raise e
+                log.error("Failed to parse: %s", e, exc_info=True)
+                session[0] += 1
+            pytest.fail(str(e))
 
     return factory
 
