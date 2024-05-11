@@ -95,7 +95,7 @@ NT_OFFSET = 256
 tok_name = {
     value: name for name, value in globals().items() if isinstance(value, int) and not name.startswith("_")
 }
-N_TOKENS = len(tok_name) - 2  # don't count N_TOKENS or NT_OFFSET
+N_TOKENS = len(tok_name) - 1  # don't count N_TOKENS or NT_OFFSET
 
 EXACT_TOKEN_TYPES = {
     "!=": NOTEQUAL,
