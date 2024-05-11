@@ -101,6 +101,8 @@ class PythonCallMakerVisitor(GrammarVisitor):
         name = node.value
         if name == "SOFT_KEYWORD":
             return "soft_keyword", "self.soft_keyword()"
+        if name == "KEYWORD":
+            return "keyword", "self.keyword()"
         if name in (
             "NAME",
         ):
@@ -229,6 +231,7 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
         self.token_map = token_map
         tokens = set(token_map)
         tokens.add("SOFT_KEYWORD")
+        tokens.add("KEYWORD")
         tokens.update(
             ["FSTRING_START", "FSTRING_MIDDLE", "FSTRING_END"]
         )  # used in metagrammar to support Python 3.12 f-strings; don't exist in 3.11
