@@ -273,6 +273,13 @@ class Parser:
         return None
 
     @memoize
+    def keyword(self):
+        tok = self._tokenizer.peek()
+        if tok.type == token.NAME and tok.string in self.KEYWORDS:
+            return self._tokenizer.getnext()
+        return None
+
+    @memoize
     def token(self, typ: int) -> TokenInfo | None:
         tok = self._tokenizer.peek()
         if tok.type == typ:
