@@ -213,23 +213,6 @@ class TokenError(Exception):
     pass
 
 
-class StopTokenizing(Exception):
-    pass
-
-
-def _get_normal_name(orig_enc):
-    """Imitates get_normal_name in tokenizer.c."""
-    # Only care about the first 12 characters.
-    enc = orig_enc[:12].lower().replace("_", "-")
-    if enc == "utf-8" or enc.startswith("utf-8-"):
-        return "utf-8"
-    if enc in ("latin-1", "iso-8859-1", "iso-latin-1") or enc.startswith(
-        ("latin-1-", "iso-8859-1-", "iso-latin-1-")
-    ):
-        return "iso-8859-1"
-    return orig_enc
-
-
 class TokenizerState:
     def __init__(self):
         self.lnum = 0
