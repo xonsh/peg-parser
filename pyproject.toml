@@ -23,7 +23,7 @@ extend-select = ["B", "I", "UP",
 #    "FURB", # modernize
     "RUF", # ruff
 ]
-fixable = ["ALL"]
+extend-safe-fixes = ["FA", "TCH"]
 
 # ruff ignore file "xonsh_parser/ply/yacc.py"
 [tool.ruff.lint.per-file-ignores]

@@ -762,7 +762,9 @@ class Parser:
     def macro_call(self, a, b, **locs):
         gbl_call = xonsh_call("globals", **locs)
         loc_call = xonsh_call("locals", **locs)
-        positionals = ast.Tuple(elts=b[0] or [], ctx=Load, **locs)
+        positionals = ast.Tuple(
+            elts=[ast.Constant(value=param.string, **param.loc()) for param in b], ctx=Load, **locs
+        )
         return xonsh_call(
             "__xonsh__.call_macro",
             a,

@@ -4,9 +4,9 @@ from ast import AST
 import pytest
 
 
-@pytest.mark.xfail
-def test_macro_call_empty(check_xonsh_ast):
-    assert check_xonsh_ast("f!()", False)
+def test_macro_call_empty(check_xonsh_ast, xsh):
+    tree = check_xonsh_ast("f!()", f="f")
+    assert isinstance(tree, AST)
 
 
 MACRO_ARGS = [
@@ -46,7 +46,7 @@ MACRO_ARGS = [
 def test_macro_call_one_arg(check_xonsh_ast, s, xsh):
     f = f"f!({s})"
 
-    tree = check_xonsh_ast(f, f="f", x="x")
+    tree = check_xonsh_ast(f, f="f", x="x", mode="exec")
     assert isinstance(tree, AST)
     assert xsh.call_macro.called
 
