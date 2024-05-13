@@ -99,13 +99,8 @@ class PythonCallMakerVisitor(GrammarVisitor):
 
     def visit_NameLeaf(self, node: NameLeaf) -> Tuple[Optional[str], str]:
         name = node.value
-        if name == "SOFT_KEYWORD":
-            return "soft_keyword", "self.soft_keyword()"
-        if name == "KEYWORD":
-            return "keyword", "self.keyword()"
-        if name in (
-            "NAME",
-        ):
+        special = {"SOFT_KEYWORD", "KEYWORD", "NAME"}
+        if name in special:
             name = name.lower()
             return name, f"self.{name}()"
         if name in ("NEWLINE", "DEDENT", "INDENT", "ENDMARKER", "ASYNC", "AWAIT"):
