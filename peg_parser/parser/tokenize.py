@@ -125,7 +125,6 @@ xsh_tokens = {
 # number literals.
 Whitespace = r"[ \f\t]*"
 Comment = r"#[^\r\n]*"
-Ignore = Whitespace + any(r"\\\r?\n" + Whitespace) + maybe(Comment)
 Name = r"\w+"
 
 Hexnumber = r"0[xX](?:_?[0-9a-fA-F])+"
@@ -194,7 +193,9 @@ ContStr = capname(pre2=StringPrefix) + group(
 )
 SearchPath = capname(search_pre=r"([rgpf]+|@\w*)?") + capname(search_path=r"`([^\n`\\]*(?:\\.[^\n`\\]*)*)`")
 PseudoExtras = group(End=r"\\\r?\n|\Z", Comment=Comment, Triple=Triple, SearchPath=SearchPath)
-PseudoToken = Whitespace + group(PseudoExtras, Number=Number, Funny=Funny, ContStr=ContStr, Name=Name)
+PseudoToken = capname(ws=Whitespace) + group(
+    PseudoExtras, Number=Number, Funny=Funny, ContStr=ContStr, Name=Name
+)
 
 # For a given string prefix plus quotes, endpats maps it to a regex
 #  to match the remainder of that string. _prefix can be empty, for
@@ -346,15 +347,17 @@ def next_statement(state: TokenizerState):
 
 
 def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrState):
-    start, end = pseudomatch.span(1)
+    if whitespace := pseudomatch.group("ws"):
+        start, end = pseudomatch.span("ws")
+        yield TokenInfo(t.WS, whitespace, (state.lnum, start), (state.lnum, end), state.line)
+    start, end = pseudomatch.span(2)
     spos, epos, state.pos = (state.lnum, start), (state.lnum, end), end
     if start == end:
         return True  # continue
-    cap_groups: dict[str, str | None] = pseudomatch.groupdict()
     token, initial = state.line[start:end], state.line[start]
 
     if (
-        cap_groups.get("Number")  # ordinary number
+        pseudomatch.group("Number")  # ordinary number
         or (initial == "." and token != "." and token != "...")
     ):
         yield TokenInfo(t.NUMBER, token, spos, epos, state.line)
@@ -364,12 +367,12 @@ def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrSta
         else:
             yield TokenInfo(t.NEWLINE, token, spos, epos, state.line)
 
-    elif cap_groups.get("Comment"):
+    elif pseudomatch.group("Comment"):
         assert not token.endswith("\n")
         yield TokenInfo(t.COMMENT, token, spos, epos, state.line)
 
-    elif cap_groups.get("Triple"):
-        cont_str.endprog = _compile(endpats[cap_groups["tquote"] or "'''"])
+    elif pseudomatch.group("Triple"):
+        cont_str.endprog = _compile(endpats[pseudomatch.group("tquote") or "'''"])
         endmatch = cont_str.endprog.match(state.line, state.pos)
         if endmatch:  # all on one line
             state.pos = endmatch.end(0)
@@ -381,35 +384,35 @@ def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrSta
 
     # Also note that single quote checking must come after
     #  triple quote checking (above).
-    elif cap_groups.get("ContStr"):
+    elif pseudomatch.group("ContStr"):
         if token[-1] == "\n":  # continued string
             cont_str.start(state, start)
             # check for matching quote
-            quote = (cap_groups["Str2"] or "")[0]
+            quote = (pseudomatch.group("Str2") or "")[0]
             cont_str.endprog = _compile(endpats[quote])
             cont_str.needcont = True
             return False
         else:  # ordinary string
             yield TokenInfo(t.STRING, token, spos, epos, state.line)
-    elif cap_groups.get("SearchPath"):
+    elif pseudomatch.group("SearchPath"):
         yield TokenInfo(t.SEARCH_PATH, token, spos, epos, state.line)
-    elif cap_groups.get("Name"):  # ordinary name
+    elif pseudomatch.group("Name"):  # ordinary name
         yield TokenInfo(t.NAME, token, spos, epos, state.line)
-    elif cap_groups.get("XshOps"):
+    elif pseudomatch.group("XshOps"):
         if token[-1] in "([{":
             state.parenlev += 1
         yield TokenInfo(xsh_tokens[token], token, spos, epos, state.line)
+    elif pseudomatch.group("Special"):
+        if token in "([{":
+            state.parenlev += 1
+        elif token in ")]}":
+            state.parenlev -= 1
+        yield TokenInfo(t.EXACT_TOKEN_TYPES[token], token, spos, epos, state.line)
     elif initial == "\\":  # continued stmt
         state.continued = True
-    else:  # Special
-        if initial in "([{":
-            state.parenlev += 1
-
-        if token in ")]}":
-            state.parenlev -= 1
-            yield TokenInfo(t.EXACT_TOKEN_TYPES[token], token, spos, epos, state.line)
-        else:
-            yield TokenInfo(t.OP, token, spos, epos, state.line)
+    else:  # Funny other than Special/XshOps
+        raise TokenError(f"Bad token: {token!r} at line {state.lnum}", spos)
+        # yield TokenInfo(t.OP, token, spos, epos, state.line)
 
 
 def next_end_tokens(state: TokenizerState):

@@ -88,6 +88,8 @@ AT_DOLLAR_LPAREN = 78
 QUESTION = 79
 DOLLAR = 80
 SEARCH_PATH = 81
+MACRO_PARAM = 82
+WS = 83
 
 # Special definitions for cooperation with parser
 NT_OFFSET = 256
