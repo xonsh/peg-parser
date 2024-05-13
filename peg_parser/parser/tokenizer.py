@@ -73,23 +73,48 @@ class Tokenizer:
     def is_macro(self, tok: TokenInfo) -> bool:
         return tok.type == token.BANG_LPAREN and self._index > 0 and self._tokens[-1].type == token.NAME
 
-    def consume_macro_params(self) -> TokenInfo:
+    def consume_macro_params(self) -> TokenInfo:  # noqa: C901, PLR0912
         # loop until we get , or ) without consuming it
         start: tuple[int, int] | None = None
         end: tuple[int, int] | None = None
+        paren_level = []
         # join strings while handling whitespace
         string = ""
         line = ""
         while True:
             tok = next(self._tokengen)
-            if tok.type == token.RPAR:
-                self._stack.append(tok)
-                self.macro_mode = False
-                break
+            if tok.type in {
+                token.LPAR,
+                token.LSQB,
+                token.LBRACE,
+                token.AT_LPAREN,
+                token.BANG_LPAREN,
+                token.BANG_LBRACKET,
+                token.DOLLAR_LPAREN,
+                token.DOLLAR_LBRACKET,
+                token.DOLLAR_LBRACE,
+                token.AT_DOLLAR_LPAREN,
+            }:  # push paren level
+                paren_level.append(tok)
+            if paren_level:
+                if tok.type in {token.RPAR, token.RSQB, token.RBRACE}:
+                    end_paren = {
+                        token.RPAR: "(",
+                        token.RSQB: "[",
+                        token.RBRACE: "{",
+                    }.get(tok.type, "")
+                    if paren_level[-1].string[-1] == end_paren:
+                        paren_level.pop()
+                    else:
+                        raise SyntaxError(f"Unmatched closing paren {tok.string} at {tok.start}")
+            else:
+                if tok.type == token.RPAR:
+                    self._stack.append(tok)
+                    self.macro_mode = False
+                    break
 
-            if tok.type in {token.RPAR, token.COMMA}:
-                # self._stack.append(tok)
-                break
+                if tok.type == token.COMMA:
+                    break
             end = tok.end
             if start is None:
                 start = tok.start
@@ -104,6 +129,8 @@ class Tokenizer:
 
         assert start is not None
         assert end is not None
+        if not string.strip():
+            return TokenInfo(token.WS, string, start, end, line)
         return TokenInfo(token.MACRO_PARAM, string, start, end, line)
 
     def diagnose(self) -> TokenInfo:
