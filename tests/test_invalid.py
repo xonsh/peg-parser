@@ -2,15 +2,13 @@ import itertools
 
 import pytest
 
-# test invalid expressions
-
 
 @pytest.mark.parametrize(
     "inp",
     [
+        "del",
         "del 7",
         "del True",
-        "del ()",
         "del foo()",
         "del lambda x: 'yay'",
         "del x if y else z",
@@ -19,10 +17,9 @@ import pytest
         "del -x",
     ],
 )
-@pytest.mark.xfail
-def test_syntax_error_del(inp, parse_str):
+def test_syntax_error_del(inp, python_parse_str):
     with pytest.raises(SyntaxError):
-        parse_str(inp)
+        python_parse_str(inp, mode="exec")
 
 
 @pytest.mark.parametrize(
@@ -36,52 +33,34 @@ def test_syntax_error_del(inp, parse_str):
         "x > y == z",
     ],
 )
-@pytest.mark.xfail
-def test_syntax_error_del_inp(parse_str, exp):
+def test_syntax_error_del_inp(python_parse_str, exp):
     with pytest.raises(SyntaxError):
-        parse_str(f"del {exp}")
+        python_parse_str(f"del {exp}", mode="exec")
 
 
-@pytest.mark.xfail
-def test_syntax_error_lonely_del(parse_str):
+def test_syntax_error_assign_literal(python_parse_str):
     with pytest.raises(SyntaxError):
-        parse_str("del")
+        python_parse_str("7 = x", mode="exec")
 
 
-@pytest.mark.xfail
-def test_syntax_error_assign_literal(parse_str):
+def test_syntax_error_assign_constant(python_parse_str):
     with pytest.raises(SyntaxError):
-        parse_str("7 = x")
+        python_parse_str("True = 8", mode="exec")
 
 
-@pytest.mark.xfail
-def test_syntax_error_assign_constant(parse_str):
+def test_syntax_error_assign_call(python_parse_str):
     with pytest.raises(SyntaxError):
-        parse_str("True = 8")
+        python_parse_str("foo() = x", mode="exec")
 
 
-@pytest.mark.xfail
-def test_syntax_error_assign_emptytuple(parse_str):
+def test_syntax_error_assign_lambda(python_parse_str):
     with pytest.raises(SyntaxError):
-        parse_str("() = x")
+        python_parse_str('lambda x: "yay" = y', mode="exec")
 
 
-@pytest.mark.xfail
-def test_syntax_error_assign_call(parse_str):
+def test_syntax_error_assign_ifexp(python_parse_str):
     with pytest.raises(SyntaxError):
-        parse_str("foo() = x")
-
-
-@pytest.mark.xfail
-def test_syntax_error_assign_lambda(parse_str):
-    with pytest.raises(SyntaxError):
-        parse_str('lambda x: "yay" = y')
-
-
-@pytest.mark.xfail
-def test_syntax_error_assign_ifexp(parse_str):
-    with pytest.raises(SyntaxError):
-        parse_str("x if y else z = 8")
+        python_parse_str("x if y else z = 8", mode="exec")
 
 
 @pytest.mark.parametrize(
@@ -93,53 +72,51 @@ def test_syntax_error_assign_ifexp(parse_str):
         "{k:v for k,v in d.items()}",
     ],
 )
-@pytest.mark.xfail
-def test_syntax_error_assign_comps(parse_str, exp):
+def test_syntax_error_assign_comps(python_parse_str, exp):
     with pytest.raises(SyntaxError):
-        parse_str(f"{exp} = z")
+        python_parse_str(f"{exp} = z", mode="exec")
 
 
 @pytest.mark.parametrize("exp", ["x + y", "x and y", "-x"])
-@pytest.mark.xfail
-def test_syntax_error_assign_ops(parse_str, exp):
+def test_syntax_error_assign_ops(python_parse_str, exp):
     with pytest.raises(SyntaxError):
-        parse_str(f"{exp} = z")
+        python_parse_str(f"{exp} = z", mode="exec")
 
 
 @pytest.mark.parametrize("exp", ["x > y", "x > y == z"])
-def test_syntax_error_assign_cmp(parse_str, exp):
+def test_syntax_error_assign_cmp(python_parse_str, exp):
     with pytest.raises(SyntaxError):
-        parse_str(f"{exp} = a")
+        python_parse_str(f"{exp} = a", mode="exec")
 
 
-def test_syntax_error_augassign_literal(parse_str):
+def test_syntax_error_augassign_literal(python_parse_str):
     with pytest.raises(SyntaxError):
-        parse_str("7 += x")
+        python_parse_str("7 += x", mode="exec")
 
 
-def test_syntax_error_augassign_constant(parse_str):
+def test_syntax_error_augassign_constant(python_parse_str):
     with pytest.raises(SyntaxError):
-        parse_str("True += 8")
+        python_parse_str("True += 8", mode="exec")
 
 
-def test_syntax_error_augassign_emptytuple(parse_str):
+def test_syntax_error_augassign_emptytuple(python_parse_str):
     with pytest.raises(SyntaxError):
-        parse_str("() += x")
+        python_parse_str("() += x", mode="exec")
 
 
-def test_syntax_error_augassign_call(parse_str):
+def test_syntax_error_augassign_call(python_parse_str):
     with pytest.raises(SyntaxError):
-        parse_str("foo() += x")
+        python_parse_str("foo() += x", mode="exec")
 
 
-def test_syntax_error_augassign_lambda(parse_str):
+def test_syntax_error_augassign_lambda(python_parse_str):
     with pytest.raises(SyntaxError):
-        parse_str('lambda x: "yay" += y')
+        python_parse_str('lambda x: "yay" += y', mode="exec")
 
 
-def test_syntax_error_augassign_ifexp(parse_str):
+def test_syntax_error_augassign_ifexp(python_parse_str):
     with pytest.raises(SyntaxError):
-        parse_str("x if y else z += 8")
+        python_parse_str("x if y else z += 8", mode="exec")
 
 
 @pytest.mark.parametrize(
@@ -151,46 +128,40 @@ def test_syntax_error_augassign_ifexp(parse_str):
         "{k:v for k,v in d.items()}",
     ],
 )
-def test_syntax_error_augassign_comps(parse_str, exp):
+def test_syntax_error_augassign_comps(python_parse_str, exp):
     with pytest.raises(SyntaxError):
-        parse_str(f"{exp} += z")
+        python_parse_str(f"{exp} += z", mode="exec")
 
 
 @pytest.mark.parametrize("exp", ["x + y", "x and y", "-x"])
-def test_syntax_error_augassign_ops(parse_str, exp):
+def test_syntax_error_augassign_ops(python_parse_str, exp):
     with pytest.raises(SyntaxError):
-        parse_str(f"{exp} += z")
+        python_parse_str(f"{exp} += z", mode="exec")
 
 
 @pytest.mark.parametrize("exp", ["x > y", "x > y +=+= z"])
-def test_syntax_error_augassign_cmp(parse_str, exp):
+def test_syntax_error_augassign_cmp(python_parse_str, exp):
     with pytest.raises(SyntaxError):
-        parse_str(f"{exp} += a")
+        python_parse_str(f"{exp} += a", mode="exec")
 
 
-def test_syntax_error_bar_kwonlyargs(parse_str):
+def test_syntax_error_bar_kwonlyargs(python_parse_str):
     with pytest.raises(SyntaxError):
-        parse_str("def spam(*):\n   pass\n", mode="exec")
+        python_parse_str("def spam(*):\n   pass\n", mode="exec")
 
 
-def test_syntax_error_nondefault_follows_default(parse_str):
+def test_syntax_error_nondefault_follows_default(python_parse_str):
     with pytest.raises(SyntaxError):
-        parse_str("def spam(x=1, y):\n   pass\n", mode="exec")
+        python_parse_str("def spam(x=1, y):\n   pass\n", mode="exec")
 
 
-def test_syntax_error_lambda_nondefault_follows_default(parse_str):
+def test_syntax_error_lambda_nondefault_follows_default(python_parse_str):
     with pytest.raises(SyntaxError):
-        parse_str("lambda x=1, y: x", mode="exec")
+        python_parse_str("lambda x=1, y: x", mode="exec")
 
 
 @pytest.mark.parametrize("first_prefix, second_prefix", itertools.permutations(["", "p", "b"], 2))
 @pytest.mark.xfail
-def test_syntax_error_literal_concat_different(first_prefix, second_prefix, parse_str):
+def test_syntax_error_literal_concat_different(first_prefix, second_prefix, python_parse_str):
     with pytest.raises(SyntaxError):
-        parse_str(f"{first_prefix}'hello' {second_prefix}'world'")
-
-
-@pytest.mark.xfail
-def test_bad_quotes(check_xonsh_ast):
-    with pytest.raises(SyntaxError):
-        check_xonsh_ast('![echo """hello]')
+        python_parse_str(f"{first_prefix}'hello' {second_prefix}'world'", mode="exec")
