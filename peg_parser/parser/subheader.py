@@ -280,6 +280,13 @@ class Parser:
         return None
 
     @memoize
+    def op(self):
+        tok = self._tokenizer.peek()
+        if tok.string in exact_token_types:
+            return self._tokenizer.getnext()
+        return None
+
+    @memoize
     def token(self, typ: int) -> TokenInfo | None:
         tok = self._tokenizer.peek()
         if tok.type == typ:

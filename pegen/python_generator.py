@@ -99,7 +99,7 @@ class PythonCallMakerVisitor(GrammarVisitor):
 
     def visit_NameLeaf(self, node: NameLeaf) -> Tuple[Optional[str], str]:
         name = node.value
-        special = {"SOFT_KEYWORD", "KEYWORD", "NAME"}
+        special = {"SOFT_KEYWORD", "KEYWORD", "NAME", "OP"}
         if name in special:
             name = name.lower()
             return name, f"self.{name}()"
@@ -227,9 +227,6 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
         tokens = set(token_map)
         tokens.add("SOFT_KEYWORD")
         tokens.add("KEYWORD")
-        tokens.update(
-            ["FSTRING_START", "FSTRING_MIDDLE", "FSTRING_END"]
-        )  # used in metagrammar to support Python 3.12 f-strings; don't exist in 3.11
         super().__init__(grammar, tokens, file)
         self.callmakervisitor: PythonCallMakerVisitor = PythonCallMakerVisitor(self)
         self.invalidvisitor: InvalidNodeVisitor = InvalidNodeVisitor()
