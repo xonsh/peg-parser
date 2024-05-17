@@ -978,16 +978,16 @@ proc_cmds:
     | a=proc_cmd+ { self.proc_args(a) }
 
 proc_cmd:
-    | NAME
-    | OP
-    | NUMBER
-    | STRING
+    | sub_procs
     | AT_LPAREN ~ a=(bare_genexp | expressions) ')' { self.proc_pyexpr(a, LOCATIONS) }
     | AT_DOLLAR_LPAREN ~ a=proc_cmds ')' { self.proc_inject(a, LOCATIONS) }
     | env_atom
     | help_atom
     | search_path
-    | sub_procs
+    | NAME
+    | NUMBER
+    | STRING
+    | !']' !')' !'}' OP
 
 slices:
     | a=slice !',' { a }
