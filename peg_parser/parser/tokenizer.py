@@ -31,6 +31,25 @@ class Tokenizer:
         self._path = path
         self._stack: list[TokenInfo] = []  # temporarily hold tokens
         self.macro_mode = False
+        self._parens = frozenset(
+            {
+                token.LPAR,
+                token.LSQB,
+                token.LBRACE,
+                token.AT_LPAREN,
+                token.BANG_LPAREN,
+                token.BANG_LBRACKET,
+                token.DOLLAR_LPAREN,
+                token.DOLLAR_LBRACKET,
+                token.DOLLAR_LBRACE,
+                token.AT_DOLLAR_LPAREN,
+            }
+        )
+        self._end_parens = {
+            token.RPAR: "(",
+            token.RSQB: "[",
+            token.RBRACE: "{",
+        }
         if verbose:
             self.report(False, False)
 
@@ -83,26 +102,10 @@ class Tokenizer:
         line = ""
         while True:
             tok = next(self._tokengen)
-            if tok.type in {
-                token.LPAR,
-                token.LSQB,
-                token.LBRACE,
-                token.AT_LPAREN,
-                token.BANG_LPAREN,
-                token.BANG_LBRACKET,
-                token.DOLLAR_LPAREN,
-                token.DOLLAR_LBRACKET,
-                token.DOLLAR_LBRACE,
-                token.AT_DOLLAR_LPAREN,
-            }:  # push paren level
+            if tok.type in self._parens:  # push paren level
                 paren_level.append(tok)
             if paren_level:
-                if tok.type in {token.RPAR, token.RSQB, token.RBRACE}:
-                    end_paren = {
-                        token.RPAR: "(",
-                        token.RSQB: "[",
-                        token.RBRACE: "{",
-                    }.get(tok.type, "")
+                if end_paren := self._end_parens.get(tok.type):
                     if paren_level[-1].string[-1] == end_paren:
                         paren_level.pop()
                     else:
