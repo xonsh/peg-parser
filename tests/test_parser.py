@@ -207,15 +207,9 @@ def test_statements(check_xonsh_ast, inp):
         ("!(ls > x.py)", ["ls", ">", "x.py"]),
     ],
 )
-def test_captured_procs(inp, args, check_xonsh_ast, xsh):
+def test_captured_procs(inp, args, check_xonsh_ast, xsh_proc_method):
     check_xonsh_ast(inp, mode="exec", xenv={"WAKKA": "wak"})
-    method_name = {
-        "$[": "subproc_uncaptured",
-        "$(": "subproc_captured",
-        "![": "subproc_captured_hiddenobject",
-        "!(": "subproc_captured_object",
-    }[inp[:2]]
-    method = getattr(xsh, method_name)
+    method = xsh_proc_method(inp[:2])
     method.assert_called_with(*args)
 
 
