@@ -153,6 +153,20 @@ def xsh():
 
 
 @pytest.fixture
+def xsh_proc_method(xsh):
+    def factory(start_symbol: str):
+        method_name = {
+            "$[": "subproc_uncaptured",
+            "$(": "subproc_captured",
+            "![": "subproc_captured_hiddenobject",
+            "!(": "subproc_captured_object",
+        }[start_symbol]
+        return getattr(xsh, method_name)
+
+    return factory
+
+
+@pytest.fixture
 def check_xonsh_ast(parse_str, xsh):
     """compatibility fixture"""
 

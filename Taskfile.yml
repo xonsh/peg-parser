@@ -34,4 +34,4 @@ tasks:
 
   wtest:
     cmds:
-      - watchexec -e py,gram --clear -- task test -- tests/test_parser.py --ff -x -vv --testmon
+      - watchexec -e py,gram --clear -- task test -- --ff -x -vv --testmon
