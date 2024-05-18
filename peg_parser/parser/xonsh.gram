@@ -984,10 +984,23 @@ proc_cmd:
     | env_atom
     | help_atom
     | search_path
+    | '!' ~ a=(cmd_group | any_cmd )* { self.proc_macro_arg(a, LOCATIONS) }
+    | cmd_name
+
+cmd_name:
     | NAME
     | NUMBER
     | STRING
     | !']' !')' !'}' OP
+
+any_cmd:
+    | cmd_name
+    | WS
+    | KEYWORD
+
+cmd_group:
+    | a=('(' | '!(' | '$(') b=any_cmd* c=')'   { ''.join(i.string for i in [a, *b, c]) }
+    | a=('[' | '![' | '$[') b=any_cmd* c=']'   { ''.join(i.string for i in [a, *b, c]) }
 
 slices:
     | a=slice !',' { a }

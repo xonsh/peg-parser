@@ -30,7 +30,8 @@ class Tokenizer:
         self._lines: dict[int, str] = {}
         self._path = path
         self._stack: list[TokenInfo] = []  # temporarily hold tokens
-        self.macro_mode = False
+        self._call_macro = False
+        self.ws_mode = False
         self._parens = frozenset(
             {
                 token.LPAR,
@@ -65,7 +66,7 @@ class Tokenizer:
     def peek(self) -> TokenInfo:
         """Return the next token *without* updating the index."""
         while self._index == len(self._tokens):
-            if self.macro_mode:
+            if self._call_macro:
                 tok = self.consume_macro_params()
             elif self._stack:
                 tok = self._stack.pop()
@@ -74,13 +75,17 @@ class Tokenizer:
             if self.is_blank(tok):
                 continue
             if self.is_macro(tok):
-                self.macro_mode = True
+                self._call_macro = True
+            if (not self.ws_mode) and self.is_proc_macro(tok):
+                self.ws_mode = True
             self._tokens.append(tok)
             if not self._path and tok.start[0] not in self._lines:
                 self._lines[tok.start[0]] = tok.line
         return self._tokens[self._index]
 
     def is_blank(self, tok: TokenInfo) -> bool:
+        if self.ws_mode and tok.type == token.WS:
+            return False
         if tok.type in {token.NL, token.COMMENT, token.WS}:
             return True
         if tok.type == token.ERRORTOKEN and tok.string.isspace():
@@ -91,6 +96,9 @@ class Tokenizer:
 
     def is_macro(self, tok: TokenInfo) -> bool:
         return tok.type == token.BANG_LPAREN and self._index > 0 and self._tokens[-1].type == token.NAME
+
+    def is_proc_macro(self, tok: TokenInfo) -> bool:
+        return tok.type == token.BANG and self._index > 0 and self._tokens[-1].type == token.NAME
 
     def consume_macro_params(self) -> TokenInfo:  # noqa: C901, PLR0912
         # loop until we get , or ) without consuming it
@@ -113,7 +121,7 @@ class Tokenizer:
             else:
                 if tok.type == token.RPAR:
                     self._stack.append(tok)
-                    self.macro_mode = False
+                    self._call_macro = False
                     break
 
                 if tok.type == token.COMMA:
