@@ -781,6 +781,12 @@ class Parser:
             **locs,
         )
 
+    def proc_macro_arg(self, a, **locs):
+        locs["col_offset"] += 1  # offset `!`
+        st = "".join((tok.string if isinstance(tok, TokenInfo) else tok) for tok in a).strip()
+        self._tokenizer.ws_mode = False
+        return ast.Constant(value=st, **locs)
+
     def _build_syntax_error(
         self,
         message: str,

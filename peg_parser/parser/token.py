@@ -89,7 +89,9 @@ QUESTION = 79
 DOLLAR = 80
 SEARCH_PATH = 81
 MACRO_PARAM = 82
-WS = 83
+MACRO_CMD = 83
+WS = 84
+BANG = 85
 
 # Special definitions for cooperation with parser
 NT_OFFSET = 256
@@ -147,6 +149,7 @@ EXACT_TOKEN_TYPES = {
     "|=": VBAREQUAL,
     "}": RBRACE,
     "~": TILDE,
+    "!": BANG,
 }
 
 
