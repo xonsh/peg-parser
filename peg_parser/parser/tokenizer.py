@@ -32,7 +32,7 @@ class Tokenizer:
         self._stack: list[TokenInfo] = []  # temporarily hold tokens
         self._call_macro = False
         self._with_macro = False
-        self.ws_mode = False
+        self._proc_macro = False
         self._parens = frozenset(
             {
                 token.LPAR,
@@ -78,18 +78,13 @@ class Tokenizer:
             if self.is_blank(tok):
                 continue
 
-            if self.is_macro(tok):
-                self._call_macro = True
-            elif (self.is_proc_macro(tok)) and (not self.ws_mode):
-                self.ws_mode = True
-
             self._tokens.append(tok)
             if not self._path and tok.start[0] not in self._lines:
                 self._lines[tok.start[0]] = tok.line
         return self._tokens[self._index]
 
     def is_blank(self, tok: TokenInfo) -> bool:
-        if self.ws_mode and tok.type == token.WS:
+        if self._proc_macro and tok.type == token.WS:
             return False
         if tok.type in {token.NL, token.COMMENT, token.WS}:
             return True
@@ -98,12 +93,6 @@ class Tokenizer:
         if tok.type == token.NEWLINE and self._tokens and self._tokens[-1].type == token.NEWLINE:
             return True
         return False
-
-    def is_macro(self, tok: TokenInfo) -> bool:
-        return tok.type == token.BANG_LPAREN and self._index > 0 and self._tokens[-1].type == token.NAME
-
-    def is_proc_macro(self, tok: TokenInfo) -> bool:
-        return tok.type == token.BANG and self._index > 0 and self._tokens[-1].type == token.NAME
 
     def consume_macro_params(self) -> TokenInfo:  # noqa: C901, PLR0912
         # loop until we get , or ) without consuming it
@@ -149,31 +138,44 @@ class Tokenizer:
             return TokenInfo(token.WS, string, start, end, line)
         return TokenInfo(token.MACRO_PARAM, string, start, end, line)
 
-    def consume_with_macro_params(self) -> TokenInfo:
-        """loop until we get DEDENT"""
+    def consume_with_macro_params(self) -> TokenInfo:  # noqa: C901
+        """loop until we get INDENT-DEDENT or NL"""
 
+        is_indented: bool = False
         indent = 0
         lines = {}
         start = end = self._tokens[-1].end
-        while True:
-            tok = next(self._tokengen)
-            if tok.type == token.INDENT:
+        for idx, tok in enumerate(self._tokengen):
+            if (idx == 0) and tok.type == token.NEWLINE:
+                continue
+            elif tok.type == token.INDENT:
+                if (not is_indented) and (idx == 1):
+                    is_indented = True
+                    continue
                 indent += 1
             elif tok.type == token.DEDENT:
                 if indent:
                     indent -= 1
+                    continue
                 else:
-                    self._stack.append(tok)
                     self._with_macro = False
                     break
-            if tok.type == token.NEWLINE and (not tok.string):
-                # empty new line added by the tokenizer
-                continue
-            lines[tok.start[0]] = tok.line
+            elif tok.type == token.NEWLINE:
+                if not is_indented:
+                    break
+                elif not tok.string:
+                    # empty new line added by the tokenizer
+                    continue
 
-        import textwrap
+            # update captured lines
+            if tok.start[0] not in lines:
+                lines[tok.start[0]] = tok.line if is_indented else tok.line[tok.start[1] :]
 
-        string = textwrap.dedent("".join(lines.values()))
+        string = "".join(lines.values())
+        if is_indented:
+            import textwrap
+
+            string = textwrap.dedent(string)
         return TokenInfo(token.MACRO_PARAM, string, start, end, string)
 
     def diagnose(self) -> TokenInfo:

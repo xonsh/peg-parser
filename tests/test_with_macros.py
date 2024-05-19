@@ -1,8 +1,20 @@
+import ast
 import textwrap
 from ast import AST, Pass, With
-from unittest.mock import ANY, MagicMock
+from unittest.mock import ANY
 
 import pytest
+
+
+@pytest.fixture(name="run")
+def run_fixture(check_xonsh_ast, xsh):
+    def run(code, **kwargs):
+        tree = check_xonsh_ast(code, mode="exec", x="x", locals=dict, globals=dict, **kwargs)
+        assert isinstance(tree, AST)
+        return xsh.enter_macro, tree
+
+    return run
+
 
 WITH_BANG_RAWSUITES = [
     "pass",
@@ -34,53 +46,25 @@ a = 42
 
 
 @pytest.mark.parametrize("body", WITH_BANG_RAWSUITES)
-def test_withbang_single_suite(body, check_xonsh_ast, xsh, get_tokens):
+def test_withbang_single_suite(body, run):
     code = "with! x:\n{}".format(textwrap.indent(body, "    "))
-    tree = check_xonsh_ast(code, mode="exec", x="x", locals=MagicMock(), globals=MagicMock())
-    assert isinstance(tree, AST)
-    method = xsh.enter_macro
+    method, _ = run(code)
     method.assert_called_once_with("x", body, ANY, ANY)
 
 
 @pytest.mark.parametrize("body", WITH_BANG_RAWSUITES)
-def test_withbang_as_single_suite(body, check_xonsh_ast, xsh):
+def test_withbang_as_single_suite(body, run):
     code = "with! x as y:\n{}".format(textwrap.indent(body, "    "))
-    tree = check_xonsh_ast(code, False, return_obs=True, mode="exec")
-    assert isinstance(tree, AST)
-    method = xsh.enter_macro
+    method, tree = run(code)
     method.assert_called_once_with("x", body, ANY, ANY)
-    # wither = tree.body[0]
-    # assert isinstance(wither, With)
-    # assert len(wither.body) == 1
-    # assert isinstance(wither.body[0], Pass)
-    # assert len(wither.items) == 1
-    # item = wither.items[0]
-    # assert item.optional_vars.id == "y"
-    # s = item.context_expr.args[1].s
-    # assert s == body
+    assert " as y:" in ast.unparse(tree)
 
 
 @pytest.mark.parametrize("body", WITH_BANG_RAWSUITES)
-@pytest.mark.xfail
-def test_withbang_single_suite_trailing(body, check_xonsh_ast):
+def test_withbang_single_suite_trailing(body, run):
     code = "with! x:\n{}\nprint(x)\n".format(textwrap.indent(body, "    "))
-    tree = check_xonsh_ast(
-        {},
-        code,
-        False,
-        return_obs=True,
-        mode="exec",
-        # debug_level=100
-    )
-    assert isinstance(tree, AST)
-    wither = tree.body[0]
-    assert isinstance(wither, With)
-    assert len(wither.body) == 1
-    assert isinstance(wither.body[0], Pass)
-    assert len(wither.items) == 1
-    item = wither.items[0]
-    s = item.context_expr.args[1].s
-    assert s == body + "\n"
+    method, tree = run(code)
+    method.assert_called_once_with("x", body + "\n", ANY, ANY)
 
 
 WITH_BANG_RAWSIMPLE = [
@@ -92,44 +76,26 @@ WITH_BANG_RAWSIMPLE = [
 
 
 @pytest.mark.parametrize("body", WITH_BANG_RAWSIMPLE)
-@pytest.mark.xfail
-def test_withbang_single_simple(body, check_xonsh_ast):
+def test_withbang_single_simple(body, run):
     code = f"with! x: {body}\n"
-    tree = check_xonsh_ast(code, False, return_obs=True, mode="exec")
-    assert isinstance(tree, AST)
-    wither = tree.body[0]
-    assert isinstance(wither, With)
-    assert len(wither.body) == 1
-    assert isinstance(wither.body[0], Pass)
-    assert len(wither.items) == 1
-    item = wither.items[0]
-    s = item.context_expr.args[1].s
-    assert s == body
+    method, tree = run(code)
+    method.assert_called_once_with("x", " " + body + "\n", ANY, ANY)
 
 
 @pytest.mark.parametrize("body", WITH_BANG_RAWSIMPLE)
-@pytest.mark.xfail
-def test_withbang_single_simple_opt(body, check_xonsh_ast):
+def test_withbang_single_simple_opt(body, run):
     code = f"with! x as y: {body}\n"
-    tree = check_xonsh_ast(code, False, return_obs=True, mode="exec")
-    assert isinstance(tree, AST)
-    wither = tree.body[0]
-    assert isinstance(wither, With)
-    assert len(wither.body) == 1
-    assert isinstance(wither.body[0], Pass)
-    assert len(wither.items) == 1
-    item = wither.items[0]
-    assert item.optional_vars.id == "y"
-    s = item.context_expr.args[1].s
-    assert s == body
+    method, tree = run(code)
+    method.assert_called_once_with("x", " " + body + "\n", ANY, ANY)
+    assert " as y:" in ast.unparse(tree)
 
 
 @pytest.mark.parametrize("body", WITH_BANG_RAWSUITES)
 @pytest.mark.xfail
-def test_withbang_as_many_suite(body, check_xonsh_ast):
+def test_withbang_as_many_suite(body, run):
     code = "with! x as a, y as b, z as c:\n{}"
     code = code.format(textwrap.indent(body, "    "))
-    tree = check_xonsh_ast(code, False, return_obs=True, mode="exec")
+    method, tree = run(code)
     assert isinstance(tree, AST)
     wither = tree.body[0]
     assert isinstance(wither, With)
