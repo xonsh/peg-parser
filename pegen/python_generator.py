@@ -99,7 +99,7 @@ class PythonCallMakerVisitor(GrammarVisitor):
 
     def visit_NameLeaf(self, node: NameLeaf) -> Tuple[Optional[str], str]:
         name = node.value
-        special = {"SOFT_KEYWORD", "KEYWORD", "NAME", "OP"}
+        special = {"SOFT_KEYWORD", "KEYWORD", "NAME", "OP", "ANY_TOKEN"}
         if name in special:
             name = name.lower()
             return name, f"self.{name}()"
@@ -227,6 +227,7 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
         tokens = set(token_map)
         tokens.add("SOFT_KEYWORD")
         tokens.add("KEYWORD")
+        tokens.add("ANY_TOKEN")
         super().__init__(grammar, tokens, file)
         self.callmakervisitor: PythonCallMakerVisitor = PythonCallMakerVisitor(self)
         self.invalidvisitor: InvalidNodeVisitor = InvalidNodeVisitor()
