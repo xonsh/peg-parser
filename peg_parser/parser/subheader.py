@@ -792,23 +792,22 @@ class Parser:
         self._tokenizer._with_macro = False
         return ast.With(items=[a], body=[ast.Pass(**locs)], **locs)
 
+    def handle_func_macro_start(self, a):
+        self._tokenizer._call_macro = True
+        return a
+
     def handle_with_macro_start(self, a: ast.withitem):
         self._tokenizer._with_macro = True
         return a
 
-    def macro_with_block(self, a: list[TokenInfo | ast.Constant], **locs):
-        st = ""
-        for tok in a:
-            if isinstance(tok, TokenInfo):
-                st += tok.string
-            else:
-                st += tok.value
-        return ast.Constant(value=st, **locs)
+    def handle_proc_macro_start(self, a):
+        self._tokenizer._proc_macro = True
+        return a
 
     def proc_macro_arg(self, a, **locs):
         locs["col_offset"] += 1  # offset `!`
         st = "".join((tok.string if isinstance(tok, TokenInfo) else tok) for tok in a).strip()
-        self._tokenizer.ws_mode = False
+        self._tokenizer._proc_macro = False
         return ast.Constant(value=st, **locs)
 
     def _build_syntax_error(

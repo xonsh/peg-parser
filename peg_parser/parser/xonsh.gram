@@ -435,12 +435,12 @@ with_item[ast.withitem]:
     | e=expression { ast.withitem(context_expr=e, optional_vars=None) }
 
 with_macro_stmt:
-    | a=with_macro_start b=MACRO_PARAM DEDENT {
+    | a=with_macro_start b=MACRO_PARAM {
         self.handle_with_macro_stmt(a, b, LOCATIONS)
      }
 
-with_macro_start:
-    | 'with' '!' ~ WS+ a=with_item ':' NEWLINE INDENT {
+with_macro_start: # same line
+    | 'with' '!' ~ a=with_item ':' {
         self.handle_with_macro_start(a)
     }
 
@@ -952,7 +952,7 @@ await_primary (memo):
 primary:
     | a=primary '.' b=NAME { ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS) }
     | a=primary b=genexp { ast.Call(func=a, args=[b], keywords=[], LOCATIONS) }
-    | a=primary BANG_LPAREN b=[MACRO_PARAM*] RPAR { self.macro_call(a, b, LOCATIONS) }
+    | a=func_macro_start ~ b=[MACRO_PARAM*] RPAR { self.macro_call(a, b, LOCATIONS) }
     | a=primary '(' b=[arguments] ')' {
         ast.Call(
             func=a,
@@ -966,6 +966,11 @@ primary:
     | env_atom
     | a=(".".help_atom+) { self.expand_help(a, LOCATIONS) }
     | atom
+
+func_macro_start:
+    | a=primary '!(' {
+        self.handle_func_macro_start(a)
+    }
 
 sub_procs:
     # $(...)
@@ -996,8 +1001,11 @@ proc_cmd:
     | env_atom
     | help_atom
     | search_path
-    | '!' ~ a=(cmd_group | any_cmd )* { self.proc_macro_arg(a, LOCATIONS) }
+    | proc_macro_start ~ a=(cmd_group | any_cmd )* { self.proc_macro_arg(a, LOCATIONS) }
     | cmd_name
+
+proc_macro_start:
+    | &cmd_name a='!' { self.handle_proc_macro_start(a) }
 
 cmd_name:
     | NAME
