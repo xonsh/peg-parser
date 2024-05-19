@@ -102,8 +102,8 @@ class Tokenizer:
 
     def consume_macro_params(self) -> TokenInfo:  # noqa: C901, PLR0912
         # loop until we get , or ) without consuming it
-        start: tuple[int, int] | None = None
-        end: tuple[int, int] | None = None
+        start: tuple[int, int] = (0, 0)
+        end: tuple[int, int] = (0, 0)
         paren_level = []
         # join strings while handling whitespace
         string = ""
