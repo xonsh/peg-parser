@@ -784,11 +784,17 @@ class Parser:
             **locs,
         )
 
-    def macro_with(self, a, b, **locs):
+    def handle_with_macro_stmt(self, a: ast.withitem, b: TokenInfo, **locs):
         gblcall = xonsh_call("globals", **locs)
         loccall = xonsh_call("locals", **locs)
-        a.context_expr = xonsh_call("__xonsh__.enter_macro", a.context_expr, b, gblcall, loccall, **locs)
+        body = ast.Constant(value=b.string, **b.loc())
+        a.context_expr = xonsh_call("__xonsh__.enter_macro", a.context_expr, body, gblcall, loccall, **locs)
+        self._tokenizer._with_macro = False
         return ast.With(items=[a], body=[ast.Pass(**locs)], **locs)
+
+    def handle_with_macro_start(self, a: ast.withitem):
+        self._tokenizer._with_macro = True
+        return a
 
     def macro_with_block(self, a: list[TokenInfo | ast.Constant], **locs):
         st = ""

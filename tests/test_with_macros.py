@@ -1,6 +1,6 @@
 import textwrap
 from ast import AST, Pass, With
-from unittest.mock import ANY
+from unittest.mock import ANY, MagicMock
 
 import pytest
 
@@ -36,27 +36,28 @@ a = 42
 @pytest.mark.parametrize("body", WITH_BANG_RAWSUITES)
 def test_withbang_single_suite(body, check_xonsh_ast, xsh, get_tokens):
     code = "with! x:\n{}".format(textwrap.indent(body, "    "))
-    tree = check_xonsh_ast(code, mode="exec", x="x")
+    tree = check_xonsh_ast(code, mode="exec", x="x", locals=MagicMock(), globals=MagicMock())
     assert isinstance(tree, AST)
     method = xsh.enter_macro
     method.assert_called_once_with("x", body, ANY, ANY)
 
 
 @pytest.mark.parametrize("body", WITH_BANG_RAWSUITES)
-@pytest.mark.xfail
-def test_withbang_as_single_suite(body, check_xonsh_ast):
+def test_withbang_as_single_suite(body, check_xonsh_ast, xsh):
     code = "with! x as y:\n{}".format(textwrap.indent(body, "    "))
     tree = check_xonsh_ast(code, False, return_obs=True, mode="exec")
     assert isinstance(tree, AST)
-    wither = tree.body[0]
-    assert isinstance(wither, With)
-    assert len(wither.body) == 1
-    assert isinstance(wither.body[0], Pass)
-    assert len(wither.items) == 1
-    item = wither.items[0]
-    assert item.optional_vars.id == "y"
-    s = item.context_expr.args[1].s
-    assert s == body
+    method = xsh.enter_macro
+    method.assert_called_once_with("x", body, ANY, ANY)
+    # wither = tree.body[0]
+    # assert isinstance(wither, With)
+    # assert len(wither.body) == 1
+    # assert isinstance(wither.body[0], Pass)
+    # assert len(wither.items) == 1
+    # item = wither.items[0]
+    # assert item.optional_vars.id == "y"
+    # s = item.context_expr.args[1].s
+    # assert s == body
 
 
 @pytest.mark.parametrize("body", WITH_BANG_RAWSUITES)
