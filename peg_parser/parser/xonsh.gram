@@ -435,13 +435,13 @@ with_item[ast.withitem]:
     | e=expression { ast.withitem(context_expr=e, optional_vars=None) }
 
 with_macro_stmt:
-    | 'with' '!' ~ WS+ a=with_item ':' b=with_macro_block {
-        self.macro_with(a, b, LOCATIONS)
+    | a=with_macro_start b=MACRO_PARAM DEDENT {
+        self.handle_with_macro_stmt(a, b, LOCATIONS)
      }
 
-with_macro_block:
-    | NEWLINE INDENT a=(with_macro_block | !DEDENT ANY_TOKEN)* DEDENT {
-        self.macro_with_block(a, LOCATIONS)
+with_macro_start:
+    | 'with' '!' ~ WS+ a=with_item ':' NEWLINE INDENT {
+        self.handle_with_macro_start(a)
     }
 
 

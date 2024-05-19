@@ -31,6 +31,7 @@ class Tokenizer:
         self._path = path
         self._stack: list[TokenInfo] = []  # temporarily hold tokens
         self._call_macro = False
+        self._with_macro = False
         self.ws_mode = False
         self._parens = frozenset(
             {
@@ -66,7 +67,9 @@ class Tokenizer:
     def peek(self) -> TokenInfo:
         """Return the next token *without* updating the index."""
         while self._index == len(self._tokens):
-            if self._call_macro:
+            if self._with_macro:
+                tok = self.consume_with_macro_params()
+            elif self._call_macro:
                 tok = self.consume_macro_params()
             elif self._stack:
                 tok = self._stack.pop()
@@ -74,10 +77,12 @@ class Tokenizer:
                 tok = next(self._tokengen)
             if self.is_blank(tok):
                 continue
+
             if self.is_macro(tok):
                 self._call_macro = True
-            if (not self.ws_mode) and self.is_proc_macro(tok):
+            elif (self.is_proc_macro(tok)) and (not self.ws_mode):
                 self.ws_mode = True
+
             self._tokens.append(tok)
             if not self._path and tok.start[0] not in self._lines:
                 self._lines[tok.start[0]] = tok.line
@@ -102,8 +107,8 @@ class Tokenizer:
 
     def consume_macro_params(self) -> TokenInfo:  # noqa: C901, PLR0912
         # loop until we get , or ) without consuming it
-        start: tuple[int, int] = (0, 0)
-        end: tuple[int, int] = (0, 0)
+        start: tuple[int, int] | None = None
+        end: tuple[int, int] | None = None
         paren_level = []
         # join strings while handling whitespace
         string = ""
@@ -143,6 +148,33 @@ class Tokenizer:
         if not string.strip():
             return TokenInfo(token.WS, string, start, end, line)
         return TokenInfo(token.MACRO_PARAM, string, start, end, line)
+
+    def consume_with_macro_params(self) -> TokenInfo:
+        """loop until we get DEDENT"""
+
+        indent = 0
+        lines = {}
+        start = end = self._tokens[-1].end
+        while True:
+            tok = next(self._tokengen)
+            if tok.type == token.INDENT:
+                indent += 1
+            elif tok.type == token.DEDENT:
+                if indent:
+                    indent -= 1
+                else:
+                    self._stack.append(tok)
+                    self._with_macro = False
+                    break
+            if tok.type == token.NEWLINE and (not tok.string):
+                # empty new line added by the tokenizer
+                continue
+            lines[tok.start[0]] = tok.line
+
+        import textwrap
+
+        string = textwrap.dedent("".join(lines.values()))
+        return TokenInfo(token.MACRO_PARAM, string, start, end, string)
 
     def diagnose(self) -> TokenInfo:
         if not self._tokens:
