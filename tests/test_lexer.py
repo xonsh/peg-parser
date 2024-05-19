@@ -1,13 +1,11 @@
 """Tests the xonsh lexer."""
 
 import difflib
-import io
 from collections.abc import Sequence
 
 import pytest
 
 import peg_parser.parser.token as t
-from peg_parser.parser import tokenize
 from peg_parser.parser.tokenize import TokenInfo
 
 
@@ -31,17 +29,9 @@ def assert_tokens_equal(expected, obtained):
 
 def lex_input(inp: str) -> list[TokenInfo]:
     # skip the NEWLINE, ENDMARKER tokens for easier testing
+    from .conftest import _get_tokens
 
-    from peg_parser.parser.tokenizer import Tokenizer
-
-    gen = tokenize.generate_tokens(io.StringIO(inp).readline)
-    tokenizer = Tokenizer(gen)
-    tokens = []
-    while True:
-        tok = tokenizer.getnext()
-        if tok.type == t.ENDMARKER:
-            break
-        tokens.append(tok)
+    tokens = _get_tokens(inp)
     if tokens[-1].type == t.ENDMARKER:
         tokens.pop()
     if tokens[-1].type == t.NEWLINE:

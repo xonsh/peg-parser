@@ -42,6 +42,27 @@ def build_parser(name: str):
     return getattr(parser, name)
 
 
+def _get_tokens(inp):
+    from peg_parser.parser import token as t
+    from peg_parser.parser import tokenize
+    from peg_parser.parser.tokenizer import Tokenizer
+
+    gen = tokenize.generate_tokens(io.StringIO(inp).readline)
+    tokenizer = Tokenizer(gen)
+    tokens = []
+    while True:
+        tok = tokenizer.getnext()
+        tokens.append(tok)
+        if tok.type == t.ENDMARKER:
+            break
+    return tokens
+
+
+@pytest.fixture(scope="session")
+def get_tokens():
+    return _get_tokens
+
+
 @pytest.fixture(scope="session")
 def python_parser_cls():
     return build_parser("XonshParser")
@@ -58,7 +79,7 @@ def python_parse_str(python_parser_cls):
 
 
 @pytest.fixture(scope="session")
-def parse_str(python_parse_str):
+def parse_str(python_parse_str, get_tokens):
     """Parse and print verbose output on failure"""
     session = [0]
 
@@ -70,9 +91,7 @@ def parse_str(python_parse_str):
             print("Source is:")
             print(text)
             if (not verbose) and session[0] < 3:
-                from peg_parser.parser import tokenize
-
-                toks = list(tokenize.generate_tokens(text))
+                toks = get_tokens(text)
                 log.info("Tokens are: \n %s", "\n".join(map(str, toks)))
                 # log verbose output of atleast 3 failures
                 log.info("Retrying with verbose=True")
