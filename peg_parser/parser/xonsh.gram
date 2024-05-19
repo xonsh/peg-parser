@@ -64,6 +64,7 @@ compound_stmt:
     | &'if' if_stmt
     | &('class' | '@') class_def
     | &('with' | 'async') with_stmt
+    | &'with' with_macro_stmt
     | &('for' | 'async') for_stmt
     | &'try' try_stmt
     | &'while' while_stmt
@@ -432,6 +433,17 @@ with_item[ast.withitem]:
      }
     | invalid_with_item
     | e=expression { ast.withitem(context_expr=e, optional_vars=None) }
+
+with_macro_stmt:
+    | 'with' '!' ~ WS+ a=with_item ':' b=with_macro_block {
+        self.macro_with(a, b, LOCATIONS)
+     }
+
+with_macro_block:
+    | NEWLINE INDENT a=(with_macro_block | !DEDENT ANY_TOKEN)* DEDENT {
+        self.macro_with_block(a, LOCATIONS)
+    }
+
 
 # Try statement
 # -------------

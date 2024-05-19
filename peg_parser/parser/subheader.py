@@ -293,6 +293,9 @@ class Parser:
             return self._tokenizer.getnext()
         return None
 
+    def any_token(self) -> TokenInfo:
+        return self._tokenizer.getnext()
+
     @memoize
     def soft_keyword(self) -> TokenInfo | None:
         tok = self._tokenizer.peek()
@@ -780,6 +783,21 @@ class Parser:
             loc_call,
             **locs,
         )
+
+    def macro_with(self, a, b, **locs):
+        gblcall = xonsh_call("globals", **locs)
+        loccall = xonsh_call("locals", **locs)
+        a.context_expr = xonsh_call("__xonsh__.enter_macro", a.context_expr, b, gblcall, loccall, **locs)
+        return ast.With(items=[a], body=[ast.Pass(**locs)], **locs)
+
+    def macro_with_block(self, a: list[TokenInfo | ast.Constant], **locs):
+        st = ""
+        for tok in a:
+            if isinstance(tok, TokenInfo):
+                st += tok.string
+            else:
+                st += tok.value
+        return ast.Constant(value=st, **locs)
 
     def proc_macro_arg(self, a, **locs):
         locs["col_offset"] += 1  # offset `!`

@@ -1,42 +1,45 @@
 import textwrap
 from ast import AST, Pass, With
+from unittest.mock import ANY
 
 import pytest
 
 WITH_BANG_RAWSUITES = [
-    "pass\n",
-    "x = 42\ny = 12\n",
-    'export PATH="yo:momma"\necho $PATH\n',
-    ("with q as t:\n" "    v = 10\n" "\n"),
-    (
-        "with q as t:\n"
-        "    v = 10\n"
-        "\n"
-        "for x in range(6):\n"
-        "    if True:\n"
-        "        pass\n"
-        "    else:\n"
-        "        ls -l\n"
-        "\n"
-        "a = 42\n"
-    ),
+    "pass",
+    """\
+x = 42
+y = 12
+""",
+    """\
+export PATH="yo:momma"
+echo $PATH
+""",
+    """\
+with q as t:
+    v = 10
+""",
+    """\
+with q as t:
+    v = 10
+    ls -l
+
+for x in range(6):
+    if True:
+        pass
+    else:
+        ls -l
+a = 42
+""",
 ]
 
 
 @pytest.mark.parametrize("body", WITH_BANG_RAWSUITES)
-@pytest.mark.xfail
-def test_withbang_single_suite(body, check_xonsh_ast):
+def test_withbang_single_suite(body, check_xonsh_ast, xsh, get_tokens):
     code = "with! x:\n{}".format(textwrap.indent(body, "    "))
-    tree = check_xonsh_ast(code, False, return_obs=True, mode="exec")
+    tree = check_xonsh_ast(code, mode="exec", x="x")
     assert isinstance(tree, AST)
-    wither = tree.body[0]
-    assert isinstance(wither, With)
-    assert len(wither.body) == 1
-    assert isinstance(wither.body[0], Pass)
-    assert len(wither.items) == 1
-    item = wither.items[0]
-    s = item.context_expr.args[1].s
-    assert s == body
+    method = xsh.enter_macro
+    method.assert_called_once_with("x", body, ANY, ANY)
 
 
 @pytest.mark.parametrize("body", WITH_BANG_RAWSUITES)
