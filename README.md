@@ -74,3 +74,8 @@ It'll automatically watch for changes in your code.
 ## License
 
 This project is licensed under the terms of the MIT license.
+
+## Credits
+
+- Thanks to [pegen](https://github.com/we-like-parsers/pegen) project for the Python version of the `CPython's` PEG parser
+- Thanks to [intellij-pegen-plugin](https://github.com/vpoverennov/pegen-plugin)
