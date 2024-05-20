@@ -6,6 +6,7 @@ import ast
 import contextlib
 import io
 import logging
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -37,6 +38,10 @@ def nodes_equal(x, y):
 
 
 def build_parser(name: str):
+    if not Path(__file__).parent.joinpath("peg_parser/parser.py").exists():
+        from peg_parser.tasks import generate_parser
+
+        generate_parser.main()
     from peg_parser.parser import parser
 
     return getattr(parser, name)
