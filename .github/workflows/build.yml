@@ -36,6 +36,7 @@ jobs:
         cache: 'pip'
     - name: Install dependencies
       run: |
+        pip install -U pip
         pip install -e ".[test]"
     - name: Test
       run: pytest --cov=peg_parser/parser tests/ --cov-report=term-missing --cov-report=xml
