@@ -151,17 +151,17 @@ def test_stmts(file, unparse_diff, subtests):
 @pytest.mark.parametrize(
     "inp",
     [
-        # 'x = "WAKKA"; ${x} = 65',
-        # 'x = "."; $(ls @(None or x))',
-        # 'x = "."; !(ls @(None or x))',
+        'x = "WAKKA"; ${x} = 65',
+        'x = "."; $(ls @(None or x))',
+        'x = "."; !(ls @(None or x))',
         '$[git commit -am "wakka jawaka" ]',
-        # '$[git commit -am "flock jawaka milwaka" ]',
-        # '$[git commit -am "wakka jawaka"]',
-        # '$[git commit -am "flock jawaka"]',
-        # '![git commit -am "wakka jawaka" ]',
-        # '![git commit -am "flock jawaka milwaka" ]',
-        # '![git commit -am "wakka jawaka"]',
-        # '![git commit -am "flock jawaka"]',
+        '$[git commit -am "flock jawaka milwaka" ]',
+        '$[git commit -am "wakka jawaka"]',
+        '$[git commit -am "flock jawaka"]',
+        '![git commit -am "wakka jawaka" ]',
+        '![git commit -am "flock jawaka milwaka" ]',
+        '![git commit -am "wakka jawaka"]',
+        '![git commit -am "flock jawaka"]',
     ],
 )
 def test_statements(check_xonsh_ast, inp):

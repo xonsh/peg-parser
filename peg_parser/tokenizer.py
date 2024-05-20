@@ -77,7 +77,7 @@ class Tokenizer:
             return True
         return False
 
-    def consume_macro_params(self) -> TokenInfo:
+    def consume_macro_params(self) -> TokenInfo:  # noqa: C901, PLR0912
         # loop until we get , or ) without consuming it
         start: tuple[int, int] | None = None
         end: tuple[int, int] | None = None
@@ -89,11 +89,12 @@ class Tokenizer:
             tok = next(self._tokengen)
             if tok.type == Token.OP and tok.string[-1] in "([{":  # push paren level
                 paren_level.append(tok.string[-1])
-            if paren_level and (tok.type == Token.OP) and (opener := self._end_parens.get(tok.string)):
-                if paren_level[-1] == opener:
-                    paren_level.pop()
-                else:
-                    raise SyntaxError(f"Unmatched closing paren {tok.string} at {tok.start}")
+            if paren_level:
+                if (tok.type == Token.OP) and (opener := self._end_parens.get(tok.string)):
+                    if paren_level[-1] == opener:
+                        paren_level.pop()
+                    else:
+                        raise SyntaxError(f"Unmatched closing paren {tok.string} at {tok.start}")
             else:
                 if tok.is_exact_type(ExactToken.RPAR):
                     self._stack.append(tok)

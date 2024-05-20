@@ -43,46 +43,51 @@ MACRO_ARGS = [
 ]
 
 
+@pytest.fixture(name="run")
+def run_fixture(check_xonsh_ast, xsh):
+    def run(code, **kwargs):
+        tree = check_xonsh_ast(code, mode="exec", f="f", x="x", locals=dict, globals=dict, **kwargs)
+        assert isinstance(tree, AST)
+        return xsh.call_macro
+
+    return run
+
+
 @pytest.mark.parametrize("s", MACRO_ARGS)
-def test_macro_call_one_arg(check_xonsh_ast, s, xsh):
+def test_macro_call_one_arg(run, s, xsh):
     f = f"f!({s})"
 
-    tree = check_xonsh_ast(f, f="f", x="x", mode="exec")
-    assert isinstance(tree, AST)
-    xsh.call_macro.assert_called_once_with("f", (s,), ANY, ANY)
+    method = run(f)
+    method.assert_called_once_with("f", (s,), ANY, ANY)
 
 
 @pytest.mark.parametrize("s,t", itertools.product(MACRO_ARGS[::2], MACRO_ARGS[1::2]))
-def test_macro_call_two_args(check_xonsh_ast, s, t, xsh):
+def test_macro_call_two_args(run, s, t, xsh):
     f = f"f!({s}, {t})"
-    tree = check_xonsh_ast(f, f="f", x="x")
-    assert isinstance(tree, AST)
-    args = xsh.call_macro.call_args.args[1]
+    method = run(f)
+    args = method.call_args.args[1]
     assert [ar.strip() for ar in args] == [s.strip(), t.strip()]
 
 
 @pytest.mark.parametrize("s,t,u", itertools.product(MACRO_ARGS[::3], MACRO_ARGS[1::3], MACRO_ARGS[2::3]))
-def test_macro_call_three_args(check_xonsh_ast, s, t, u, xsh):
+def test_macro_call_three_args(run, s, t, u, xsh):
     f = f"f!({s}, {t}, {u})"
-    tree = check_xonsh_ast(f, f="f", x="x")
-    assert isinstance(tree, AST)
-    args = xsh.call_macro.call_args.args[1]
+    method = run(f)
+    args = method.call_args.args[1]
     assert [ar.strip() for ar in args] == [s.strip(), t.strip(), u.strip()]
 
 
 @pytest.mark.parametrize("s", MACRO_ARGS)
-def test_macro_call_one_trailing(check_xonsh_ast, s, xsh):
+def test_macro_call_one_trailing(run, s, xsh):
     f = f"f!({s},)"
-    tree = check_xonsh_ast(f, f="f", x="x")
-    assert isinstance(tree, AST)
-    args = xsh.call_macro.call_args.args[1]
+    method = run(f)
+    args = method.call_args.args[1]
     assert [ar.strip() for ar in args] == [s.strip()]
 
 
 @pytest.mark.parametrize("s", MACRO_ARGS)
-def test_macro_call_one_trailing_space(check_xonsh_ast, s, xsh):
+def test_macro_call_one_trailing_space(run, s, xsh):
     f = f"f!( {s}, )"
-    tree = check_xonsh_ast(f, f="f", x="x")
-    assert isinstance(tree, AST)
-    args = xsh.call_macro.call_args.args[1]
+    method = run(f)
+    args = method.call_args.args[1]
     assert [ar.strip() for ar in args] == [s.strip()]

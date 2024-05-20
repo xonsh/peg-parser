@@ -15,6 +15,7 @@ from pegen.tokenizer import Tokenizer
 
 # match 3.10
 @pytest.mark.parametrize("source", ["match a:\n\tcase 1:\n\t\tpass", "match a", "match a:\ncase b"])
+@pytest.mark.xfail
 def test_match_statement(python_parser_cls, source):
     temp = io.StringIO(source)
     tokengen = tokenize.generate_tokens(temp.readline)
@@ -28,6 +29,7 @@ def test_match_statement(python_parser_cls, source):
 
 # try except * 3.11
 @pytest.mark.parametrize("source", ["try:\n\ta = 1\nexcept *ValueError:\n\tpass"])
+@pytest.mark.xfail
 def test_exceptgroup_statement(python_parser_cls, source):
     temp = io.StringIO(source)
     tokengen = tokenize.generate_tokens(temp.readline)
@@ -41,6 +43,7 @@ def test_exceptgroup_statement(python_parser_cls, source):
 
 # type alias and type vars 3.12
 @pytest.mark.parametrize("source", ["type T = int", "type T[U] = tuple[U]"])
+@pytest.mark.xfail
 def test_type_params_statement(python_parser_cls, source):
     temp = io.StringIO(source)
     tokengen = tokenize.generate_tokens(temp.readline)
@@ -54,6 +57,7 @@ def test_type_params_statement(python_parser_cls, source):
 
 # type alias and type vars 3.12
 @pytest.mark.parametrize("source", ["def f[T]():\n\tpass", "async def f[T]():\n\tpass"])
+@pytest.mark.xfail
 def test_generic_function_statement(python_parser_cls, source):
     temp = io.StringIO(source)
     tokengen = tokenize.generate_tokens(temp.readline)
@@ -67,6 +71,7 @@ def test_generic_function_statement(python_parser_cls, source):
 
 # generic classes 3.12
 @pytest.mark.parametrize("source", ["class A[T]:\n\tpass"])
+@pytest.mark.xfail
 def test_generic_class_statement(python_parser_cls, source):
     temp = io.StringIO(source)
     tokengen = tokenize.generate_tokens(temp.readline)

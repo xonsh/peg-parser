@@ -279,7 +279,7 @@ class Parser:
         return None
 
     @memoize
-    def token(self, typ: int) -> TokenInfo | None:
+    def token(self, typ: Token) -> TokenInfo | None:
         tok = self._tokenizer.peek()
         if tok.type == typ:
             return self._tokenizer.getnext()
