@@ -1,8 +1,8 @@
 def main():
-    from parser_lib import parse_string
+    from peg_parser.parser import XonshParser
 
     src_txt = "print(1)"
-    ast = parse_string(src_txt, mode="eval")
+    ast = XonshParser.parse_string(src_txt, mode="eval")
     print(f"ast: {ast}", type(ast))
 
 

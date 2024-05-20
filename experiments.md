@@ -96,3 +96,20 @@ benchmarks.PeakMemSuite.peakmem_parser_init_                                    
                   /tmp/xonsh-lr-table.py      4.8M
                 /tmp/xonsh-lr-table.jsonl    7.53M
                /tmp/xonsh-lr-table.cpickle   7.54M
+
+
+# with PEGen based parser
+```text
+current=2173.5KiB,  peak=2231.1KiB
+...
+Total allocated size: 2166.9 KiB
+Took:  1.57s
+```
+
+but the same time PLY parsing was faster but used more memory
+```
+Took:  0.31s
+current=2625.3KiB,  peak=9884.7KiB
+...
+Total allocated size: 9799.6 KiB
+```
