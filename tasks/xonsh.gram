@@ -101,10 +101,10 @@ assignment:
             LOCATIONS,
         )
      }
-    | a=(z=star_targets '=' { z })+ b=(yield_expr | star_expressions) !'=' tc=[TYPE_COMMENT] {
+    | a=(z=star_targets '=' { z })+ b=annotated_rhs !'=' tc=[TYPE_COMMENT] {
          ast.Assign(targets=a, value=b, type_comment=tc, LOCATIONS)
      }
-    | a=single_target b=augassign ~ c=(yield_expr | star_expressions) {
+    | a=single_target b=augassign ~ c=annotated_rhs {
         ast.AugAssign(target = a, op=b, value=c, LOCATIONS)
      }
     | invalid_assignment
@@ -1130,7 +1130,7 @@ fstring_mid:
     | fstring_replacement_field
     | t=FSTRING_MIDDLE { ast.Constant(value=t.string, LOCATIONS) }
 fstring_replacement_field:
-    | '{' a=(yield_expr | star_expressions) debug_expr="="? conversion=[fstring_conversion] format=[fstring_full_format_spec] rbrace='}' {
+    | '{' a=annotated_rhs debug_expr="="? conversion=[fstring_conversion] format=[fstring_full_format_spec] rbrace='}' {
         ast.FormattedValue(
             value=a,
             conversion=(
@@ -1507,7 +1507,7 @@ invalid_assignment[NoReturn]:
     | (star_targets '=')* a=yield_expr '=' {
         self.raise_syntax_error_known_location("assignment to yield expression not possible", a)
      }
-    | a=star_expressions augassign (yield_expr | star_expressions) {
+    | a=star_expressions augassign annotated_rhs {
         self.raise_syntax_error_known_location(
             f"'{self.get_expr_name(a)}' is an illegal expression for augmented assignment", a
         )
@@ -1860,24 +1860,24 @@ invalid_replacement_field:
     | '{' a='!' { self.raise_syntax_error_known_location("f-string: valid expression required before '!'", a) }
     | '{' a=':' { self.raise_syntax_error_known_location("f-string: valid expression required before ':'", a) }
     | '{' a='}' { self.raise_syntax_error_known_location("f-string: valid expression required before '}'", a) }
-    | '{' !(yield_expr | star_expressions) {
+    | '{' !annotated_rhs {
         self.raise_syntax_error_on_next_token(
             "f-string: expecting a valid expression after '{'"
         )
      }
-    | '{' (yield_expr | star_expressions) !('=' | '!' | ':' | '}') {
+    | '{' annotated_rhs !('=' | '!' | ':' | '}') {
         self.raise_syntax_error_on_next_token("f-string: expecting '=', or '!', or ':', or '}'") }
-    | '{' (yield_expr | star_expressions) '=' !('!' | ':' | '}') {
+    | '{' annotated_rhs '=' !('!' | ':' | '}') {
        self.raise_syntax_error_on_next_token("f-string: expecting '!', or ':', or '}'")
      }
-    | '{' (yield_expr | star_expressions) '='? invalid_conversion_character
-    | '{' (yield_expr | star_expressions) '='? ['!' NAME] !(':' | '}') {
+    | '{' annotated_rhs '='? invalid_conversion_character
+    | '{' annotated_rhs '='? ['!' NAME] !(':' | '}') {
         self.raise_syntax_error_on_next_token("f-string: expecting ':' or '}'")
      }
-    | '{' (yield_expr | star_expressions) '='? ['!' NAME] ':' fstring_format_spec* !'}' {
+    | '{' annotated_rhs '='? ['!' NAME] ':' fstring_format_spec* !'}' {
         self.raise_syntax_error_on_next_token("f-string: expecting '}', or format specs")
      }
-    | '{' (yield_expr | star_expressions) '='? ['!' NAME] !'}' {
+    | '{' annotated_rhs '='? ['!' NAME] !'}' {
         self.raise_syntax_error_on_next_token("f-string: expecting '}'")
      }
 
