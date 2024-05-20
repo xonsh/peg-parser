@@ -35,3 +35,12 @@ tasks:
   wtest:
     cmds:
       - watchexec -e py,gram --clear -- task test -- --ff -x -vv --testmon
+
+  bench:
+    cmds:
+      - asv run --python=same --show-stderr
+
+  bench-view:
+    cmds:
+      - asv publish
+      - asv preview
