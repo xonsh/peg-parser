@@ -49,7 +49,6 @@ def build_parser(name: str):
 
 
 def _get_tokens(inp):
-    from peg_parser import token as t
     from peg_parser import tokenize
     from peg_parser.tokenizer import Tokenizer
 
@@ -59,7 +58,7 @@ def _get_tokens(inp):
     while True:
         tok = tokenizer.getnext()
         tokens.append(tok)
-        if tok.type == t.ENDMARKER:
+        if tok.type == tokenize.Token.ENDMARKER:
             break
     return tokens
 

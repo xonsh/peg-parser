@@ -5,16 +5,16 @@ from collections.abc import Sequence
 
 import pytest
 
-import peg_parser.token as t
+from peg_parser.tokenize import Token as t  # noqa: N813
 from peg_parser.tokenize import TokenInfo
 
 
 def ensure_tuple(seq) -> str:
     if isinstance(seq, TokenInfo):
-        seq = (t.tok_name[seq.type], seq.string, seq.start[1])
+        seq = (seq.type, seq.string, seq.start[1])
     if isinstance(seq, Sequence):
         typ, *rest = seq
-        seq = (t.tok_name[typ] if isinstance(typ, int) else typ, *rest)
+        seq = (typ if isinstance(typ, t) else t[typ], *rest)
     return repr(tuple(seq))
 
 
@@ -79,7 +79,7 @@ def test_post_whitespace():
 
 def test_internal_whitespace():
     inp = "42  +\t65"
-    exp = [("NUMBER", "42", 0), ("PLUS", "+", 4), ("NUMBER", "65", 6)]
+    exp = [("NUMBER", "42", 0), ("OP", "+", 4), ("NUMBER", "65", 6)]
     assert check_tokens(inp, *exp)
 
 
@@ -88,7 +88,7 @@ def test_indent_internal_whitespace():
     exp = [
         ("INDENT", " ", 0),
         ("NUMBER", "42", 1),
-        ("PLUS", "+", 5),
+        ("OP", "+", 5),
         ("NUMBER", "65", 7),
         ("NEWLINE", "", 9),
         ("DEDENT", "", 0),
@@ -98,7 +98,7 @@ def test_indent_internal_whitespace():
 
 def test_assignment():
     inp = "x = 42"
-    exp = [("NAME", "x", 0), ("EQUAL", "=", 2), ("NUMBER", "42", 4)]
+    exp = [("NAME", "x", 0), ("OP", "=", 2), ("NUMBER", "42", 4)]
     assert check_tokens(inp, *exp)
 
 
@@ -111,8 +111,8 @@ def test_multiline():
 @pytest.mark.parametrize(
     "inp,exp",
     [
-        ("$ENV", [[t.DOLLAR, "$", 0], [t.NAME, "ENV", 1]]),
-        ("$ENV = 'val'", [[t.DOLLAR, "$", 0], [t.NAME, "ENV", 1], [t.EQUAL, "=", 5], [t.STRING, "'val'", 7]]),
+        ("$ENV", [[t.OP, "$", 0], [t.NAME, "ENV", 1]]),
+        ("$ENV = 'val'", [[t.OP, "$", 0], [t.NAME, "ENV", 1], [t.OP, "=", 5], [t.STRING, "'val'", 7]]),
     ],
 )
 def test_dollar_names(inp, exp):
@@ -122,10 +122,10 @@ def test_dollar_names(inp, exp):
 def test_atdollar_expression():
     inp = "@$(which python)"
     exp = [
-        (t.AT_DOLLAR_LPAREN, "@$(", 0),
+        (t.OP, "@$(", 0),
         ("NAME", "which", 3),
         ("NAME", "python", 9),
-        ("RPAR", ")", 15),
+        ("OP", ")", 15),
     ]
     assert check_tokens(inp, *exp)
 
@@ -138,17 +138,17 @@ def test_and():
 
 
 def test_ampersand():
-    assert check_tokens("&", [t.AMPER, "&", 0])
+    assert check_tokens("&", [t.OP, "&", 0])
 
 
 def test_not_really_and_pre():
     inp = "![foo-and]"
     exp = [
-        ("BANG_LBRACKET", "![", 0),
+        ("OP", "![", 0),
         ("NAME", "foo", 2),
-        ("MINUS", "-", 5),
+        ("OP", "-", 5),
         ("NAME", "and", 6),
-        ("RSQB", "]", 9),
+        ("OP", "]", 9),
     ]
     assert check_tokens(inp, *exp)
 
@@ -156,11 +156,11 @@ def test_not_really_and_pre():
 def test_not_really_and_post():
     inp = "![and-bar]"
     exp = [
-        ("BANG_LBRACKET", "![", 0),
+        ("OP", "![", 0),
         ("NAME", "and", 2),
-        ("MINUS", "-", 5),
+        ("OP", "-", 5),
         ("NAME", "bar", 6),
-        ("RSQB", "]", 9),
+        ("OP", "]", 9),
     ]
     assert check_tokens(inp, *exp)
 
@@ -168,13 +168,13 @@ def test_not_really_and_post():
 def test_not_really_and_pre_post():
     inp = "![foo-and-bar]"
     exp = [
-        ("BANG_LBRACKET", "![", 0),
+        ("OP", "![", 0),
         ("NAME", "foo", 2),
-        (t.MINUS, "-", 5),
+        (t.OP, "-", 5),
         ("NAME", "and", 6),
-        (t.MINUS, "-", 9),
+        (t.OP, "-", 9),
         ("NAME", "bar", 10),
-        ("RSQB", "]", 13),
+        ("OP", "]", 13),
     ]
     assert check_tokens(inp, *exp)
 
@@ -182,11 +182,11 @@ def test_not_really_and_pre_post():
 def test_not_really_or_pre():
     inp = "![foo-or]"
     exp = [
-        ("BANG_LBRACKET", "![", 0),
+        ("OP", "![", 0),
         ("NAME", "foo", 2),
-        (t.MINUS, "-", 5),
+        (t.OP, "-", 5),
         ("NAME", "or", 6),
-        ("RSQB", "]", 8),
+        ("OP", "]", 8),
     ]
     assert check_tokens(inp, *exp)
 
@@ -194,11 +194,11 @@ def test_not_really_or_pre():
 def test_not_really_or_post():
     inp = "![or-bar]"
     exp = [
-        ("BANG_LBRACKET", "![", 0),
+        ("OP", "![", 0),
         ("NAME", "or", 2),
-        (t.MINUS, "-", 4),
+        (t.OP, "-", 4),
         ("NAME", "bar", 5),
-        ("RSQB", "]", 8),
+        ("OP", "]", 8),
     ]
     assert check_tokens(inp, *exp)
 
@@ -206,13 +206,13 @@ def test_not_really_or_post():
 def test_not_really_or_pre_post():
     inp = "![foo-or-bar]"
     exp = [
-        ("BANG_LBRACKET", "![", 0),
+        ("OP", "![", 0),
         ("NAME", "foo", 2),
-        (t.MINUS, "-", 5),
+        (t.OP, "-", 5),
         ("NAME", "or", 6),
-        (t.MINUS, "-", 8),
+        (t.OP, "-", 8),
         ("NAME", "bar", 9),
-        ("RSQB", "]", 12),
+        ("OP", "]", 12),
     ]
     assert check_tokens(inp, *exp)
 
@@ -220,21 +220,21 @@ def test_not_really_or_pre_post():
 def test_subproc_line_cont_space():
     inp = "![echo --option1 value1 \\\n" "     --option2 value2 \\\n" "     --optionZ valueZ]"
     exp = [
-        ("BANG_LBRACKET", "![", 0),
+        ("OP", "![", 0),
         ("NAME", "echo", 2),
-        (t.MINUS, "-", 7),
-        (t.MINUS, "-", 8),
+        (t.OP, "-", 7),
+        (t.OP, "-", 8),
         ("NAME", "option1", 9),
         ("NAME", "value1", 17),
-        (t.MINUS, "-", 5),
-        (t.MINUS, "-", 6),
+        (t.OP, "-", 5),
+        (t.OP, "-", 6),
         ("NAME", "option2", 7),
         ("NAME", "value2", 15),
-        (t.MINUS, "-", 5),
-        (t.MINUS, "-", 6),
+        (t.OP, "-", 5),
+        (t.OP, "-", 6),
         ("NAME", "optionZ", 7),
         ("NAME", "valueZ", 15),
-        ("RSQB", "]", 21),
+        ("OP", "]", 21),
     ]
     assert check_tokens(inp, *exp)
 
@@ -242,35 +242,35 @@ def test_subproc_line_cont_space():
 def test_subproc_line_cont_nospace():
     inp = "![echo --option1 value1\\\n" "     --option2 value2\\\n" "     --optionZ valueZ]"
     exp = [
-        ("BANG_LBRACKET", "![", 0),
+        ("OP", "![", 0),
         ("NAME", "echo", 2),
-        (t.MINUS, "-", 7),
-        (t.MINUS, "-", 8),
+        (t.OP, "-", 7),
+        (t.OP, "-", 8),
         ("NAME", "option1", 9),
         ("NAME", "value1", 17),
-        (t.MINUS, "-", 5),
-        (t.MINUS, "-", 6),
+        (t.OP, "-", 5),
+        (t.OP, "-", 6),
         ("NAME", "option2", 7),
         ("NAME", "value2", 15),
-        (t.MINUS, "-", 5),
-        (t.MINUS, "-", 6),
+        (t.OP, "-", 5),
+        (t.OP, "-", 6),
         ("NAME", "optionZ", 7),
         ("NAME", "valueZ", 15),
-        ("RSQB", "]", 21),
+        ("OP", "]", 21),
     ]
     assert check_tokens(inp, *exp)
 
 
 def test_doubleamp():
-    assert check_tokens("&&", ["DOUBLE_AMPER", "&&", 0])
+    assert check_tokens("&&", ["OP", "&&", 0])
 
 
 def test_pipe():
-    assert check_tokens("|", [t.VBAR, "|", 0])
+    assert check_tokens("|", [t.OP, "|", 0])
 
 
 def test_doublepipe():
-    assert check_tokens("||", ["DOUBLE_PIPE", "||", 0])
+    assert check_tokens("||", ["OP", "||", 0])
 
 
 def test_single_quote_literal():
@@ -365,7 +365,7 @@ def test_float_literals(case):
 
 @pytest.mark.parametrize("case", ["o>", "all>", "e>", "out>"])
 def test_ioredir1(case):
-    assert check_tokens_subproc(case, [("NAME", case[:-1], 2), (t.GREATER, case[-1], len(case) + 1)])
+    assert check_tokens_subproc(case, [("NAME", case[:-1], 2), (t.OP, case[-1], len(case) + 1)])
 
 
 @pytest.mark.parametrize("case", ["2>1", "err>out", "e>o", pytest.param("2>&1", marks=pytest.mark.xfail)])
@@ -375,7 +375,7 @@ def test_ioredir2(case):
         case,
         [
             ("NUMBER" if case[:idx].isdigit() else t.NAME, case[:idx], 0 + 2),
-            (t.GREATER, ">", idx + 2),
+            (t.OP, ">", idx + 2),
             ("NUMBER" if case[idx + 1].isdigit() else t.NAME, case[idx + 1 :], idx + 3),
         ],
     )
@@ -384,15 +384,15 @@ def test_ioredir2(case):
 @pytest.mark.parametrize(
     "s, exp",
     [
-        ("2>1", [("NUMBER", "2", 0), (t.GREATER, ">", 1), ("NUMBER", "1", 2)]),
-        ("a>b", [("NAME", "a", 0), (t.GREATER, ">", 1), ("NAME", "b", 2)]),
+        ("2>1", [("NUMBER", "2", 0), (t.OP, ">", 1), ("NUMBER", "1", 2)]),
+        ("a>b", [("NAME", "a", 0), (t.OP, ">", 1), ("NAME", "b", 2)]),
         (
             "3>2>1",
             [
                 ("NUMBER", "3", 0),
-                (t.GREATER, ">", 1),
+                (t.OP, ">", 1),
                 ("NUMBER", "2", 2),
-                (t.GREATER, ">", 3),
+                (t.OP, ">", 3),
                 ("NUMBER", "1", 4),
             ],
         ),
@@ -400,9 +400,9 @@ def test_ioredir2(case):
             "36+2>>3",
             [
                 ("NUMBER", "36", 0),
-                (t.PLUS, "+", 2),
+                (t.OP, "+", 2),
                 ("NUMBER", "2", 3),
-                (t.RIGHTSHIFT, ">>", 4),
+                (t.OP, ">>", 4),
                 ("NUMBER", "3", 6),
             ],
         ),

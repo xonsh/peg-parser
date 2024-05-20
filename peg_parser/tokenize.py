@@ -32,31 +32,117 @@ import functools
 import io
 import itertools as _itertools
 import re
+from enum import IntEnum, StrEnum, auto
 from typing import NamedTuple
-
-import peg_parser.token as t
 
 cookie_re = re.compile(r"^[ \t\f]*#.*?coding[:=][ \t]*([-\w.]+)", re.ASCII)
 blank_re = re.compile(rb"^[ \t\f]*(?:[#\r\n]|$)", re.ASCII)
 
 
+class ExactToken(StrEnum):
+    NOTEQUAL = "!="
+    PERCENT = "%"
+    PERCENTEQUAL = "%="
+    AMPER = "&"
+    AMPEREQUAL = "&="
+    LPAR = "("
+    RPAR = ")"
+    STAR = "*"
+    DOUBLESTAR = "**"
+    DOUBLESTAREQUAL = "**="
+    STAREQUAL = "*="
+    PLUS = "+"
+    PLUSEQUAL = "+="
+    COMMA = ","
+    MINUS = "-"
+    MINEQUAL = "-="
+    RARROW = "->"
+    DOT = "."
+    ELLIPSIS = "..."
+    SLASH = "/"
+    DOUBLESLASH = "//"
+    DOUBLESLASHEQUAL = "//="
+    SLASHEQUAL = "/="
+    COLON = ":"
+    COLONEQUAL = ":="
+    SEMI = ";"
+    LESS = "<"
+    LEFTSHIFT = "<<"
+    LEFTSHIFTEQUAL = "<<="
+    LESSEQUAL = "<="
+    EQUAL = "="
+    EQEQUAL = "=="
+    GREATER = ">"
+    GREATEREQUAL = ">="
+    RIGHTSHIFT = ">>"
+    RIGHTSHIFTEQUAL = ">>="
+    AT = "@"
+    ATEQUAL = "@="
+    LSQB = "["
+    RSQB = "]"
+    CIRCUMFLEX = "^"
+    CIRCUMFLEXEQUAL = "^="
+    LBRACE = "{"
+    VBAR = "|"
+    VBAREQUAL = "|="
+    RBRACE = "}"
+    TILDE = "~"
+    BANG = "!"
+
+    # xonsh specific tokens
+    DOLLAR = "$"
+    QUESTION = "?"
+    DOUBLE_QUESTION = "??"
+    DOUBLE_PIPE = "||"
+    DOUBLE_AMPER = "&&"
+    AT_LPAREN = "@("
+    BANG_LPAREN = "!("
+    BANG_LBRACKET = "!["
+    DOLLAR_LPAREN = "$("
+    DOLLAR_LBRACKET = "$["
+    DOLLAR_LBRACE = "${"
+    AT_DOLLAR_LPAREN = "@$("
+
+
+class Token(IntEnum):
+    """Tokens"""
+
+    ENDMARKER = auto()
+    NAME = auto()
+    NUMBER = auto()
+    STRING = auto()
+    NEWLINE = auto()
+    INDENT = auto()
+    DEDENT = auto()
+    OP = auto()  # all exact tokens
+    AWAIT = auto()
+    ASYNC = auto()
+    TYPE_IGNORE = auto()
+    TYPE_COMMENT = auto()
+    SOFT_KEYWORD = auto()
+    FSTRING_START = auto()
+    FSTRING_MIDDLE = auto()
+    FSTRING_END = auto()
+    ERRORTOKEN = auto()
+    COMMENT = auto()
+    NL = auto()
+    ENCODING = auto()
+
+    # xonsh specific tokens starting at 80
+    SEARCH_PATH = auto()
+    MACRO_PARAM = auto()
+    WS = auto()
+
+
 class TokenInfo(NamedTuple):
-    type: int
+    type: Token
     string: str
     start: tuple[int, int]
     end: tuple[int, int]
     line: str
 
-    def __repr__(self):
-        annotated_type = "%d (%s)" % (self.type, t.tok_name[self.type])
-        return f"TokenInfo(type={annotated_type}, string={self.string!r}, start={self.start!r}, end={self.end!r}, line={self.line!r})"
-
-    @property
-    def exact_type(self):
-        if self.type == t.OP and self.string in t.EXACT_TOKEN_TYPES:
-            return t.EXACT_TOKEN_TYPES[self.string]
-        else:
-            return self.type
+    def is_exact_type(self, typ: ExactToken) -> bool:
+        return self.type == Token.OP and self.string == typ.value
 
     def loc_start(self):
         """helper method to construct AST node location"""
@@ -105,21 +191,6 @@ def any(*choices):
 def maybe(*choices):
     return group(*choices) + "?"
 
-
-xsh_tokens = {
-    "$": t.DOLLAR,
-    "?": t.QUESTION,
-    "??": t.DOUBLE_QUESTION,
-    "||": t.DOUBLE_PIPE,
-    "&&": t.DOUBLE_AMPER,
-    "@(": t.AT_LPAREN,
-    "!(": t.BANG_LPAREN,
-    "![": t.BANG_LBRACKET,
-    "$(": t.DOLLAR_LPAREN,
-    "$[": t.DOLLAR_LBRACKET,
-    "${": t.DOLLAR_LBRACE,
-    "@$(": t.AT_DOLLAR_LPAREN,
-}
 
 # Note: we use unicode matching for names ("\w") but ascii matching for
 # number literals.
@@ -181,9 +252,8 @@ String = group(StringPrefix + r"'[^\n'\\]*(?:\\.[^\n'\\]*)*'", StringPrefix + r'
 # Sorting in reverse order puts the long operators before their prefixes.
 # Otherwise if = came before ==, == would get recognized as two instances
 # of =.
-Special = group(*map(re.escape, sorted(t.EXACT_TOKEN_TYPES, reverse=True)))
-XshOps = group(*map(re.escape, sorted(xsh_tokens, reverse=True)))
-Funny = group(r"\r?\n", XshOps=XshOps, Special=Special)
+Special = group(*map(re.escape, sorted([t.value for t in ExactToken], reverse=True)))
+Funny = group(r"\r?\n", Special=Special)
 
 # First (or only) line of ' or " string.
 ContStr = capname(pre2=StringPrefix) + group(
@@ -273,7 +343,7 @@ def next_cont_string(cont_str: ContStrState, state: TokenizerState):
     if endmatch:
         state.pos = end = endmatch.end(0)
         yield TokenInfo(
-            t.STRING,
+            Token.STRING,
             cont_str.contstr + state.line[:end],
             cont_str.strstart,
             (state.lnum, end),
@@ -282,7 +352,7 @@ def next_cont_string(cont_str: ContStrState, state: TokenizerState):
         cont_str.reset_cont()
     elif cont_str.needcont and state.line[-2:] != "\\\n" and state.line[-3:] != "\\\r\n":
         yield TokenInfo(
-            t.ERRORTOKEN,
+            Token.ERRORTOKEN,
             cont_str.contstr + state.line,
             cont_str.strstart,
             (state.lnum, len(state.line)),
@@ -317,7 +387,7 @@ def next_statement(state: TokenizerState):
         if state.line[state.pos] == "#":
             comment_token = state.line[state.pos :].rstrip("\r\n")
             yield TokenInfo(
-                t.COMMENT,
+                Token.COMMENT,
                 comment_token,
                 (state.lnum, state.pos),
                 (state.lnum, state.pos + len(comment_token)),
@@ -326,14 +396,18 @@ def next_statement(state: TokenizerState):
             state.pos += len(comment_token)
 
         yield TokenInfo(
-            t.NL, state.line[state.pos :], (state.lnum, state.pos), (state.lnum, len(state.line)), state.line
+            Token.NL,
+            state.line[state.pos :],
+            (state.lnum, state.pos),
+            (state.lnum, len(state.line)),
+            state.line,
         )
         return True  # continue
 
     if column > state.indents[-1]:  # count indents or dedents
         state.indents.append(column)
         yield TokenInfo(
-            t.INDENT, state.line[: state.pos], (state.lnum, 0), (state.lnum, state.pos), state.line
+            Token.INDENT, state.line[: state.pos], (state.lnum, 0), (state.lnum, state.pos), state.line
         )
     while column < state.indents[-1]:
         if column not in state.indents:
@@ -343,13 +417,13 @@ def next_statement(state: TokenizerState):
             )
         state.indents = state.indents[:-1]
 
-        yield TokenInfo(t.DEDENT, "", (state.lnum, state.pos), (state.lnum, state.pos), state.line)
+        yield TokenInfo(Token.DEDENT, "", (state.lnum, state.pos), (state.lnum, state.pos), state.line)
 
 
 def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrState):
     if whitespace := pseudomatch.group("ws"):
         start, end = pseudomatch.span("ws")
-        yield TokenInfo(t.WS, whitespace, (state.lnum, start), (state.lnum, end), state.line)
+        yield TokenInfo(Token.WS, whitespace, (state.lnum, start), (state.lnum, end), state.line)
     start, end = pseudomatch.span(2)
     spos, epos, state.pos = (state.lnum, start), (state.lnum, end), end
     if start == end:
@@ -360,16 +434,16 @@ def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrSta
         pseudomatch.group("Number")  # ordinary number
         or (initial == "." and token != "." and token != "...")
     ):
-        yield TokenInfo(t.NUMBER, token, spos, epos, state.line)
+        yield TokenInfo(Token.NUMBER, token, spos, epos, state.line)
     elif initial in "\r\n":
         if state.parenlev > 0:
-            yield TokenInfo(t.NL, token, spos, epos, state.line)
+            yield TokenInfo(Token.NL, token, spos, epos, state.line)
         else:
-            yield TokenInfo(t.NEWLINE, token, spos, epos, state.line)
+            yield TokenInfo(Token.NEWLINE, token, spos, epos, state.line)
 
     elif pseudomatch.group("Comment"):
         assert not token.endswith("\n")
-        yield TokenInfo(t.COMMENT, token, spos, epos, state.line)
+        yield TokenInfo(Token.COMMENT, token, spos, epos, state.line)
 
     elif pseudomatch.group("Triple"):
         cont_str.endprog = _compile(endpats[pseudomatch.group("tquote") or "'''"])
@@ -377,7 +451,7 @@ def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrSta
         if endmatch:  # all on one line
             state.pos = endmatch.end(0)
             token = state.line[start : state.pos]
-            yield TokenInfo(t.STRING, token, spos, (state.lnum, state.pos), state.line)
+            yield TokenInfo(Token.STRING, token, spos, (state.lnum, state.pos), state.line)
         else:
             cont_str.start(state, start)
             return False
@@ -393,24 +467,20 @@ def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrSta
             cont_str.needcont = True
             return False
         else:  # ordinary string
-            yield TokenInfo(t.STRING, token, spos, epos, state.line)
+            yield TokenInfo(Token.STRING, token, spos, epos, state.line)
     elif pseudomatch.group("SearchPath"):
-        yield TokenInfo(t.SEARCH_PATH, token, spos, epos, state.line)
+        yield TokenInfo(Token.SEARCH_PATH, token, spos, epos, state.line)
     elif pseudomatch.group("Name"):  # ordinary name
-        yield TokenInfo(t.NAME, token, spos, epos, state.line)
-    elif pseudomatch.group("XshOps"):
-        if token[-1] in "([{":
-            state.parenlev += 1
-        yield TokenInfo(xsh_tokens[token], token, spos, epos, state.line)
+        yield TokenInfo(Token.NAME, token, spos, epos, state.line)
     elif pseudomatch.group("Special"):
-        if token in "([{":
+        if token[-1] in "([{":
             state.parenlev += 1
         elif token in ")]}":
             state.parenlev -= 1
-        yield TokenInfo(t.EXACT_TOKEN_TYPES[token], token, spos, epos, state.line)
+        yield TokenInfo(Token.OP, token, spos, epos, state.line)
     elif initial == "\\":  # continued stmt
         state.continued = True
-    else:  # Funny other than Special/XshOps
+    else:  # Funny other than Special
         raise TokenError(f"Bad token: {token!r} at line {state.lnum}", spos)
         # yield TokenInfo(t.OP, token, spos, epos, state.line)
 
@@ -419,15 +489,15 @@ def next_end_tokens(state: TokenizerState):
     # Add an implicit NEWLINE if the input doesn't end in one
     if state.last_line and state.last_line[-1] not in "\r\n" and not state.last_line.strip().startswith("#"):
         yield TokenInfo(
-            t.NEWLINE,
+            Token.NEWLINE,
             "",
             (state.lnum - 1, len(state.last_line)),
             (state.lnum - 1, len(state.last_line) + 1),
             "",
         )
     for _ in state.indents[1:]:  # pop remaining indent levels
-        yield TokenInfo(t.DEDENT, "", (state.lnum, 0), (state.lnum, 0), "")
-    yield TokenInfo(t.ENDMARKER, "", (state.lnum, 0), (state.lnum, 0), "")
+        yield TokenInfo(Token.DEDENT, "", (state.lnum, 0), (state.lnum, 0), "")
+    yield TokenInfo(Token.ENDMARKER, "", (state.lnum, 0), (state.lnum, 0), "")
 
 
 def _tokenize(readline):
@@ -467,7 +537,7 @@ def _tokenize(readline):
                     break
             else:
                 yield TokenInfo(
-                    t.ERRORTOKEN,
+                    Token.ERRORTOKEN,
                     state.line[state.pos],
                     (state.lnum, state.pos),
                     (state.lnum, state.pos + 1),

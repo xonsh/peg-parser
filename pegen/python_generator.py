@@ -1,5 +1,6 @@
 import ast
 import re
+from enum import IntEnum
 from typing import IO, Any, Dict, List, Optional, Sequence, Set, Text, Tuple
 
 from pegen import grammar
@@ -99,15 +100,13 @@ class PythonCallMakerVisitor(GrammarVisitor):
 
     def visit_NameLeaf(self, node: NameLeaf) -> Tuple[Optional[str], str]:
         name = node.value
-        special = {"SOFT_KEYWORD", "KEYWORD", "NAME", "OP", "ANY_TOKEN"}
+        special = {"SOFT_KEYWORD", "KEYWORD", "NAME", "ANY_TOKEN"}
         if name in special:
             name = name.lower()
             return name, f"self.{name}()"
-        if name in ("NEWLINE", "DEDENT", "INDENT", "ENDMARKER", "ASYNC", "AWAIT"):
-            # Avoid using names that can be Python keywords
-            return "_" + name.lower(), f"self.expect({name!r})"
-        if name.isupper() and (token_num := self.gen.token_map.get(name)):
-            return name.lower(), f"self.token({token_num!r})"
+        if name.isupper() and (name in self.gen.tokens):
+            token = self.gen.tokens_enum[name]
+            return "_" + name.lower(), f"self.token({token.__class__.__name__}.{token.name})"
         return name, f"self.{name}()"
 
     def visit_StringLeaf(self, node: StringLeaf) -> Tuple[str, str]:
@@ -219,12 +218,12 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
         self,
         grammar: grammar.Grammar,
         file: Optional[IO[Text]],
-        token_map: dict[str, int],
+        tokens_enum: IntEnum,
         location_formatting: Optional[str] = None,
         unreachable_formatting: Optional[str] = None,
     ):
-        self.token_map = token_map
-        tokens = set(token_map)
+        self.tokens_enum = tokens_enum
+        tokens = {t.name for t in tokens_enum}
         tokens.add("SOFT_KEYWORD")
         tokens.add("KEYWORD")
         tokens.add("ANY_TOKEN")

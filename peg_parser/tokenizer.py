@@ -1,20 +1,17 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NewType
+from typing import TYPE_CHECKING, Final, NewType
 
-from . import token
-from .tokenize import TokenInfo
+from .tokenize import ExactToken, Token, TokenInfo
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 Mark = NewType("Mark", int)
 
-exact_token_types = token.EXACT_TOKEN_TYPES
-
 
 def shorttok(tok: TokenInfo) -> str:
-    return "%-25.25s" % f"{tok.start[0]}.{tok.start[1]}: {token.tok_name[tok.type]}:{tok.string!r}"
+    return "%-25.25s" % f"{tok.start[0]}.{tok.start[1]}: {tok.type!r}:{tok.string!r}"
 
 
 class Tokenizer:
@@ -33,24 +30,10 @@ class Tokenizer:
         self._call_macro = False
         self._with_macro = False
         self._proc_macro = False
-        self._parens = frozenset(
-            {
-                token.LPAR,
-                token.LSQB,
-                token.LBRACE,
-                token.AT_LPAREN,
-                token.BANG_LPAREN,
-                token.BANG_LBRACKET,
-                token.DOLLAR_LPAREN,
-                token.DOLLAR_LBRACKET,
-                token.DOLLAR_LBRACE,
-                token.AT_DOLLAR_LPAREN,
-            }
-        )
-        self._end_parens = {
-            token.RPAR: "(",
-            token.RSQB: "[",
-            token.RBRACE: "{",
+        self._end_parens: Final = {
+            ")": "(",
+            "]": "[",
+            "}": "{",
         }
         if verbose:
             self.report(False, False)
@@ -84,41 +67,40 @@ class Tokenizer:
         return self._tokens[self._index]
 
     def is_blank(self, tok: TokenInfo) -> bool:
-        if self._proc_macro and tok.type == token.WS:
+        if self._proc_macro and tok.type == Token.WS:
             return False
-        if tok.type in {token.NL, token.COMMENT, token.WS}:
+        if tok.type in {Token.NL, Token.COMMENT, Token.WS}:
             return True
-        if tok.type == token.ERRORTOKEN and tok.string.isspace():
+        if tok.type == Token.ERRORTOKEN and tok.string.isspace():
             return True
-        if tok.type == token.NEWLINE and self._tokens and self._tokens[-1].type == token.NEWLINE:
+        if tok.type == Token.NEWLINE and self._tokens and self._tokens[-1].type == Token.NEWLINE:
             return True
         return False
 
-    def consume_macro_params(self) -> TokenInfo:  # noqa: C901, PLR0912
+    def consume_macro_params(self) -> TokenInfo:
         # loop until we get , or ) without consuming it
         start: tuple[int, int] | None = None
         end: tuple[int, int] | None = None
-        paren_level = []
+        paren_level: list[str] = []
         # join strings while handling whitespace
         string = ""
         line = ""
         while True:
             tok = next(self._tokengen)
-            if tok.type in self._parens:  # push paren level
-                paren_level.append(tok)
-            if paren_level:
-                if end_paren := self._end_parens.get(tok.type):
-                    if paren_level[-1].string[-1] == end_paren:
-                        paren_level.pop()
-                    else:
-                        raise SyntaxError(f"Unmatched closing paren {tok.string} at {tok.start}")
+            if tok.type == Token.OP and tok.string[-1] in "([{":  # push paren level
+                paren_level.append(tok.string[-1])
+            if paren_level and (tok.type == Token.OP) and (opener := self._end_parens.get(tok.string)):
+                if paren_level[-1] == opener:
+                    paren_level.pop()
+                else:
+                    raise SyntaxError(f"Unmatched closing paren {tok.string} at {tok.start}")
             else:
-                if tok.type == token.RPAR:
+                if tok.is_exact_type(ExactToken.RPAR):
                     self._stack.append(tok)
                     self._call_macro = False
                     break
 
-                if tok.type == token.COMMA:
+                if tok.is_exact_type(ExactToken.COMMA):
                     break
             end = tok.end
             if start is None:
@@ -135,8 +117,8 @@ class Tokenizer:
         assert start is not None
         assert end is not None
         if not string.strip():
-            return TokenInfo(token.WS, string, start, end, line)
-        return TokenInfo(token.MACRO_PARAM, string, start, end, line)
+            return TokenInfo(Token.WS, string, start, end, line)
+        return TokenInfo(Token.MACRO_PARAM, string, start, end, line)
 
     def consume_with_macro_params(self) -> TokenInfo:  # noqa: C901
         """loop until we get INDENT-DEDENT or NL"""
@@ -146,21 +128,21 @@ class Tokenizer:
         lines = {}
         start = end = self._tokens[-1].end
         for idx, tok in enumerate(self._tokengen):
-            if (idx == 0) and tok.type == token.NEWLINE:
+            if (idx == 0) and tok.type == Token.NEWLINE:
                 continue
-            elif tok.type == token.INDENT:
+            elif tok.type == Token.INDENT:
                 if (not is_indented) and (idx == 1):
                     is_indented = True
                     continue
                 indent += 1
-            elif tok.type == token.DEDENT:
+            elif tok.type == Token.DEDENT:
                 if indent:
                     indent -= 1
                     continue
                 else:
                     self._with_macro = False
                     break
-            elif tok.type == token.NEWLINE:
+            elif tok.type == Token.NEWLINE:
                 if not is_indented:
                     break
                 elif not tok.string:
@@ -176,7 +158,7 @@ class Tokenizer:
             import textwrap
 
             string = textwrap.dedent(string)
-        return TokenInfo(token.MACRO_PARAM, string, start, end, string)
+        return TokenInfo(Token.MACRO_PARAM, string, start, end, string)
 
     def diagnose(self) -> TokenInfo:
         if not self._tokens:
@@ -185,7 +167,7 @@ class Tokenizer:
 
     def get_last_non_whitespace_token(self) -> TokenInfo:
         for tok in reversed(self._tokens[: self._index]):
-            if tok.type != token.ENDMARKER and (tok.type < token.NEWLINE or tok.type > token.DEDENT):
+            if tok.type != Token.ENDMARKER and (tok.type < Token.NEWLINE or tok.type > Token.DEDENT):
                 break
         return tok
 

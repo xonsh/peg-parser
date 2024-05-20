@@ -5,9 +5,8 @@ import enum
 import sys
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, Literal, NoReturn, TypeVar, cast
 
-from peg_parser import token, tokenize
-from peg_parser.tokenize import TokenInfo
-from peg_parser.tokenizer import Mark, Tokenizer, exact_token_types
+from peg_parser.tokenize import ExactToken, Token, TokenInfo, generate_tokens
+from peg_parser.tokenizer import Mark, Tokenizer
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -263,26 +262,19 @@ class Parser:
 
     def showpeek(self) -> str:
         tok = self._tokenizer.peek()
-        return f"{tok.start[0]}.{tok.start[1]}: {token.tok_name[tok.type]}:{tok.string!r}"
+        return f"{tok.start[0]}.{tok.start[1]}: {tok.type}:{tok.string!r}"
 
     @memoize
     def name(self) -> TokenInfo | None:
         tok = self._tokenizer.peek()
-        if tok.type == token.NAME and tok.string not in self.KEYWORDS:
+        if tok.type == Token.NAME and tok.string not in self.KEYWORDS:
             return self._tokenizer.getnext()
         return None
 
     @memoize
     def keyword(self):
         tok = self._tokenizer.peek()
-        if tok.type == token.NAME and tok.string in self.KEYWORDS:
-            return self._tokenizer.getnext()
-        return None
-
-    @memoize
-    def op(self):
-        tok = self._tokenizer.peek()
-        if tok.string in exact_token_types:
+        if tok.type == Token.NAME and tok.string in self.KEYWORDS:
             return self._tokenizer.getnext()
         return None
 
@@ -299,7 +291,7 @@ class Parser:
     @memoize
     def soft_keyword(self) -> TokenInfo | None:
         tok = self._tokenizer.peek()
-        if tok.type == token.NAME and tok.string in self.SOFT_KEYWORDS:
+        if tok.type == Token.NAME and tok.string in self.SOFT_KEYWORDS:
             return self._tokenizer.getnext()
         return None
 
@@ -307,12 +299,6 @@ class Parser:
     def expect(self, typ: str) -> TokenInfo | None:
         tok = self._tokenizer.peek()
         if tok.string == typ:
-            return self._tokenizer.getnext()
-        if typ in exact_token_types and tok.type == exact_token_types[typ]:
-            return self._tokenizer.getnext()
-        if typ in token.__dict__ and tok.type == token.__dict__[typ]:
-            return self._tokenizer.getnext()
-        if tok.type == token.OP and tok.string == typ:
             return self._tokenizer.getnext()
         return None
 
@@ -655,7 +641,7 @@ class Parser:
     def expand_help(self, atoms: list[tuple[ast.expr, TokenInfo]], **locs):
         node = None
         for atom, tok in atoms:
-            fn = "superhelp" if tok.type == token.DOUBLE_QUESTION else "help"
+            fn = "superhelp" if tok.is_exact_type(ExactToken.DOUBLE_QUESTION) else "help"
             if node is None:
                 node = xonsh_call(f"__xonsh__.{fn}", atom, **tok.loc())
             else:
@@ -745,11 +731,11 @@ class Parser:
 
     def subproc(self, start: TokenInfo, args: list, **locs) -> ast.Call:
         method = {
-            token.DOLLAR_LPAREN: "subproc_captured",
-            token.DOLLAR_LBRACKET: "subproc_uncaptured",
-            token.BANG_LBRACKET: "subproc_captured_hiddenobject",
-            token.BANG_LPAREN: "subproc_captured_object",
-        }[start.type]
+            ExactToken.DOLLAR_LPAREN: "subproc_captured",
+            ExactToken.DOLLAR_LBRACKET: "subproc_uncaptured",
+            ExactToken.BANG_LBRACKET: "subproc_captured_hiddenobject",
+            ExactToken.BANG_LPAREN: "subproc_captured_object",
+        }[ExactToken._value2member_map_[start.string]]  # type: ignore
         return xonsh_call(f"__xonsh__.{method}", *args, **locs)
 
     def proc_inject(self, args: list, **locs) -> ast.Starred:
@@ -853,7 +839,7 @@ class Parser:
             last_token = self._tokenizer.diagnose()
             end = last_token.start
             if sys.version_info >= (3, 12) or (
-                sys.version_info >= (3, 11) and last_token.type != token.NEWLINE
+                sys.version_info >= (3, 11) and last_token.type != Token.NEWLINE
             ):  # i.e. not a \n
                 end = last_token.end
             self.raise_raw_syntax_error(f"expected {expectation}", last_token.start, end)
@@ -865,7 +851,7 @@ class Parser:
         raise self._build_syntax_error(
             message,
             tok.start,
-            tok.end if sys.version_info >= (3, 12) or tok.type != token.NEWLINE else tok.start,
+            tok.end if sys.version_info >= (3, 12) or tok.type != Token.NEWLINE else tok.start,
         )
 
     def raise_syntax_error_known_location(self, message: str, node: ast.AST | TokenInfo) -> NoReturn:
@@ -933,7 +919,7 @@ class Parser:
     ) -> ast.Module | None:
         """Parse a file or string."""
         with open(path) as f:
-            tok_stream = tokenize.generate_tokens(f.readline)
+            tok_stream = generate_tokens(f.readline)
             tokenizer = Tokenizer(tok_stream, verbose=verbose, path=str(path))
             parser = cls(
                 tokenizer,
@@ -954,7 +940,7 @@ class Parser:
         """Parse a string."""
         import io
 
-        tok_stream = tokenize.generate_tokens(io.StringIO(source).readline)
+        tok_stream = generate_tokens(io.StringIO(source).readline)
         tokenizer = Tokenizer(tok_stream, verbose=verbose)
         parser = cls(tokenizer, verbose=verbose, py_version=py_version)
         return parser.parse(mode if mode == "eval" else "file")
