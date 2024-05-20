@@ -40,7 +40,7 @@ jobs:
         pip install -U pip
         pip install -e ".[test]"
     - name: Test
-      run: pytest --cov=peg_parser/parser tests/ --cov-report=term-missing --cov-report=xml
+      run: pytest -x --cov=peg_parser/parser tests/ --cov-report=term-missing --cov-report=xml
     - uses: codecov/codecov-action@v4.0.1
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
