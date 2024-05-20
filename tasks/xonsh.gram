@@ -848,11 +848,11 @@ named_expression:
     | a=expression !':=' { a }
 
 disjunction (memo):
-    | a=conjunction b=(('or' | DOUBLE_PIPE) c=conjunction { c })+ { ast.BoolOp(op=ast.Or(), values=[a] + b, LOCATIONS) }
+    | a=conjunction b=(('or' | '||') c=conjunction { c })+ { ast.BoolOp(op=ast.Or(), values=[a] + b, LOCATIONS) }
     | conjunction
 
 conjunction (memo):
-    | a=inversion b=(('and' | DOUBLE_AMPER ) c=inversion { c })+ { ast.BoolOp(op=ast.And(), values=[a] + b, LOCATIONS) }
+    | a=inversion b=(('and' | '&&' ) c=inversion { c })+ { ast.BoolOp(op=ast.And(), values=[a] + b, LOCATIONS) }
     | inversion
 
 inversion (memo):
@@ -952,7 +952,7 @@ await_primary (memo):
 primary:
     | a=primary '.' b=NAME { ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS) }
     | a=primary b=genexp { ast.Call(func=a, args=[b], keywords=[], LOCATIONS) }
-    | a=func_macro_start ~ b=[MACRO_PARAM*] RPAR { self.macro_call(a, b, LOCATIONS) }
+    | a=func_macro_start ~ b=[MACRO_PARAM*] ')' { self.macro_call(a, b, LOCATIONS) }
     | a=primary '(' b=[arguments] ')' {
         ast.Call(
             func=a,
@@ -973,31 +973,25 @@ func_macro_start:
     }
 
 sub_procs:
-    # $(...)
-    | a=DOLLAR_LPAREN ~ args=proc_cmds ')' { self.subproc(a, args, LOCATIONS) }
-    # $[...]
-    | a=DOLLAR_LBRACKET ~ args=proc_cmds ']' { self.subproc(a, args, LOCATIONS) }
-    # ![...]
-    | a=BANG_LBRACKET ~ args=proc_cmds ']' { self.subproc(a, args, LOCATIONS) }
-    # !(...)
-    | a=BANG_LPAREN ~ args=proc_cmds ')' { self.subproc(a, args, LOCATIONS) }
+    | a='$(' ~ args=proc_cmds ')' { self.subproc(a, args, LOCATIONS) }
+    | a='$[' ~ args=proc_cmds ']' { self.subproc(a, args, LOCATIONS) }
+    | a='![' ~ args=proc_cmds ']' { self.subproc(a, args, LOCATIONS) }
+    | a='!(' ~ args=proc_cmds ')' { self.subproc(a, args, LOCATIONS) }
 
 help_atom:
-    | a=atom b=(DOUBLE_QUESTION | QUESTION) { (a, b) }
+    | a=atom b=('??' | '?') { (a, b) }
 
 env_atom:
-    # $a
-    | DOLLAR a=NAME { self.expand_env_name(a, LOCATIONS) }
-    # ${...}
-    | DOLLAR_LBRACE a=slices '}' { self.expand_env_expr(a, LOCATIONS) }
+    | '$' a=NAME { self.expand_env_name(a, LOCATIONS) }
+    | '${' a=slices '}' { self.expand_env_expr(a, LOCATIONS) }
 
 proc_cmds:
     | a=proc_cmd+ { self.proc_args(a) }
 
 proc_cmd:
     | sub_procs
-    | AT_LPAREN ~ a=(bare_genexp | expressions) ')' { self.proc_pyexpr(a, LOCATIONS) }
-    | AT_DOLLAR_LPAREN ~ a=proc_cmds ')' { self.proc_inject(a, LOCATIONS) }
+    | '@(' ~ a=(bare_genexp | expressions) ')' { self.proc_pyexpr(a, LOCATIONS) }
+    | '@$(' ~ a=proc_cmds ')' { self.proc_inject(a, LOCATIONS) }
     | env_atom
     | help_atom
     | search_path
@@ -1297,8 +1291,8 @@ star_target (memo):
 target_with_star_atom (memo):
     | a=t_primary '.' b=NAME !t_lookahead { ast.Attribute(value=a, attr=b.string, ctx=Store, LOCATIONS) }
     | a=t_primary '[' b=slices ']' !t_lookahead { ast.Subscript(value=a, slice=b, ctx=Store, LOCATIONS) }
-    | DOLLAR a=NAME { self.expand_env_name(a, ctx=Store, LOCATIONS) }
-    | DOLLAR_LBRACE a=slices '}' { self.expand_env_expr(a, ctx=Store, LOCATIONS) }
+    | '$' a=NAME { self.expand_env_name(a, ctx=Store, LOCATIONS) }
+    | '${' a=slices '}' { self.expand_env_expr(a, ctx=Store, LOCATIONS) }
     | star_atom
 
 star_atom:
