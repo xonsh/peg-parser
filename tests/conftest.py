@@ -38,8 +38,9 @@ def nodes_equal(x, y):
 
 
 def build_parser(name: str):
-    if not Path(__file__).parent.joinpath("peg_parser/parser.py").exists():
-        from peg_parser.tasks import generate_parser
+    print(Path(__file__).parent.parent.joinpath("peg_parser/parser.py").absolute())
+    if not Path(__file__).parent.joinpath("peg_parser/parser/parser.py").exists():
+        from tasks import generate_parser
 
         generate_parser.main()
     from peg_parser.parser import parser
@@ -211,3 +212,7 @@ def check_xonsh_ast(parse_str, xsh):
         return obs
 
     return factory
+
+
+if __name__ == "__main__":
+    build_parser("XonshParser")

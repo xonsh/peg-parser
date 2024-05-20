@@ -2,7 +2,7 @@ version: '3'
 tasks:
   generate:
     cmds:
-      - python3 peg_parser/tasks/generate_parser.py
+      - python3 tasks/generate_parser.py
     generates:
       - peg_parser/parser/parser.py
     sources:
@@ -12,7 +12,7 @@ tasks:
 
   profile:
     cmds:
-      - python peg_parser/tasks/profile_mem.py tee "logs/xonsh-parser-$(date "+%Y%m%d-%H%M%S").log"
+      - python tasks/profile_mem.py tee "logs/xonsh-parser-$(date "+%Y%m%d-%H%M%S").log"
 
   ply-add:
     cmds:
