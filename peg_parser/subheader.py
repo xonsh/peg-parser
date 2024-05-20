@@ -5,9 +5,9 @@ import enum
 import sys
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, Literal, NoReturn, TypeVar, cast
 
-from peg_parser.parser import token, tokenize
-from peg_parser.parser.tokenize import TokenInfo
-from peg_parser.parser.tokenizer import Mark, Tokenizer, exact_token_types
+from peg_parser import token, tokenize
+from peg_parser.tokenize import TokenInfo
+from peg_parser.tokenizer import Mark, Tokenizer, exact_token_types
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

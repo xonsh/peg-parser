@@ -1,7 +1,7 @@
 [tool.ruff]
 line-length = 110
 extend-exclude = [
-    "tests/xonsh-data", "tests/data", "pegen", "benchmarks", "peg_parser/tasks/bench_utils.py",
+    "tests/xonsh-data", "tests/data", "pegen", "benchmarks", "tasks/bench_utils.py",
     "peg_parser/parser/untokenizer.py"
 ]
 
@@ -147,7 +147,7 @@ follow_imports = 'skip'
 #warn_redundant_casts = true
 exclude = [
     'tests',
-    'peg_parser/parser/parser.py',
+    'peg_parser/parser.py',
     'pegen\/build.py',
     'pegen\/grammar_parser.py',
 ]

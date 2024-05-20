@@ -43,15 +43,15 @@ def build_parser(name: str):
         from tasks import generate_parser
 
         generate_parser.main()
-    from peg_parser.parser import parser
+    from peg_parser import parser
 
     return getattr(parser, name)
 
 
 def _get_tokens(inp):
-    from peg_parser.parser import token as t
-    from peg_parser.parser import tokenize
-    from peg_parser.parser.tokenizer import Tokenizer
+    from peg_parser import token as t
+    from peg_parser import tokenize
+    from peg_parser.tokenizer import Tokenizer
 
     gen = tokenize.generate_tokens(io.StringIO(inp).readline)
     tokenizer = Tokenizer(gen)

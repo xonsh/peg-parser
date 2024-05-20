@@ -34,7 +34,7 @@ import itertools as _itertools
 import re
 from typing import NamedTuple
 
-import peg_parser.parser.token as t
+import peg_parser.token as t
 
 cookie_re = re.compile(r"^[ \t\f]*#.*?coding[:=][ \t]*([-\w.]+)", re.ASCII)
 blank_re = re.compile(rb"^[ \t\f]*(?:[#\r\n]|$)", re.ASCII)

@@ -4,10 +4,10 @@ tasks:
     cmds:
       - python3 tasks/generate_parser.py
     generates:
-      - peg_parser/parser/parser.py
+      - peg_parser/parser.py
     sources:
-      - peg_parser/parser/xonsh.gram
-      - peg_parser/parser/*.py
+      - tasks/xonsh.gram
+      - peg_parser/*.py
       - pegen/*.py
 
   profile:
