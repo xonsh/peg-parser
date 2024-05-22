@@ -194,7 +194,7 @@ def maybe(*choices):
 
 # Note: we use unicode matching for names ("\w") but ascii matching for
 # number literals.
-Whitespace = r"[ \f\t]*"
+Whitespace = r"[ \f\t]+"
 Comment = r"#[^\r\n]*"
 Name = r"\w+"
 
@@ -237,17 +237,7 @@ def _compile(expr):
 #  StringPrefix can be the empty string (making it optional).
 StringPrefix = group(*_all_string_prefixes())
 
-# Tail end of ' string.
-Single = r"[^'\\]*(?:\\.[^'\\]*)*'"
-# Tail end of " string.
-Double = r'[^"\\]*(?:\\.[^"\\]*)*"'
-# Tail end of ''' string.
-Single3 = r"[^'\\]*(?:(?:\\.|'(?!''))[^'\\]*)*'''"
-# Tail end of """ string.
-Double3 = r'[^"\\]*(?:(?:\\.|"(?!""))[^"\\]*)*"""'
 Triple = capname(pre1=StringPrefix) + group("'''", '"""', name="tquote")
-# Single-line ' or " string.
-String = group(StringPrefix + r"'[^\n'\\]*(?:\\.[^\n'\\]*)*'", StringPrefix + r'"[^\n"\\]*(?:\\.[^\n"\\]*)*"')
 
 # Sorting in reverse order puts the long operators before their prefixes.
 # Otherwise if = came before ==, == would get recognized as two instances
@@ -263,18 +253,16 @@ ContStr = capname(pre2=StringPrefix) + group(
 )
 SearchPath = capname(search_pre=r"([rgpf]+|@\w*)?") + capname(search_path=r"`([^\n`\\]*(?:\\.[^\n`\\]*)*)`")
 PseudoExtras = group(End=r"\\\r?\n|\Z", Comment=Comment, Triple=Triple, SearchPath=SearchPath)
-PseudoToken = capname(ws=Whitespace) + group(
-    PseudoExtras, Number=Number, Funny=Funny, ContStr=ContStr, Name=Name
-)
+PseudoToken = group(PseudoExtras, Number=Number, Funny=Funny, ContStr=ContStr, Name=Name, ws=Whitespace)
 
 # For a given string prefix plus quotes, endpats maps it to a regex
 #  to match the remainder of that string. _prefix can be empty, for
 #  a normal single or triple quoted string (with no prefix).
 endpats = {
-    "'": Single,
-    '"': Double,
-    "'''": Single3,
-    '"""': Double3,
+    "'": r"[^'\\]*(?:\\.[^'\\]*)*'",
+    '"': r'[^"\\]*(?:\\.[^"\\]*)*"',
+    "'''": r"[^'\\]*(?:(?:\\.|'(?!''))[^'\\]*)*'''",
+    '"""': r'[^"\\]*(?:(?:\\.|"(?!""))[^"\\]*)*"""',
 }
 
 tabsize = 8
@@ -420,38 +408,21 @@ def next_statement(state: TokenizerState):
         yield TokenInfo(Token.DEDENT, "", (state.lnum, state.pos), (state.lnum, state.pos), state.line)
 
 
-def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrState):
-    if whitespace := pseudomatch.group("ws"):
-        start, end = pseudomatch.span("ws")
-        yield TokenInfo(Token.WS, whitespace, (state.lnum, start), (state.lnum, end), state.line)
-    start, end = pseudomatch.span(2)
+def next_psuedo_matches(pseudomatch: re.Match, state: TokenizerState, cont_str: ContStrState):
+    start, end = pseudomatch.span(1)
     spos, epos, state.pos = (state.lnum, start), (state.lnum, end), end
     if start == end:
         return True  # continue
     token, initial = state.line[start:end], state.line[start]
 
-    if (
-        pseudomatch.group("Number")  # ordinary number
-        or (initial == "." and token != "." and token != "...")
-    ):
-        yield TokenInfo(Token.NUMBER, token, spos, epos, state.line)
-    elif initial in "\r\n":
-        if state.parenlev > 0:
-            yield TokenInfo(Token.NL, token, spos, epos, state.line)
-        else:
-            yield TokenInfo(Token.NEWLINE, token, spos, epos, state.line)
-
-    elif pseudomatch.group("Comment"):
-        assert not token.endswith("\n")
-        yield TokenInfo(Token.COMMENT, token, spos, epos, state.line)
-
-    elif pseudomatch.group("Triple"):
+    if pseudomatch.group("Triple"):
         cont_str.endprog = _compile(endpats[pseudomatch.group("tquote") or "'''"])
         endmatch = cont_str.endprog.match(state.line, state.pos)
         if endmatch:  # all on one line
             state.pos = endmatch.end(0)
             token = state.line[start : state.pos]
-            yield TokenInfo(Token.STRING, token, spos, (state.lnum, state.pos), state.line)
+            token_type = Token.STRING
+            epos = (state.lnum, state.pos)
         else:
             cont_str.start(state, start)
             return False
@@ -466,23 +437,35 @@ def next_psuedo_matches(pseudomatch, state: TokenizerState, cont_str: ContStrSta
             cont_str.endprog = _compile(endpats[quote])
             cont_str.needcont = True
             return False
-        else:  # ordinary string
-            yield TokenInfo(Token.STRING, token, spos, epos, state.line)
+        else:
+            token_type = Token.STRING
+    elif pseudomatch.group("ws"):
+        token_type = Token.WS
+    elif pseudomatch.group("Number") or (initial == "." and token not in (".", "...")):
+        token_type = Token.NUMBER
+    elif initial in "\r\n":
+        token_type = Token.NL if state.parenlev > 0 else Token.NEWLINE
+    elif pseudomatch.group("Comment"):
+        token_type = Token.COMMENT
     elif pseudomatch.group("SearchPath"):
-        yield TokenInfo(Token.SEARCH_PATH, token, spos, epos, state.line)
-    elif pseudomatch.group("Name"):  # ordinary name
-        yield TokenInfo(Token.NAME, token, spos, epos, state.line)
+        token_type = Token.SEARCH_PATH
+    elif pseudomatch.group("Name"):
+        token_type = Token.NAME
     elif pseudomatch.group("Special"):
         if token[-1] in "([{":
             state.parenlev += 1
         elif token in ")]}":
             state.parenlev -= 1
-        yield TokenInfo(Token.OP, token, spos, epos, state.line)
-    elif initial == "\\":  # continued stmt
+        token_type = Token.OP
+    elif initial == "\\":
         state.continued = True
-    else:  # Funny other than Special
+        return
+    else:
         raise TokenError(f"Bad token: {token!r} at line {state.lnum}", spos)
-        # yield TokenInfo(t.OP, token, spos, epos, state.line)
+
+    # Yield Token if Found
+    if token_type:
+        yield TokenInfo(token_type, token, spos, epos, state.line)
 
 
 def next_end_tokens(state: TokenizerState):
