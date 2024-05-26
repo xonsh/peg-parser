@@ -114,38 +114,42 @@ def test_subscription_special_syntaxes_2(eval_code):
     assert eval_code('arr[:, "2"]') == 2
 
 
-def get_cases(path, splitter="# "):
-    inp = ""
+def get_cases(path: Path, splitter="# "):
+    inp = []
     parts = []
+
+    def value():
+        res = ("\n".join(inp), "\n".join(parts))
+        inp.clear()
+        parts.clear()
+        return res
+
     for line in path.read_text().splitlines():
         if line.startswith(splitter):
-            inp = line.lstrip(splitter)
+            inp.append(line.lstrip(splitter))
         elif not line.strip():
             if parts:
-                yield inp, "\n".join(parts)
-                parts.clear()
+                yield value()
         else:
             parts.append(line)
     if parts:
-        yield inp, "\n".join(parts)
+        yield value()
 
 
 def glob_data_param(pattern: str):
-    return [pytest.param(path, id=path.name) for path in Path(__file__).parent.joinpath("data").glob(pattern)]
+    for path in Path(__file__).parent.joinpath("data").glob(pattern):
+        for idx, (inp, exp) in enumerate(get_cases(path)):
+            yield pytest.param(inp, exp, id=f"{path.name}-{idx}")
 
 
-@pytest.mark.parametrize("file", glob_data_param("exprs/*.py"))
-def test_exprs(file, unparse_diff, subtests):
-    for idx, (inp, exp) in enumerate(get_cases(file)):
-        with subtests.test(idx=idx, inp=inp):
-            unparse_diff(inp, exp)
+@pytest.mark.parametrize("inp, exp", glob_data_param("exprs/*.py"))
+def test_exprs(inp, exp, unparse_diff):
+    unparse_diff(inp, exp)
 
 
-@pytest.mark.parametrize("file", glob_data_param("stmts/*.py"))
-def test_stmts(file, unparse_diff, subtests):
-    for idx, (inp, exp) in enumerate(get_cases(file)):
-        with subtests.test(idx=idx, inp=inp):
-            unparse_diff(inp, exp, mode="exec")
+@pytest.mark.parametrize("inp, exp", glob_data_param("stmts/*.py"))
+def test_stmts(inp, exp, unparse_diff):
+    unparse_diff(inp, exp, mode="exec")
 
 
 @pytest.mark.parametrize(
