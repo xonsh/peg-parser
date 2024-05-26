@@ -35,9 +35,6 @@ import re
 from enum import IntEnum, StrEnum, auto
 from typing import NamedTuple
 
-cookie_re = re.compile(r"^[ \t\f]*#.*?coding[:=][ \t]*([-\w.]+)", re.ASCII)
-blank_re = re.compile(rb"^[ \t\f]*(?:[#\r\n]|$)", re.ASCII)
-
 
 class ExactToken(StrEnum):
     NOTEQUAL = "!="
@@ -169,23 +166,20 @@ class TokenInfo(NamedTuple):
         return prev.end == self.start
 
 
-def capname(**kwargs) -> str:
-    text = ""
-    for name, pattern in kwargs.items():
-        text += f"(?P<{name}>{pattern})"
-    return text
+def capname(name: str, pattern: str) -> str:
+    return f"(?P<{name}>{pattern})"
+
+
+def choice(*choices, **named_choices) -> str:
+    choices += tuple(capname(name, pattern) for name, pattern in named_choices.items())
+    return "|".join(choices)
 
 
 def group(*choices, name="", **named_choices):
-    choices += tuple(f"(?P<{name}>{pattern})" for name, pattern in named_choices.items())
-    pattern = "(" + "|".join(choices) + ")"
+    pattern = "(" + choice(*choices, **named_choices) + ")"
     if name:
-        pattern = capname(**{name: pattern})
+        pattern = capname(name, pattern)
     return pattern
-
-
-def any(*choices):
-    return group(*choices) + "*"
 
 
 def maybe(*choices):
@@ -235,25 +229,27 @@ def _compile(expr):
 
 # Note that since _all_string_prefixes includes the empty string,
 #  StringPrefix can be the empty string (making it optional).
-StringPrefix = group(*_all_string_prefixes())
-
-Triple = capname(pre1=StringPrefix) + group("'''", '"""', name="tquote")
+StringStart = group(*_all_string_prefixes(), name="StringPrefix") + group(
+    group("'''", '"""', name="TripleQt"), group('"', "'", name="SingleQt"), name="Quote"
+)
 
 # Sorting in reverse order puts the long operators before their prefixes.
 # Otherwise if = came before ==, == would get recognized as two instances
 # of =.
 Special = group(*map(re.escape, sorted([t.value for t in ExactToken], reverse=True)))
-Funny = group(r"\r?\n", Special=Special)
 
-# First (or only) line of ' or " string.
-ContStr = capname(pre2=StringPrefix) + group(
-    r"'[^\n'\\]*(?:\\.[^\n'\\]*)*" + group("'", r"\\\r?\n"),
-    r'"[^\n"\\]*(?:\\.[^\n"\\]*)*' + group('"', r"\\\r?\n"),
-    name="Str2",
+SearchPath = r"([rgpf]+|@\w*)?`([^\n`\\]*(?:\\.[^\n`\\]*)*)`"
+PseudoToken = choice(
+    Comment=Comment,
+    StringStart=StringStart,
+    End=r"\\\r?\n|\Z",
+    NL=r"\r?\n",
+    SearchPath=SearchPath,
+    Number=Number,
+    Special=Special,
+    Name=Name,
+    ws=Whitespace,
 )
-SearchPath = capname(search_pre=r"([rgpf]+|@\w*)?") + capname(search_path=r"`([^\n`\\]*(?:\\.[^\n`\\]*)*)`")
-PseudoExtras = group(End=r"\\\r?\n|\Z", Comment=Comment, Triple=Triple, SearchPath=SearchPath)
-PseudoToken = group(PseudoExtras, Number=Number, Funny=Funny, ContStr=ContStr, Name=Name, ws=Whitespace)
 
 # For a given string prefix plus quotes, endpats maps it to a regex
 #  to match the remainder of that string. _prefix can be empty, for
@@ -282,6 +278,7 @@ class TokenizerState:
         self.line = ""
         self.pos = 0
         self.max = 0
+        self.cstr = ContStrState()
 
     def move_next_line(self, readline):
         self.last_line = self.line
@@ -297,59 +294,51 @@ class TokenizerState:
         self.pos = 0
         self.max = len(self.line)
 
+    def __repr__(self):
+        return f"<TokenizerState: {self.pos} in {self.line}>"
+
 
 class ContStrState:
     def __init__(self):
-        self.contstr = ""
-        self.needcont = False
+        self.text = ""
         self.contline = None  # str
-        self.strstart = None  # tuple[int, int]
+        self.start = None  # tuple[int, int]
         self.endprog = None  # re.Pattern[str]
 
     def reset(self):
+        self.start = None
         self.contline = None
-        self.contstr = None
+        self.text = None
 
     def reset_cont(self):
         self.reset()
-        self.needcont = False
 
     def join(self, state: TokenizerState):
-        self.contstr += state.line
+        self.text += state.line
         self.contline += state.line
 
-    def start(self, state: TokenizerState, start: int):
-        self.strstart = (state.lnum, start)  # multiple lines
-        self.contstr = state.line[start:]
+    def set(self, state: TokenizerState, start: int):
+        self.start = (state.lnum, start)  # multiple lines
+        self.text = state.line[start:]
         self.contline = state.line
 
 
-def next_cont_string(cont_str: ContStrState, state: TokenizerState):
+def next_cont_string(state: TokenizerState):
     if not state.line:
-        raise TokenError("EOF in multi-line string", cont_str.strstart)
-    endmatch = cont_str.endprog.match(state.line)
+        raise TokenError("EOF in multi-line string", state.cstr.start)
+    endmatch = state.cstr.endprog.match(state.line)
     if endmatch:
         state.pos = end = endmatch.end(0)
         yield TokenInfo(
             Token.STRING,
-            cont_str.contstr + state.line[:end],
-            cont_str.strstart,
+            state.cstr.text + state.line[:end],
+            state.cstr.start,
             (state.lnum, end),
-            cont_str.contline + state.line,
+            state.cstr.contline + state.line,
         )
-        cont_str.reset_cont()
-    elif cont_str.needcont and state.line[-2:] != "\\\n" and state.line[-3:] != "\\\r\n":
-        yield TokenInfo(
-            Token.ERRORTOKEN,
-            cont_str.contstr + state.line,
-            cont_str.strstart,
-            (state.lnum, len(state.line)),
-            cont_str.contline,
-        )
-        cont_str.reset()
-        return True
+        state.cstr.reset_cont()
     else:
-        cont_str.join(state)
+        state.cstr.join(state)
         return True
 
 
@@ -408,56 +397,52 @@ def next_statement(state: TokenizerState):
         yield TokenInfo(Token.DEDENT, "", (state.lnum, state.pos), (state.lnum, state.pos), state.line)
 
 
-def next_psuedo_matches(pseudomatch: re.Match, state: TokenizerState, cont_str: ContStrState):
-    start, end = pseudomatch.span(1)
+def next_psuedo_matches(state: TokenizerState):
+    match = _compile(PseudoToken).match(state.line, state.pos)
+    if not match:
+        return
+    start, end = match.span(match.lastgroup)
     spos, epos, state.pos = (state.lnum, start), (state.lnum, end), end
-    if start == end:
-        return True  # continue
-    token, initial = state.line[start:end], state.line[start]
+    token = state.line[start:end]
 
-    if pseudomatch.group("Triple"):
-        cont_str.endprog = _compile(endpats[pseudomatch.group("tquote") or "'''"])
-        endmatch = cont_str.endprog.match(state.line, state.pos)
+    if match.lastgroup == "StringStart":
+        state.cstr.endprog = _compile(endpats[match.group("Quote") or '"'])
+        endmatch = state.cstr.endprog.match(state.line, state.pos)
         if endmatch:  # all on one line
             state.pos = endmatch.end(0)
             token = state.line[start : state.pos]
             token_type = Token.STRING
             epos = (state.lnum, state.pos)
+        elif (
+            match.group("TripleQt")
+            or (
+                state.line[-2:] == "\\\n"  # single quote should have line continuation at the end
+            )
+            or (state.line[-3:] == "\\\r\n")
+        ):
+            state.cstr.set(state, start)
+            state.pos = state.max
+            return  # early exit
         else:
-            cont_str.start(state, start)
-            return False
-
-    # Also note that single quote checking must come after
-    #  triple quote checking (above).
-    elif pseudomatch.group("ContStr"):
-        if token[-1] == "\n":  # continued string
-            cont_str.start(state, start)
-            # check for matching quote
-            quote = (pseudomatch.group("Str2") or "")[0]
-            cont_str.endprog = _compile(endpats[quote])
-            cont_str.needcont = True
-            return False
-        else:
-            token_type = Token.STRING
-    elif pseudomatch.group("ws"):
-        token_type = Token.WS
-    elif pseudomatch.group("Number") or (initial == "." and token not in (".", "...")):
+            raise TokenError("Invalid string quotes")
+    elif tok := {
+        "ws": Token.WS,
+        "Comment": Token.COMMENT,
+        "SearchPath": Token.SEARCH_PATH,
+        "Name": Token.NAME,
+    }.get(match.lastgroup):
+        token_type = tok
+    elif match.lastgroup == "Number" or (token[0] == "." and token not in (".", "...")):
         token_type = Token.NUMBER
-    elif initial in "\r\n":
+    elif match.lastgroup == "NL":
         token_type = Token.NL if state.parenlev > 0 else Token.NEWLINE
-    elif pseudomatch.group("Comment"):
-        token_type = Token.COMMENT
-    elif pseudomatch.group("SearchPath"):
-        token_type = Token.SEARCH_PATH
-    elif pseudomatch.group("Name"):
-        token_type = Token.NAME
-    elif pseudomatch.group("Special"):
+    elif match.lastgroup == "Special":
         if token[-1] in "([{":
             state.parenlev += 1
         elif token in ")]}":
             state.parenlev -= 1
         token_type = Token.OP
-    elif initial == "\\":
+    elif match.lastgroup == "End":  # // continuation
         state.continued = True
         return
     else:
@@ -465,7 +450,7 @@ def next_psuedo_matches(pseudomatch: re.Match, state: TokenizerState, cont_str: 
 
     # Yield Token if Found
     if token_type:
-        yield TokenInfo(token_type, token, spos, epos, state.line)
+        return TokenInfo(token_type, token, spos, epos, state.line)
 
 
 def next_end_tokens(state: TokenizerState):
@@ -485,13 +470,12 @@ def next_end_tokens(state: TokenizerState):
 
 def _tokenize(readline):
     state = TokenizerState()
-    cont_str = ContStrState()
 
     while True:  # loop over lines in stream
         state.move_next_line(readline)
 
-        if cont_str.contstr:  # continued string
-            loop_action = yield from next_cont_string(cont_str, state)
+        if state.cstr.text:  # continued string
+            loop_action = yield from next_cont_string(state)
             if loop_action is True:
                 continue
             elif loop_action is False:
@@ -510,15 +494,12 @@ def _tokenize(readline):
                 raise TokenError("EOF in multi-line statement", (state.lnum, 0))
             state.continued = False
 
+        pos = state.pos
         while state.pos < state.max:
-            pseudomatch = _compile(PseudoToken).match(state.line, state.pos)
-            if pseudomatch:  # scan for tokens
-                loop_action = yield from next_psuedo_matches(pseudomatch, state, cont_str)
-                if loop_action is True:
-                    continue
-                elif loop_action is False:
-                    break
-            else:
+            token = next_psuedo_matches(state)
+            if token:
+                yield token
+            elif pos == state.pos:
                 yield TokenInfo(
                     Token.ERRORTOKEN,
                     state.line[state.pos],
@@ -527,6 +508,7 @@ def _tokenize(readline):
                     state.line,
                 )
                 state.pos += 1
+                pos = state.pos
 
     yield from next_end_tokens(state)
 

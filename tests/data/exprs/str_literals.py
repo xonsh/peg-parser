@@ -12,3 +12,8 @@ f'Simple stringmore'
 # 'some line \
 # more'
 'some line more'
+
+# "more line \
+# \
+# some more"
+'more line some more'
