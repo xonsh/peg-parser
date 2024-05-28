@@ -1,10 +1,9 @@
 import pytest
 
 
-@pytest.mark.xfail
 def test_redirect(check_xonsh_ast):
-    assert check_xonsh_ast("$[cat < input.txt]", False)
-    assert check_xonsh_ast("$[< input.txt cat]", False)
+    assert check_xonsh_ast("$[cat < input.txt]")
+    assert check_xonsh_ast("$[< input.txt cat]")
 
 
 @pytest.mark.parametrize(
@@ -19,7 +18,7 @@ def test_redirect(check_xonsh_ast):
 )
 @pytest.mark.xfail
 def test_redirect_abspath(case, check_xonsh_ast):
-    assert check_xonsh_ast(case, False)
+    assert check_xonsh_ast(case)
 
 
 @pytest.mark.parametrize("case", ["", "o", "out", "1"])

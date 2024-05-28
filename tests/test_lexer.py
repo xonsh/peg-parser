@@ -11,10 +11,10 @@ from peg_parser.tokenize import TokenInfo
 
 def ensure_tuple(seq) -> str:
     if isinstance(seq, TokenInfo):
-        seq = (seq.type, seq.string, seq.start[1])
+        seq = (seq.type.name, seq.string, seq.start[1])
     if isinstance(seq, Sequence):
         typ, *rest = seq
-        seq = (typ if isinstance(typ, t) else t[typ], *rest)
+        seq = (typ.name if isinstance(typ, t) else t[typ].name, *rest)
     return repr(tuple(seq))
 
 
@@ -23,7 +23,7 @@ def assert_tokens_equal(expected, obtained):
     left = [ensure_tuple(item) for item in expected]
     right = [ensure_tuple(item) for item in obtained]
     if diff := "\n".join(difflib.unified_diff(left, right, "expected", "obtained")):
-        print(diff)
+        print("\n".join(difflib.ndiff(left, right)))
     return not diff
 
 
@@ -438,4 +438,35 @@ def test_fstring_nested_py312():
         ("OP", "}", 28),
         ("FSTRING_MIDDLE", " final words", 29),
         ("FSTRING_END", "'", 41),
+    )
+
+
+def test_fstring_triple():
+    inp = """\
+a = 10
+f'''
+  {a
+     *
+       x()}
+non-important content
+'''
+"""
+
+    assert check_tokens(
+        inp,
+        (t.NAME, "a", 0),
+        (t.OP, "=", 2),
+        (t.NUMBER, "10", 4),
+        (t.NEWLINE, "\n", 6),
+        (t.FSTRING_START, "f'''", 0),
+        (t.FSTRING_MIDDLE, "\n  ", 4),
+        (t.OP, "{", 2),
+        (t.NAME, "a", 3),
+        (t.OP, "*", 5),
+        (t.NAME, "x", 7),
+        (t.OP, "(", 8),
+        (t.OP, ")", 9),
+        (t.OP, "}", 10),
+        ("FSTRING_MIDDLE", "\nnon-important content\n", 11),
+        (t.FSTRING_END, "'''", 0),
     )
