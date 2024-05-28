@@ -297,12 +297,16 @@ def test_double_raw_string_literal():
     assert check_tokens('r"yo"', ["STRING", 'r"yo"', 0])
 
 
-def test_single_f_string_literal():
-    assert check_tokens("f'{yo}'", ["STRING", "f'{yo}'", 0])
-
-
-def test_double_f_string_literal():
-    assert check_tokens('f"{yo}"', ["STRING", 'f"{yo}"', 0])
+@pytest.mark.parametrize("quote", ["'", '"'])
+def test_single_f_string_literal(quote):
+    assert check_tokens(
+        f"f{quote}{{yo}}{quote}",
+        ("FSTRING_START", f"f{quote}", 0),
+        ("OP", "{", 2),
+        ("NAME", "yo", 3),
+        ("OP", "}", 5),
+        ("FSTRING_END", f"{quote}", 6),
+    )
 
 
 def test_single_unicode_literal():
@@ -326,15 +330,15 @@ def test_path_string_literal():
     assert check_tokens('rp"/foo"', ["STRING", 'rp"/foo"', 0])
 
 
-def test_path_fstring_literal():
-    assert check_tokens("pf'/foo'", ["STRING", "pf'/foo'", 0])
-    assert check_tokens('pf"/foo"', ["STRING", 'pf"/foo"', 0])
-    assert check_tokens("fp'/foo'", ["STRING", "fp'/foo'", 0])
-    assert check_tokens('fp"/foo"', ["STRING", 'fp"/foo"', 0])
-    assert check_tokens("pF'/foo'", ["STRING", "pF'/foo'", 0])
-    assert check_tokens('pF"/foo"', ["STRING", 'pF"/foo"', 0])
-    assert check_tokens("Fp'/foo'", ["STRING", "Fp'/foo'", 0])
-    assert check_tokens('Fp"/foo"', ["STRING", 'Fp"/foo"', 0])
+@pytest.mark.parametrize("quote", ["'", '"'])
+@pytest.mark.parametrize("pre", ["pf", "fp", "pF", "Fp"])
+def test_path_fstring_literal(pre, quote):
+    assert check_tokens(
+        f"{pre}{quote}/foo{quote}",
+        ["FSTRING_START", f"{pre}{quote}", 0],
+        ["FSTRING_MIDDLE", "/foo", 3],
+        ["FSTRING_END", f"{quote}", 7],
+    )
 
 
 def test_regex_globs():
@@ -414,8 +418,24 @@ def test_pymode_not_ioredirect(s, exp):
     assert check_tokens(s, *exp)
 
 
-@pytest.mark.xfail
 def test_fstring_nested_py312():
-    raise AssertionError(
-        "fstring nested py312 https://github.com/psf/black/blob/main/src/blib2to3/pgen2/tokenize.py#L288"
+    assert check_tokens(
+        "f'{a+b:.3f} more words {c+d=} final words'",
+        ("FSTRING_START", "f'", 0),
+        ("OP", "{", 2),
+        ("NAME", "a", 3),
+        ("OP", "+", 4),
+        ("NAME", "b", 5),
+        ("OP", ":", 6),
+        ("FSTRING_MIDDLE", ".3f", 7),
+        ("OP", "}", 10),
+        ("FSTRING_MIDDLE", " more words ", 11),
+        ("OP", "{", 23),
+        ("NAME", "c", 24),
+        ("OP", "+", 25),
+        ("NAME", "d", 26),
+        ("OP", "=", 27),
+        ("OP", "}", 28),
+        ("FSTRING_MIDDLE", " final words", 29),
+        ("FSTRING_END", "'", 41),
     )

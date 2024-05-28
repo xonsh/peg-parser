@@ -28,12 +28,14 @@ __credits__ = (
     "Skip Montanaro, Raymond Hettinger, Trent Nelson, "
     "Michael Foord"
 )
+
+import dataclasses
 import functools
 import io
 import itertools as _itertools
 import re
 from enum import IntEnum, StrEnum, auto
-from typing import NamedTuple
+from typing import Final, NamedTuple
 
 
 class ExactToken(StrEnum):
@@ -254,18 +256,38 @@ PseudoToken = choice(
 # For a given string prefix plus quotes, endpats maps it to a regex
 #  to match the remainder of that string. _prefix can be empty, for
 #  a normal single or triple quoted string (with no prefix).
-endpats = {
-    "'": r"[^'\\]*(?:\\.[^'\\]*)*'",
-    '"': r'[^"\\]*(?:\\.[^"\\]*)*"',
-    "'''": r"[^'\\]*(?:(?:\\.|'(?!''))[^'\\]*)*'''",
-    '"""': r'[^"\\]*(?:(?:\\.|"(?!""))[^"\\]*)*"""',
+endpats: Final = {
+    "'": r"(?:[^'\\]|\\.)*'",
+    '"': r'(?:[^"\\]|\\.)*"',
+    "'''": r"(?:[^'\\]|\\.|'(?!''))*'''",
+    '"""': r'(?:[^"\\]|\\.|"(?!""))*"""',
 }
+StartLBrace = r".*?(?=\{(?!\{)){"
+EndRBrace = r".*?(?=\}(?!\}))}"
 
 tabsize = 8
 
 
 class TokenError(Exception):
     pass
+
+
+class ModeMiddle(NamedTuple):
+    # in the string portion of an f-string (outside braces)
+    parenlevel: int
+
+
+class ModeInBraces(NamedTuple):
+    parenlevel: int
+
+
+class ModeInColon(NamedTuple):
+    """in the format specifier ({:*})"""
+
+    parenlevel: int
+
+
+Mode = ModeMiddle | ModeInBraces | ModeInColon
 
 
 class TokenizerState:
@@ -278,7 +300,7 @@ class TokenizerState:
         self.line = ""
         self.pos = 0
         self.max = 0
-        self.cstr = ContStrState()
+        self.end_progs: list[EndProg] = []
 
     def move_next_line(self, readline):
         self.last_line = self.line
@@ -297,49 +319,63 @@ class TokenizerState:
     def __repr__(self):
         return f"<TokenizerState: {self.pos} in {self.line}>"
 
-
-class ContStrState:
-    def __init__(self):
-        self.text = ""
-        self.contline = None  # str
-        self.start = None  # tuple[int, int]
-        self.endprog = None  # re.Pattern[str]
-
-    def reset(self):
-        self.start = None
-        self.contline = None
-        self.text = None
-
-    def reset_cont(self):
-        self.reset()
-
-    def join(self, state: TokenizerState):
-        self.text += state.line
-        self.contline += state.line
-
-    def set(self, state: TokenizerState, start: int):
-        self.start = (state.lnum, start)  # multiple lines
-        self.text = state.line[start:]
-        self.contline = state.line
-
-
-def next_cont_string(state: TokenizerState):
-    if not state.line:
-        raise TokenError("EOF in multi-line string", state.cstr.start)
-    endmatch = state.cstr.endprog.match(state.line)
-    if endmatch:
-        state.pos = end = endmatch.end(0)
-        yield TokenInfo(
-            Token.STRING,
-            state.cstr.text + state.line[:end],
-            state.cstr.start,
-            (state.lnum, end),
-            state.cstr.contline + state.line,
+    def add_prog(self, start: int, end: int, **kwargs) -> None:
+        self.end_progs.append(
+            EndProg(text=self.line[start:end], contline=self.line, start=(self.lnum, start), **kwargs)
         )
-        state.cstr.reset_cont()
-    else:
-        state.cstr.join(state)
-        return True
+
+    def prog_token(self, end: int, tok: Token):
+        endprog = self.end_progs[-1]
+        endprog.join(self, end)
+        self.pos = end
+        epos = (self.lnum, end)
+        return TokenInfo(tok, endprog.text, endprog.start, epos, endprog.contline)
+
+    def match(self, pattern: str | re.Pattern):
+        pattern = _compile(pattern) if isinstance(pattern, str) else pattern
+        return pattern.match(self.line, self.pos)
+
+    def in_mode(self, mode: type[Mode]) -> bool:
+        return bool(self.end_progs) and isinstance(self.end_progs[-1].mode, mode)
+
+    def in_braces(self) -> bool:
+        return self.in_mode(ModeInBraces)
+
+    def in_fstring(self) -> bool:
+        return self.in_mode(ModeMiddle)
+
+    def in_colon(self) -> bool:
+        return self.in_mode(ModeInColon)
+
+    def pop_mode(self, end: tuple[int, int] | None = None):
+        prog = self.end_progs.pop()
+        if self.end_progs and end:
+            self.end_progs[-1].reset(end)
+        return prog
+
+    def at_parenlev(self) -> bool:
+        return (self.end_progs[-1].mode is not None) and self.end_progs[-1].mode.parenlevel == self.parenlev
+
+
+@dataclasses.dataclass(slots=True)
+class EndProg:
+    mode: Mode | None = None
+    pattern: re.Pattern | str = ""  # end pattern
+    text: str = ""
+    contline: str = ""  # str
+    start: tuple[int, int] = (0, 0)
+    quote: str = ""
+
+    def join(self, state: TokenizerState, end=0):
+        if state.pos == 0:
+            self.text += state.line
+            self.contline += state.line
+        else:
+            self.text += state.line[state.pos : end or len(state.line)]
+
+    def reset(self, start: tuple[int, int]):
+        self.start = start
+        self.text = ""
 
 
 def next_statement(state: TokenizerState):
@@ -398,7 +434,9 @@ def next_statement(state: TokenizerState):
 
 
 def next_psuedo_matches(state: TokenizerState):
-    match = _compile(PseudoToken).match(state.line, state.pos)
+    if state.pos == state.max or state.in_fstring():
+        return
+    match = state.match(PseudoToken)
     if not match:
         return
     start, end = match.span(match.lastgroup)
@@ -406,25 +444,15 @@ def next_psuedo_matches(state: TokenizerState):
     token = state.line[start:end]
 
     if match.lastgroup == "StringStart":
-        state.cstr.endprog = _compile(endpats[match.group("Quote") or '"'])
-        endmatch = state.cstr.endprog.match(state.line, state.pos)
-        if endmatch:  # all on one line
-            state.pos = endmatch.end(0)
-            token = state.line[start : state.pos]
-            token_type = Token.STRING
-            epos = (state.lnum, state.pos)
-        elif (
-            match.group("TripleQt")
-            or (
-                state.line[-2:] == "\\\n"  # single quote should have line continuation at the end
-            )
-            or (state.line[-3:] == "\\\r\n")
-        ):
-            state.cstr.set(state, start)
-            state.pos = state.max
-            return  # early exit
+        quote = match.group("Quote") or '"'
+        if "f" in token.lower():
+            token_type = Token.FSTRING_START
+            pattern = choice(LBrace=StartLBrace, End=endpats[quote])
+            state.add_prog(end, end, pattern=pattern, quote=quote, mode=ModeMiddle(state.parenlev))
         else:
-            raise TokenError("Invalid string quotes")
+            pattern = endpats[quote]
+            state.add_prog(start, end, pattern=pattern, quote=quote)
+            return
     elif tok := {
         "ws": Token.WS,
         "Comment": Token.COMMENT,
@@ -440,7 +468,11 @@ def next_psuedo_matches(state: TokenizerState):
         if token[-1] in "([{":
             state.parenlev += 1
         elif token in ")]}":
+            if state.in_braces() and state.at_parenlev():
+                state.pop_mode((state.lnum, end))
             state.parenlev -= 1
+        elif token == ":" and state.in_braces() and state.at_parenlev():
+            state.add_prog(start + 1, end, mode=ModeInColon(state.parenlev), pattern=choice(RBrace=EndRBrace))
         token_type = Token.OP
     elif match.lastgroup == "End":  # // continuation
         state.continued = True
@@ -468,18 +500,92 @@ def next_end_tokens(state: TokenizerState):
     yield TokenInfo(Token.ENDMARKER, "", (state.lnum, 0), (state.lnum, 0), "")
 
 
+def handle_end_progs(state: TokenizerState):
+    if not state.end_progs:
+        return
+    if state.pos == 0 and not state.line:
+        raise TokenError("EOF in multi-line string", state.end_progs[-1].start)
+
+    if state.in_braces():
+        return
+
+    endprog = state.end_progs[-1]
+    if state.in_fstring() or state.in_colon():
+        if endmatch := state.match(endprog.pattern):
+            start, end = endmatch.span(endmatch.lastgroup)
+            if endmatch.lastgroup == "End":  # quote match
+                middle_end = end - len(endprog.quote)
+                if middle_end > state.pos:
+                    yield state.prog_token(middle_end, Token.FSTRING_MIDDLE)
+                yield TokenInfo(
+                    Token.FSTRING_END,
+                    endprog.quote,
+                    start=(state.lnum, state.pos),
+                    end=(state.lnum, end),
+                    line=state.line,
+                )
+                state.pop_mode()
+            else:  # "{" or "}"
+                middle_end = end - 1
+                if middle_end > state.pos:  # has buffer
+                    yield state.prog_token(middle_end, Token.FSTRING_MIDDLE)
+                if endmatch.lastgroup == "LBrace":
+                    yield TokenInfo(
+                        Token.OP,
+                        "{",
+                        start=(state.lnum, state.pos),
+                        end=(state.lnum, end),
+                        line=state.line,
+                    )
+                    state.parenlev += 1
+                    state.add_prog(end, end, mode=ModeInBraces(state.parenlev))
+                else:  # rbrace
+                    yield TokenInfo(
+                        Token.OP,
+                        "}",
+                        start=(state.lnum, state.pos),
+                        end=(state.lnum, end),
+                        line=state.line,
+                    )
+                    state.parenlev -= 1
+                    state.pop_mode()  # in-colon
+                    state.pop_mode((state.lnum, end))  # in braces
+
+            state.pos = end
+            return
+        else:
+            raise TokenError(f"Expected {endprog.quote} inside f-string", (state.lnum, state.pos))
+
+    if endmatch := state.match(endprog.pattern):  # all on one line
+        end = endmatch.end(0)
+        yield state.prog_token(end, Token.STRING)
+        state.pop_mode()
+        return
+
+    if (
+        (state.pos == 0)  # called at start of the line
+        or (
+            len(endprog.quote) == 3
+            or (
+                state.line[-2:] == "\\\n"  # single quote should have line continuation at the end
+            )
+            or (state.line[-3:] == "\\\r\n")
+        )
+    ):
+        endprog.join(state)
+        state.pos = state.max
+    else:
+        raise TokenError("Invalid string quotes")
+
+
 def _tokenize(readline):
     state = TokenizerState()
 
     while True:  # loop over lines in stream
         state.move_next_line(readline)
 
-        if state.cstr.text:  # continued string
-            loop_action = yield from next_cont_string(state)
-            if loop_action is True:
-                continue
-            elif loop_action is False:
-                break
+        if state.end_progs:
+            yield from handle_end_progs(state)
 
         elif state.parenlev == 0 and not state.continued:  # new statement
             loop_action = yield from next_statement(state)
@@ -496,8 +602,8 @@ def _tokenize(readline):
 
         pos = state.pos
         while state.pos < state.max:
-            token = next_psuedo_matches(state)
-            if token:
+            yield from handle_end_progs(state)
+            if token := next_psuedo_matches(state):
                 yield token
             elif pos == state.pos:
                 yield TokenInfo(
