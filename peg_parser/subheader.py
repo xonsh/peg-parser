@@ -250,6 +250,9 @@ class Parser:
         # for error reporting.
         self.in_recursive_rule = 0
 
+        # handle path literal joined-str
+        self._path_token: TokenInfo | None = None
+
         # Pass through common tokenizer methods.
         self._mark = self._tokenizer.mark
         self._reset = self._tokenizer.reset
@@ -466,6 +469,10 @@ class Parser:
         seen_joined = False
         values = []
         ss = []
+
+        if path_tok := (self._strip_path_prefix(parts[0])):
+            parts[0] = path_tok
+
         for p in parts:
             if isinstance(p, ast.JoinedStr):
                 seen_joined = True
@@ -489,9 +496,9 @@ class Parser:
                 consolidated.append(p)
 
         if not seen_joined and len(values) == 1 and isinstance(values[0], ast.Constant):
-            return values[0]
+            node = values[0]
         else:
-            return ast.JoinedStr(
+            node = ast.JoinedStr(
                 values=consolidated,
                 lineno=start[0] if start else values[0].lineno,
                 col_offset=start[1] if start else values[0].col_offset,
@@ -499,72 +506,29 @@ class Parser:
                 end_col_offset=end[1] if end else values[-1].end_col_offset,
             )
 
-    @staticmethod
-    def _join_str_tokens(tokens: list[TokenInfo]) -> str:
-        line = 1
-        col_offset = 0
-        source = ""
-        for t in tokens:
-            n_line = t.start[0] - line
-            if n_line:
-                col_offset = 0
-            source += """\n""" * n_line + " " * (t.start[1] - col_offset) + t.string
-            line, col_offset = t.end
-        source = "(" + source[1:] if source[0] == " " else "(" + source
-        source += ")"
-        return source
-
-    @staticmethod
-    def _has_path_prefix(token: TokenInfo) -> bool:
-        text = token.string
-        if not text.startswith(("'", '"')):
-            prefix = text[:2].lower()
-            return bool(prefix and ("p" in prefix))
-        return False
-
-    def generate_ast_for_string(self, tokens: list[TokenInfo]):
-        """Generate AST nodes for strings."""
-        first_token = tokens[0]
-        if path_literal := self._has_path_prefix(first_token):
-            tokens[0] = first_token._replace(
-                string=first_token.string.replace("p", "", 1).replace("P", "", 1)
-            )
-
-        node = self._parse_pure_string(tokens)
-        if path_literal:
-            return xonsh_call("__xonsh__.path_literal", node, **first_token.loc())
-
+        if path_tok := (path_tok or self._path_token):
+            node = xonsh_call("__xonsh__.path_literal", node, **path_tok.loc())
+            self._path_token = None
         return node
 
-    def _parse_pure_string(self, tokens: list[TokenInfo]):
-        err_args = None
-        source = self._join_str_tokens(tokens)
+    def handle_fstring(self, a: TokenInfo, b, **locs):
+        path_tok = self._strip_path_prefix(a)
+        if path_tok:
+            self._path_token = path_tok
+        return ast.JoinedStr(values=b, **locs)
 
-        try:
-            # ast.Module
-            m: ast.Module = ast.parse(source)
-        except SyntaxError as err:
-            line_offset = tokens[0].start[0]
-            args: tuple[str | int | None, ...] = (
-                err.filename,
-                (err.lineno or 0) + line_offset - 2,
-                err.offset,
-                err.text,
-            )
-            if sys.version_info >= (3, 10):
-                args += (err.end_lineno + line_offset - 2, err.end_offset)  # type: ignore
-            err_args = (err.msg, args)
-            # Ensure we do not keep the frame alive longer than necessary
-            # by explicitly deleting the error once we got what we needed out
-            # of it
-            del err
-
-        # Avoid getting a triple nesting in the error report that does not
-        # bring anything relevant to the traceback.
-        if err_args:
-            raise SyntaxError(*err_args)
-
-        return m.body[0].value  # type: ignore
+    @staticmethod
+    def _strip_path_prefix(token: TokenInfo) -> TokenInfo | None:
+        if not isinstance(token, TokenInfo):
+            return None
+        text = token.string
+        idx = text.find("'") if text.find("'") >= 0 else text.find('"')
+        if idx > 0:
+            prefix, text = text[:idx].lower(), text[idx:]
+            if "p" in prefix:
+                prefix = prefix.replace("p", "", 1)
+                return token._replace(string=prefix + text)
+        return None
 
     def extract_import_level(self, tokens: list[TokenInfo]) -> int:
         """Extract the relative import level from the tokens preceding the module name.

@@ -1157,13 +1157,12 @@ fstring_format_spec:
     | fstring_replacement_field
 fstring:
     | a=FSTRING_START b=fstring_mid* c=FSTRING_END {
-        ast.JoinedStr(values=b, LOCATIONS)
+        self.handle_fstring(a, b, LOCATIONS)
      }
 
 strings (memo): a=(fstring|STRING)+ {
-    # self.concatenate_strings(a) if sys.version_info >= (3, 12) else
-    self.generate_ast_for_string(a)
- }
+    self.concatenate_strings(a)
+}
 
 list[ast.List]:
     | '[' a=[star_named_expressions] ']' { ast.List(elts=a or [], ctx=Load, LOCATIONS) }
