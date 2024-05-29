@@ -3,7 +3,8 @@ from __future__ import annotations
 import ast
 import enum
 import sys
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Literal, NoReturn, TypeVar, cast
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, NoReturn, TypeVar, cast
 
 from peg_parser.tokenize import ExactToken, Token, TokenInfo, generate_tokens
 from peg_parser.tokenizer import Mark, Tokenizer
@@ -17,7 +18,7 @@ Load = ast.Load()
 Store = ast.Store()
 Del = ast.Del()
 
-Node = TypeVar("Node")
+Node = TypeVar("Node", bound=ast.AST)
 FC = TypeVar("FC", ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 
 EXPR_NAME_MAPPING = {
@@ -117,7 +118,7 @@ def memoize_left_rec(method: Callable[[P], T | None]) -> Callable[[P], T | None]
     """Memoize a left-recursive symbol method."""
     method_name = method.__name__
 
-    def memoize_left_rec_wrapper(self: P) -> T | None:
+    def memoize_left_rec_wrapper(self: P) -> T | Any | None:
         mark = self._mark()
         key = mark, method_name, ()
         # Fast path: cache hit, and not verbose.
@@ -143,7 +144,8 @@ def memoize_left_rec(method: Callable[[P], T | None]) -> Callable[[P], T | None]
 
             # Prime the cache with a failure.
             self._cache[key] = None, mark
-            lastresult, lastmark = None, mark
+            lastresult: Any = None
+            lastmark = mark
             depth = 0
             if verbose:
                 print(f"{fill}Recursive {method_name} at {mark} depth {depth}")
@@ -195,18 +197,18 @@ def memoize_left_rec(method: Callable[[P], T | None]) -> Callable[[P], T | None]
     return memoize_left_rec_wrapper
 
 
-def load_attribute_chain(name, **locs):
+def load_attribute_chain(name: str, **locs: int) -> ast.Attribute | ast.Name:
     """Creates an AST that loads variable name that may (or may not)
     have attribute chains. For example, "a.b.c"
     """
     names = name.split(".")
-    node = ast.Name(id=names.pop(0), ctx=Load, **locs)
+    node: ast.Name | ast.Attribute = ast.Name(id=names.pop(0), ctx=Load, **locs)
     for attr in names:
         node = ast.Attribute(value=node, attr=attr, ctx=Load, **locs)
     return node
 
 
-def xonsh_call(name, *args, **locs) -> ast.Call:
+def xonsh_call(name: str, *args: Node, **locs: int) -> ast.Call:
     """Creates the AST node for calling a function of a given name.
     Functions names may contain attribute access, e.g. __xonsh__.env.
     """
@@ -239,7 +241,7 @@ class Parser:
         *,
         verbose: bool = False,
         filename: str = "<unknown>",
-        py_version: tuple | None = None,
+        py_version: tuple[int, ...] | None = None,
     ) -> None:
         self._tokenizer = tokenizer
         self._verbose = verbose
@@ -275,7 +277,7 @@ class Parser:
         return None
 
     @memoize
-    def keyword(self):
+    def keyword(self) -> TokenInfo | None:
         tok = self._tokenizer.peek()
         if tok.type == Token.NAME and tok.string in self.KEYWORDS:
             return self._tokenizer.getnext()
@@ -317,7 +319,7 @@ class Parser:
         self._reset(mark)
         return not ok
 
-    def parse(self, rule: str, call_invalid_rules: bool = False) -> ast.AST | None:
+    def parse(self, rule: str, call_invalid_rules: bool = False) -> ast.AST | Any | None:
         self.call_invalid_rules = call_invalid_rules
         res = getattr(self, rule)()
 
@@ -351,11 +353,10 @@ class Parser:
         """Raise an indentation error."""
         last_token = self._tokenizer.diagnose()
         args = (self.filename, last_token.start[0], last_token.start[1] + 1, last_token.line)
-        if sys.version_info >= (3, 10):
-            args += (last_token.end[0], last_token.end[1] + 1)  # type: ignore
+        args += (last_token.end[0], last_token.end[1] + 1)  # type: ignore
         raise IndentationError(msg, args)
 
-    def get_expr_name(self, node) -> str:
+    def get_expr_name(self, node: Any) -> str:
         """Get a descriptive name for an expression."""
         # See https://github.com/python/cpython/blob/master/Parser/pegen.c#L161
         assert node is not None
@@ -387,7 +388,7 @@ class Parser:
         # they are parsed as expressions. Any other kind of expression
         # that is a container (like Sets or Dicts) is directly invalid and
         # we do not need to visit it recursively.
-        if isinstance(node, (ast.List, ast.Tuple)):
+        if isinstance(node, ast.List | ast.Tuple):
             for e in node.elts:
                 if (inv := self.get_invalid_target(target, e)) is not None:
                     return inv
@@ -405,18 +406,18 @@ class Parser:
                 return None
 
             return node
-        elif isinstance(node, (ast.Name, ast.Subscript, ast.Attribute)):
+        elif isinstance(node, ast.Name | ast.Subscript | ast.Attribute):
             return None
         return node
 
-    def set_expr_context(self, node, context):
+    def set_expr_context(self, node: Any, context: ast.Load | ast.Store | ast.Del) -> Any:
         """Set the context (Load, Store, Del) of an ast node."""
         node.ctx = context
         return node
 
     def ensure_real(self, number: TokenInfo) -> float:
         value = ast.literal_eval(number.string)
-        if isinstance(value, complex):
+        if not isinstance(value, float):
             self.raise_syntax_error_known_location("real number required in complex literal", number)
         return value
 
@@ -441,7 +442,7 @@ class Parser:
 
         return name
 
-    def _concat_strings_in_constant(self, parts) -> ast.Constant:
+    def _concat_strings_in_constant(self, parts: list[TokenInfo]) -> ast.Constant:
         s = ast.literal_eval(parts[0].string)
         for ss in parts[1:]:
             s += ast.literal_eval(ss.string)
@@ -456,7 +457,9 @@ class Parser:
             args["kind"] = "u"
         return ast.Constant(**args)
 
-    def concatenate_strings(self, parts):
+    def concatenate_strings(
+        self, parts: list[ast.JoinedStr | TokenInfo]
+    ) -> ast.Constant | ast.JoinedStr | ast.Call:
         """Concatenate multiple tokens and ast.JoinedStr"""
         # Get proper start and stop
         start = end = None
@@ -467,8 +470,8 @@ class Parser:
 
         # Combine the different parts
         seen_joined = False
-        values = []
-        ss = []
+        values: list[Any] = []  # ast.Constant | ast.FormattedValue
+        ss: list[TokenInfo] = []
 
         if path_tok := (self._strip_path_prefix(parts[0])):
             parts[0] = path_tok
@@ -479,6 +482,7 @@ class Parser:
                 if ss:
                     values.append(self._concat_strings_in_constant(ss))
                     ss.clear()
+
                 values.extend(p.values)
             else:
                 ss.append(p)
@@ -486,17 +490,17 @@ class Parser:
         if ss:
             values.append(self._concat_strings_in_constant(ss))
 
-        consolidated = []
+        consolidated: list[Any] = []  # ast.Constant | ast.FormattedValue
         for p in values:
             if consolidated and isinstance(consolidated[-1], ast.Constant) and isinstance(p, ast.Constant):
-                consolidated[-1].value += p.value
+                consolidated[-1].value += p.value  # type: ignore
                 consolidated[-1].end_lineno = p.end_lineno
                 consolidated[-1].end_col_offset = p.end_col_offset
             else:
                 consolidated.append(p)
 
         if not seen_joined and len(values) == 1 and isinstance(values[0], ast.Constant):
-            node = values[0]
+            node: ast.Constant | ast.JoinedStr | ast.Call = values[0]
         else:
             node = ast.JoinedStr(
                 values=consolidated,
@@ -511,14 +515,14 @@ class Parser:
             self._path_token = None
         return node
 
-    def handle_fstring(self, a: TokenInfo, b, **locs):
+    def handle_fstring(self, a: TokenInfo, b: list[ast.expr], **locs: int) -> ast.JoinedStr:
         path_tok = self._strip_path_prefix(a)
         if path_tok:
             self._path_token = path_tok
         return ast.JoinedStr(values=b, **locs)
 
     @staticmethod
-    def _strip_path_prefix(token: TokenInfo) -> TokenInfo | None:
+    def _strip_path_prefix(token: TokenInfo | ast.expr) -> TokenInfo | None:
         if not isinstance(token, TokenInfo):
             return None
         text = token.string
@@ -544,21 +548,16 @@ class Parser:
                 level += 3
         return level
 
-    def set_decorators(self, target: FC, decorators: list) -> FC:
+    def set_decorators(self, target: FC, decorators: list[ast.expr]) -> FC:
         """Set the decorators on a function or class definition."""
         target.decorator_list = decorators
         return target
 
-    def get_comparison_ops(self, pairs):
+    def get_comparison_ops(self, pairs: list[tuple[T, T]]) -> list[T]:
         return [op for op, _ in pairs]
 
-    def get_comparators(self, pairs):
+    def get_comparators(self, pairs: list[tuple[T, T]]) -> list[T]:
         return [comp for _, comp in pairs]
-
-    def set_arg_type_comment(self, arg, type_comment):
-        if type_comment or sys.version_info < (3, 9):
-            arg.type_comment = type_comment
-        return arg
 
     def make_arguments(
         self,
@@ -592,7 +591,9 @@ class Parser:
             kwarg=after_star[2],
         )
 
-    def expand_env_name(self, name: TokenInfo, ctx=None, **locs):
+    def expand_env_name(
+        self, name: TokenInfo, ctx: ast.Load | ast.Store | None = None, **locs: int
+    ) -> ast.Subscript:
         if ctx is None:
             ctx = Load
         return ast.Subscript(
@@ -602,8 +603,8 @@ class Parser:
             **locs,
         )
 
-    def expand_help(self, atoms: list[tuple[ast.expr, TokenInfo]], **locs):
-        node = None
+    def expand_help(self, atoms: list[tuple[ast.Name, TokenInfo]], **_: int) -> ast.Call | None:
+        node: ast.Call | None = None
         for atom, tok in atoms:
             fn = "superhelp" if tok.is_exact_type(ExactToken.DOUBLE_QUESTION) else "help"
             if node is None:
@@ -616,7 +617,9 @@ class Parser:
                 )
         return node
 
-    def expand_env_expr(self, slices: ast.expr, ctx=None, **locs):
+    def expand_env_expr(
+        self, slices: ast.expr, ctx: ast.Store | ast.Load | None = None, **locs: int
+    ) -> ast.Subscript:
         if ctx is None:
             ctx = Load
         return ast.Subscript(
@@ -650,7 +653,7 @@ class Parser:
                 end_col_offset=cmd.end_col_offset,
             )
         # @(...)suffix
-        if isinstance(tree, (ast.Starred, ast.Tuple)) and isinstance(cmd, TokenInfo):
+        if isinstance(tree, ast.Starred | ast.Tuple) and isinstance(cmd, TokenInfo):
             suffix = ast.Constant(value=cmd.string, **cmd.loc())
             elts = [*tree.elts, suffix] if isinstance(tree, ast.Tuple) else [tree, suffix]
             return ast.Tuple(elts=elts, ctx=Load, **locs, **cmd.loc_end())
@@ -690,10 +693,9 @@ class Parser:
             yield stash
 
     def proc_args(self, args: list[TokenInfo | ast.expr]) -> list[ast.AST]:
-        cmds = list(self._proc_args(args))
-        return cmds
+        return list(self._proc_args(args))
 
-    def subproc(self, start: TokenInfo, args: list, **locs) -> ast.Call:
+    def subproc(self, start: TokenInfo, args: list[ast.AST], **locs: int) -> ast.Call:
         method = {
             ExactToken.DOLLAR_LPAREN: "subproc_captured",
             ExactToken.DOLLAR_LBRACKET: "subproc_uncaptured",
@@ -702,24 +704,24 @@ class Parser:
         }[ExactToken._value2member_map_[start.string]]  # type: ignore
         return xonsh_call(f"__xonsh__.{method}", *args, **locs)
 
-    def proc_inject(self, args: list, **locs) -> ast.Starred:
+    def proc_inject(self, args: list[ast.AST], **locs: int) -> ast.Starred:
         return ast.Starred(
             value=xonsh_call("__xonsh__.subproc_captured_inject", *args, **locs),
             ctx=Load,
             **locs,
         )
 
-    def proc_pyexpr(self, expr: ast.expr, **locs) -> ast.Starred:
+    def proc_pyexpr(self, expr: ast.expr, **locs: int) -> ast.Starred:
         return ast.Starred(
             value=xonsh_call("__xonsh__.list_of_strs_or_callables", expr, **locs),
             ctx=Load,
             **locs,
         )
 
-    def expand_search_path(self, a: TokenInfo, **locs):
+    def expand_search_path(self, a: TokenInfo, **locs: int) -> ast.Call:
         return xonsh_call("__xonsh__.pathsearch", ast.Constant(value=a.string, **locs), **locs)
 
-    def macro_call(self, a, b, **locs):
+    def macro_call(self, a: ast.expr, b: list[TokenInfo], **locs: int) -> ast.Call:
         gbl_call = xonsh_call("globals", **locs)
         loc_call = xonsh_call("locals", **locs)
         positionals = ast.Tuple(
@@ -734,7 +736,7 @@ class Parser:
             **locs,
         )
 
-    def handle_with_macro_stmt(self, a: ast.withitem, b: TokenInfo, **locs):
+    def handle_with_macro_stmt(self, a: ast.withitem, b: TokenInfo, **locs: int) -> ast.With:
         gblcall = xonsh_call("globals", **locs)
         loccall = xonsh_call("locals", **locs)
         body = ast.Constant(value=b.string, **b.loc())
@@ -742,19 +744,19 @@ class Parser:
         self._tokenizer._with_macro = False
         return ast.With(items=[a], body=[ast.Pass(**locs)], **locs)
 
-    def handle_func_macro_start(self, a):
+    def handle_func_macro_start(self, a: ast.expr) -> ast.expr:
         self._tokenizer._call_macro = True
         return a
 
-    def handle_with_macro_start(self, a: ast.withitem):
+    def handle_with_macro_start(self, a: ast.withitem) -> ast.withitem:
         self._tokenizer._with_macro = True
         return a
 
-    def handle_proc_macro_start(self, a):
+    def handle_proc_macro_start(self, a: TokenInfo) -> TokenInfo:
         self._tokenizer._proc_macro = True
         return a
 
-    def proc_macro_arg(self, a, **locs):
+    def proc_macro_arg(self, a: list[TokenInfo | str], **locs: int) -> ast.Constant:
         locs["col_offset"] += 1  # offset `!`
         st = "".join((tok.string if isinstance(tok, TokenInfo) else tok) for tok in a).strip()
         self._tokenizer._proc_macro = False
@@ -782,8 +784,7 @@ class Parser:
         # offset at 1 when reporting SyntaxError, so we need to increment
         # the column offset when reporting the error.
         args = (self.filename, start[0], start[1] + 1, line)
-        if sys.version_info >= (3, 10):
-            args += (end[0], end[1] + 1)  # type: ignore
+        args += (end[0], end[1] + 1)  # type: ignore
 
         return SyntaxError(message, args)
 
@@ -798,7 +799,7 @@ class Parser:
     def make_syntax_error(self, message: str) -> SyntaxError:
         return self._build_syntax_error(message)
 
-    def expect_forced(self, res: Any, expectation: str) -> TokenInfo | None:
+    def expect_forced(self, res: TokenInfo | None, expectation: str) -> TokenInfo | None:
         if res is None:
             last_token = self._tokenizer.diagnose()
             end = last_token.start
@@ -838,14 +839,14 @@ class Parser:
         if isinstance(start_node, TokenInfo):
             start = start_node.start
         else:
-            start = start_node.lineno, start_node.col_offset  # type: ignore
+            start = start_node.lineno, start_node.col_offset
 
         if isinstance(end_node, TokenInfo):
             end = end_node.end
         else:
             end = end_node.end_lineno, end_node.end_col_offset  # type: ignore
 
-        raise self._build_syntax_error(message, start, end)  # type: ignore
+        raise self._build_syntax_error(message, start, end)
 
     def raise_syntax_error_starting_from(self, message: str, start_node: ast.AST | TokenInfo) -> NoReturn:
         if isinstance(start_node, TokenInfo):
@@ -878,7 +879,7 @@ class Parser:
     def parse_file(
         cls,
         path: Path,
-        py_version: tuple | None = None,
+        py_version: tuple[int, ...] | None = None,
         verbose: bool = False,
     ) -> ast.Module | None:
         """Parse a file or string."""
@@ -898,7 +899,7 @@ class Parser:
         cls,
         source: str,
         mode: Literal["eval", "exec"] = "eval",
-        py_version: tuple | None = None,
+        py_version: tuple[int, ...] | None = None,
         verbose: bool = False,
     ) -> Any:
         """Parse a string."""

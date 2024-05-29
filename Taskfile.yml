@@ -49,3 +49,7 @@ tasks:
   memray:
     cmds:
       - pytest --memray
+
+  mypy:
+    cmds:
+      - watchexec -e py --clear -- mypy peg_parser

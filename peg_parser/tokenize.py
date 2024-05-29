@@ -34,11 +34,14 @@ import functools
 import io
 import itertools as _itertools
 import re
-from enum import IntEnum, StrEnum, auto
-from typing import Final, NamedTuple
+from enum import Enum, auto
+from typing import TYPE_CHECKING, Any, Final, NamedTuple
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Generator, Iterator
 
 
-class ExactToken(StrEnum):
+class ExactToken(Enum):
     NOTEQUAL = "!="
     PERCENT = "%"
     PERCENTEQUAL = "%="
@@ -103,7 +106,7 @@ class ExactToken(StrEnum):
     AT_DOLLAR_LPAREN = "@$("
 
 
-class Token(IntEnum):
+class Token(Enum):
     """Tokens"""
 
     ENDMARKER = auto()
@@ -143,20 +146,20 @@ class TokenInfo(NamedTuple):
     def is_exact_type(self, typ: ExactToken) -> bool:
         return self.type == Token.OP and self.string == typ.value
 
-    def loc_start(self):
+    def loc_start(self) -> dict[str, int]:
         """helper method to construct AST node location"""
         return {
             "lineno": self.start[0],
             "col_offset": self.start[1],
         }
 
-    def loc_end(self):
+    def loc_end(self) -> dict[str, int]:
         return {
             "end_lineno": self.end[0],
             "end_col_offset": self.end[1],
         }
 
-    def loc(self):
+    def loc(self) -> dict[str, int]:
         """helper method to construct AST node location"""
         return {
             **self.loc_start(),
@@ -172,19 +175,19 @@ def capname(name: str, pattern: str) -> str:
     return f"(?P<{name}>{pattern})"
 
 
-def choice(*choices, **named_choices) -> str:
+def choice(*choices: str, **named_choices: str) -> str:
     choices += tuple(capname(name, pattern) for name, pattern in named_choices.items())
     return "|".join(choices)
 
 
-def group(*choices, name="", **named_choices):
+def group(*choices: str, name: str = "", **named_choices: str) -> str:
     pattern = "(" + choice(*choices, **named_choices) + ")"
     if name:
         pattern = capname(name, pattern)
     return pattern
 
 
-def maybe(*choices):
+def maybe(*choices: str) -> str:
     return group(*choices) + "?"
 
 
@@ -208,7 +211,7 @@ Number = group(Imagnumber, Floatnumber, Intnumber)
 
 
 # Return the empty string, plus all of the valid string prefixes.
-def _all_string_prefixes():
+def _all_string_prefixes() -> set[str]:
     # The valid string prefixes. Only contain the lower case versions,
     #  and don't contain any permutations (include 'fr', but not
     #  'rf'). The various permutations will be generated.
@@ -225,7 +228,7 @@ def _all_string_prefixes():
 
 
 @functools.lru_cache
-def _compile(expr):
+def _compile(expr: str) -> re.Pattern[str]:
     return re.compile(expr, re.UNICODE)
 
 
@@ -291,7 +294,7 @@ Mode = ModeMiddle | ModeInBraces | ModeInColon
 
 
 class TokenizerState:
-    def __init__(self):
+    def __init__(self) -> None:
         self.lnum = 0
         self.parenlev = 0
         self.continued = False
@@ -302,7 +305,7 @@ class TokenizerState:
         self.max = 0
         self.end_progs: list[EndProg] = []
 
-    def move_next_line(self, readline):
+    def move_next_line(self, readline: Callable[[], str]) -> None:
         self.last_line = self.line
         try:
             # We capture the value of the line variable here because
@@ -316,25 +319,25 @@ class TokenizerState:
         self.pos = 0
         self.max = len(self.line)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         form = f"<TokenizerState: {self.line[:self.pos]}﹝{self.pos}﹞{self.line[self.pos:]}> "
         if self.end_progs:
             form += f"({self.end_progs[-1].mode})"
         return form
 
-    def add_prog(self, start: int, end: int, **kwargs) -> None:
+    def add_prog(self, start: int, end: int, **kwargs: Any) -> None:
         self.end_progs.append(
             EndProg(text=self.line[start:end], contline=self.line, start=(self.lnum, start), **kwargs)
         )
 
-    def prog_token(self, end: int, tok: Token):
+    def prog_token(self, end: int, tok: Token) -> TokenInfo:
         endprog = self.end_progs[-1]
         endprog.join(self, end)
         self.pos = end
         epos = (self.lnum, end)
         return TokenInfo(tok, endprog.text, endprog.start, epos, endprog.contline)
 
-    def match(self, pattern: str | re.Pattern):
+    def match(self, pattern: str | re.Pattern[str]) -> re.Match[str] | None:
         pattern = _compile(pattern) if isinstance(pattern, str) else pattern
         return pattern.match(self.line, self.pos)
 
@@ -353,7 +356,7 @@ class TokenizerState:
     def in_multi_line_string(self) -> bool:
         return bool(self.end_progs) and (len(self.end_progs[-1].quote) == 3)
 
-    def pop_mode(self, end: tuple[int, int] | None = None):
+    def pop_mode(self, end: tuple[int, int] | None = None) -> EndProg:
         prog = self.end_progs.pop()
         if self.end_progs and end:
             self.end_progs[-1].reset(end)
@@ -362,9 +365,9 @@ class TokenizerState:
     def at_parenlev(self) -> bool:
         return (self.end_progs[-1].mode is not None) and self.end_progs[-1].mode.parenlevel == self.parenlev
 
-    def in_continued_string(self):
+    def in_continued_string(self) -> bool:
         return (
-            self.end_progs
+            bool(self.end_progs)
             and (
                 (self.line[-2:] == "\\\n")  # single quote should have line continuation at the end
                 or (self.line[-3:] == "\\\r\n")
@@ -375,7 +378,7 @@ class TokenizerState:
 @dataclasses.dataclass(slots=True)
 class EndProg:
     mode: Mode | None = None
-    pattern: re.Pattern | str = ""  # end pattern
+    pattern: re.Pattern[str] | str = ""  # end pattern
     text: str = ""
     contline: str = ""  # str
     start: tuple[int, int] = (0, 0)
@@ -388,13 +391,13 @@ class EndProg:
         self.text += state.line[state.pos :]
         self.contline += state.line
 
-    def reset(self, start: tuple[int, int]):
+    def reset(self, start: tuple[int, int]) -> None:
         self.start = start
         self.text = ""
         self.contline = ""
 
 
-def next_statement(state: TokenizerState):
+def next_statement(state: TokenizerState) -> Generator[TokenInfo, None, bool | None]:
     if not state.line:
         return False  # break parent loop
     column = 0
@@ -447,14 +450,15 @@ def next_statement(state: TokenizerState):
         state.indents = state.indents[:-1]
 
         yield TokenInfo(Token.DEDENT, "", (state.lnum, state.pos), (state.lnum, state.pos), state.line)
+    return None
 
 
-def next_psuedo_matches(state: TokenizerState):
+def next_psuedo_matches(state: TokenizerState) -> TokenInfo | None:
     if state.pos == state.max or state.in_fstring():
-        return
+        return None
     match = state.match(PseudoToken)
-    if not match:
-        return
+    if (not match) or (not match.lastgroup):
+        return None
     start, end = match.span(match.lastgroup)
     spos, epos, state.pos = (state.lnum, start), (state.lnum, end), end
     token = state.line[start:end]
@@ -468,7 +472,7 @@ def next_psuedo_matches(state: TokenizerState):
         else:
             pattern = endpats[quote]
             state.add_prog(start, end, pattern=pattern, quote=quote)
-            return
+            return None
     elif tok := {
         "ws": Token.WS,
         "Comment": Token.COMMENT,
@@ -492,16 +496,17 @@ def next_psuedo_matches(state: TokenizerState):
         token_type = Token.OP
     elif match.lastgroup == "End":  # // continuation
         state.continued = True
-        return
+        return None
     else:
         raise TokenError(f"Bad token: {token!r} at line {state.lnum}", spos)
 
     # Yield Token if Found
     if token_type:
         return TokenInfo(token_type, token, spos, epos, state.line)
+    return None
 
 
-def next_end_tokens(state: TokenizerState):
+def next_end_tokens(state: TokenizerState) -> Iterator[TokenInfo]:
     # Add an implicit NEWLINE if the input doesn't end in one
     if state.last_line and state.last_line[-1] not in "\r\n" and not state.last_line.strip().startswith("#"):
         yield TokenInfo(
@@ -516,10 +521,10 @@ def next_end_tokens(state: TokenizerState):
     yield TokenInfo(Token.ENDMARKER, "", (state.lnum, 0), (state.lnum, 0), "")
 
 
-def handle_fstring_progs(state, endprog: EndProg):
+def handle_fstring_progs(state: TokenizerState, endprog: EndProg) -> Iterator[TokenInfo]:
     endmatch = state.match(endprog.pattern)
-    if not endmatch:
-        return
+    if (not endmatch) or (not endmatch.lastgroup):
+        return None
     start, end = endmatch.span(endmatch.lastgroup)
     if endmatch.lastgroup == "End":  # quote match
         middle_end = end - len(endprog.quote)
@@ -562,7 +567,7 @@ def handle_fstring_progs(state, endprog: EndProg):
     state.pos = end
 
 
-def handle_end_progs(state: TokenizerState):
+def handle_end_progs(state: TokenizerState) -> Iterator[TokenInfo]:
     if not state.end_progs:
         return
     if state.pos == 0 and not state.line:
@@ -595,7 +600,7 @@ def handle_end_progs(state: TokenizerState):
     #     raise TokenError(f"Invalid string quotes at {state.pos} in {state.line}", (state.lnum, state.pos))
 
 
-def _tokenize(readline):
+def _tokenize(readline: Callable[[], str]) -> Iterator[TokenInfo]:
     state = TokenizerState()
 
     while True:  # loop over lines in stream
@@ -636,7 +641,7 @@ def _tokenize(readline):
     yield from next_end_tokens(state)
 
 
-def generate_tokens(readline):
+def generate_tokens(readline: Callable[[], str] | str) -> Iterator[TokenInfo]:
     """Tokenize a source reading Python code as unicode strings.
 
     This has the same API as tokenize(), except that it expects the *readline*

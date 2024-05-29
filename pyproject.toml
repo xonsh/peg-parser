@@ -128,15 +128,24 @@ Source = "https://github.com/jnoortheen/xonsh-parser"
 [tool.mypy]
 # mypy ignore file "xonsh_parser/ply/yacc.py"
 packages = "peg_parser"
-ignore_missing_imports = true
-warn_unused_configs = true
-follow_imports = 'skip'
-#warn_unused_ignores = true
-#strict_optional = false
-#warn_redundant_casts = true
 exclude = [
     'tests',
     'peg_parser/parser.py',
     'pegen\/build.py',
     'pegen\/grammar_parser.py',
 ]
+check_untyped_defs = true
+ignore_missing_imports = true
+follow_imports = 'skip'
+strict = true
+
+warn_unused_configs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+
+show_error_codes = true
+show_column_numbers = true
+show_error_context = true
+error_summary = true
+pretty = true

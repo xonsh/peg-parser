@@ -73,16 +73,11 @@ def parse_invalid_syntax(
                 and (end[1] is not None and exc.end_offset != end[1])
             )
         ):
-            if sys.version_info >= (3, 10):
-                raise ValueError(
-                    f"Expected locations of {start} and {end}, but got "
-                    f"{(exc.lineno, exc.offset)} and {(exc.end_lineno, exc.end_offset)} "
-                    f"from {parser}"
-                )
-            else:
-                raise ValueError(
-                    f"Expected locations of {start}, but got {(exc.lineno, exc.offset)} from {parser}"
-                )
+            raise ValueError(
+                f"Expected locations of {start} and {end}, but got "
+                f"{(exc.lineno, exc.offset)} and {(exc.end_lineno, exc.end_offset)} "
+                f"from {parser}"
+            )
 
 
 @pytest.mark.parametrize(

@@ -168,7 +168,7 @@ class Tokenizer:
 
     def get_last_non_whitespace_token(self) -> TokenInfo:
         for tok in reversed(self._tokens[: self._index]):
-            if tok.type != Token.ENDMARKER and (tok.type < Token.NEWLINE or tok.type > Token.DEDENT):
+            if tok.type not in {Token.ENDMARKER, Token.NEWLINE, Token.DEDENT, Token.INDENT}:
                 break
         return tok
 

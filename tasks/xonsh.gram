@@ -355,17 +355,17 @@ kwds[ast.arg]:
 #
 
 param_no_default[ast.arg]:
-    | a=param ',' tc=TYPE_COMMENT? { self.set_arg_type_comment(a, tc) }
-    | a=param tc=TYPE_COMMENT? &')' { self.set_arg_type_comment(a, tc) }
+    | a=param ',' tc=TYPE_COMMENT? { a }
+    | a=param tc=TYPE_COMMENT? &')' { a }
 param_no_default_star_annotation[ast.arg]:
-    | a=param_star_annotation ',' tc=TYPE_COMMENT? { self.set_arg_type_comment(a, tc) }
-    | a=param_star_annotation tc=TYPE_COMMENT? &')' { self.set_arg_type_comment(a, tc) }
+    | a=param_star_annotation ',' tc=TYPE_COMMENT? { a }
+    | a=param_star_annotation tc=TYPE_COMMENT? &')' { a }
 param_with_default[Tuple[ast.arg, Any]]:
-    | a=param c=default ',' tc=TYPE_COMMENT? { (self.set_arg_type_comment(a, tc), c) }
-    | a=param c=default tc=TYPE_COMMENT? &')' { (self.set_arg_type_comment(a, tc), c) }
+    | a=param c=default ',' tc=TYPE_COMMENT? { (a, c) }
+    | a=param c=default tc=TYPE_COMMENT? &')' { (a, c) }
 param_maybe_default[Tuple[ast.arg, Any]]:
-    | a=param c=default? ',' tc=TYPE_COMMENT? { (self.set_arg_type_comment(a, tc), c) }
-    | a=param c=default? tc=TYPE_COMMENT? &')' { (self.set_arg_type_comment(a, tc), c) }
+    | a=param c=default? ',' tc=TYPE_COMMENT? { (a, c) }
+    | a=param c=default? tc=TYPE_COMMENT? &')' { (a, c) }
 param: a=NAME b=annotation? { ast.arg(arg=a.string, annotation=b, LOCATIONS) }
 param_star_annotation: a=NAME b=star_annotation {
     ast.arg(arg=a.string, annotations=b, LOCATIONS)

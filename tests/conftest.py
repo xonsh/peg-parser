@@ -20,19 +20,19 @@ def nodes_equal(x, y):
         assert x.value == y.value, (
             f"Constant ast nodes do not have the same value: " f"{x.value!r} != {y.value!r}"
         )
-    if isinstance(x, (ast.Expr, ast.FunctionDef, ast.ClassDef)):
+    if isinstance(x, ast.Expr | ast.FunctionDef | ast.ClassDef):
         assert x.lineno == y.lineno, f"Ast nodes do not have the same line number : {x.lineno} != {y.lineno}"
         assert (
             x.col_offset == y.col_offset
         ), f"Ast nodes do not have the same column offset number : {x.col_offset} != {y.col_offset}"
-    for (xname, xval), (yname, yval) in zip(ast.iter_fields(x), ast.iter_fields(y)):
+    for (xname, xval), (yname, yval) in zip(ast.iter_fields(x), ast.iter_fields(y), strict=False):
         assert (
             xname == yname
         ), f"Ast nodes fields differ : {xname} (of type {type(xval)}) != {yname} (of type {type(yval)})"
         assert type(xval) == type(
             yval
         ), f"Ast nodes fields differ : {xname} (of type {type(xval)}) != {yname} (of type {type(yval)})"
-    for xchild, ychild in zip(ast.iter_child_nodes(x), ast.iter_child_nodes(y)):
+    for xchild, ychild in zip(ast.iter_child_nodes(x), ast.iter_child_nodes(y), strict=False):
         assert nodes_equal(xchild, ychild), "Ast node children differs"
     return True
 
@@ -158,7 +158,7 @@ def xsh():
         """
         A simplified version of the xonsh function.
         """
-        if isinstance(x, (str, bytes)):
+        if isinstance(x, str | bytes):
             return [x]
         if callable(x):
             return [x([])]
