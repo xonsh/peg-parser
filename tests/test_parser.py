@@ -1,5 +1,6 @@
 """Tests the xonsh parser."""
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -144,6 +145,12 @@ def glob_data_param(pattern: str):
 
 @pytest.mark.parametrize("inp, exp", glob_data_param("exprs/*.py"))
 def test_exprs(inp, exp, unparse_diff):
+    unparse_diff(inp, exp)
+
+
+@pytest.mark.parametrize("inp, exp", glob_data_param("fstring_py312.py"))
+@pytest.mark.skipif(sys.version_info < (3, 12), reason="requires python3.12")
+def test_py312_fstring(inp, exp, unparse_diff):
     unparse_diff(inp, exp)
 
 
