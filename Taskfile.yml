@@ -42,5 +42,10 @@ tasks:
 
   bench-view:
     cmds:
+      - asv run "main^!" -v
       - asv publish
       - asv preview
+
+  memray:
+    cmds:
+      - pytest --memray

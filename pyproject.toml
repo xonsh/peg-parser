@@ -84,6 +84,8 @@ profile = [
     "virtualenv>=20.21.0",
     "pympler>=1.0.1",
     "guppy3>=3.1.2",
+    "memray",
+    "pytest-memray",
 ]
 dev = [
     "flask>=3.0.3",
@@ -110,7 +112,7 @@ dynamic = ["version"]
 classifiers = [
     "Programming Language :: Python :: 3 :: Only",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "mypy-extensions>=1.0.0",
 ]
