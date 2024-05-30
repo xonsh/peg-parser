@@ -29,4 +29,21 @@ class CustomBuild(build):
     sub_commands = [("build_custom", None), *build.sub_commands]  # noqa: RUF012
 
 
-setup(cmdclass={"build": CustomBuild, "build_custom": CustomCommand})
+options = {}
+
+
+if os.environ.get("COMPILE_WITH_MYPYC"):
+    from mypyc.build import mypycify
+
+    options["ext_modules"] = mypycify(
+        [
+            "peg_parser/tokenize.py",
+            "peg_parser/tokenizer.py",
+            "peg_parser/subheader.py",
+        ]
+    )
+
+setup(
+    cmdclass={"build": CustomBuild, "build_custom": CustomCommand},
+    **options,
+)

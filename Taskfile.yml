@@ -12,7 +12,8 @@ tasks:
 
   profile:
     cmds:
-      - python tasks/profile_mem.py tee "logs/xonsh-parser-$(date "+%Y%m%d-%H%M%S").log"
+      - mkdir -p .local/logs
+      - python tasks/profile_mem.py | tee ".local/logs/xonsh-parser-$(date "+%Y%m%d-%H%M%S").$(git rev-parse --short HEAD).log"
 
   ply-add:
     cmds:
@@ -38,7 +39,8 @@ tasks:
 
   bench:
     cmds:
-      - asv run --python=same --show-stderr
+      - mkdir -p .local/logs
+      - asv run --python=same --show-stderr | tee .local/logs/bench.$(date "+%Y%m%d-%H%M%S").$(git rev-parse --short HEAD).txt
 
   bench-view:
     cmds:
@@ -53,3 +55,14 @@ tasks:
   mypy:
     cmds:
       - watchexec -e py --clear -- mypy peg_parser
+
+  mypyc:
+    cmds:
+      - env COMPILE_WITH_MYPYC=1 pip install -e .
+    sources:
+      - peg_parser/subheader.py
+      - peg_parser/toke*.py
+
+  clean:
+    cmds:
+      - find peg_parser -name "*.so" -delete -print

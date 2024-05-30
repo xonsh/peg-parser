@@ -113,3 +113,33 @@ current=2625.3KiB,  peak=9884.7KiB
 ...
 Total allocated size: 9799.6 KiB
 ```
+
+# Compiling with mypyc doesn't improve much
+
+needed to add following to use it successfully
+```py
+from mypy_extensions import mypyc_attr
+
+
+@mypyc_attr(allow_interpreted_subclasses=True)
+class Parser():
+    ...
+```
+
+with mypyc
+```
+current=2125.4KiB,  peak=28725.6KiB
+...
+1836 other: 757.9 KiB
+Total allocated size: 1387.7 KiB
+Took:  4.03s
+```
+
+without mypyc
+```
+current=1904.7KiB,  peak=1947.3KiB
+...
+1948 other: 596.0 KiB
+Total allocated size: 1901.8 KiB
+Took:  1.39s
+```
