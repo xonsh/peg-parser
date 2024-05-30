@@ -1,26 +1,44 @@
 {
-    "benchmarks.MemSuite.mem_parser_init": {
-        "code": "class MemSuite:\n    def mem_parser_init(self):\n        parse(\"![ls -alh]\")",
-        "name": "benchmarks.MemSuite.mem_parser_init",
+    "benchmarks.MemSuite.mem_parse_small": {
+        "code": "class MemSuite:\n    def mem_parse_small(self):\n        parse(small_code)",
+        "name": "benchmarks.MemSuite.mem_parse_small",
         "param_names": [],
         "params": [],
         "type": "memory",
         "unit": "bytes",
-        "version": "d1d13e9271ac2f54e4467d6fa696e8594e58c73a636054c7408b1f70d6993831"
+        "version": "2980056e1c6a36c127d33192fdaf94834c4e9bb478e01f2115905fd2479f2641"
     },
-    "benchmarks.PeakMemSuite.peakmem_parser_init_": {
-        "code": "class PeakMemSuite:\n    def peakmem_parser_init_(self):\n        parse(\"![ls -alh]\")",
-        "name": "benchmarks.PeakMemSuite.peakmem_parser_init_",
+    "benchmarks.MemSuite.mem_parser_large_file": {
+        "code": "class MemSuite:\n    def mem_parser_large_file(self):\n        parse(file)",
+        "name": "benchmarks.MemSuite.mem_parser_large_file",
+        "param_names": [],
+        "params": [],
+        "type": "memory",
+        "unit": "bytes",
+        "version": "8dc526837bb685865223e60aa9c39e265e1d8074dd2222fcce432218e31dd942"
+    },
+    "benchmarks.PeakMemSuite.peakmem_parse_small": {
+        "code": "class PeakMemSuite:\n    def peakmem_parse_small(self):\n        parse(\"![ls -alh]\")",
+        "name": "benchmarks.PeakMemSuite.peakmem_parse_small",
         "param_names": [],
         "params": [],
         "type": "peakmemory",
         "unit": "bytes",
-        "version": "47681fd0575e44856252c83a7fa6e6fe4fe73a76dd56202580ae9b2fedc0259d"
+        "version": "65abaa17b84b8e7f12233f9ab9d91f00fc2adb92b37cd7c09440e8f0c0d5c88b"
     },
-    "benchmarks.TimeSuite.time_parser_init": {
-        "code": "class TimeSuite:\n    def time_parser_init(self):\n        parse(\"![ls -alh]\")",
+    "benchmarks.PeakMemSuite.peakmem_parser_large_file": {
+        "code": "class PeakMemSuite:\n    def peakmem_parser_large_file(self):\n        parse(file)",
+        "name": "benchmarks.PeakMemSuite.peakmem_parser_large_file",
+        "param_names": [],
+        "params": [],
+        "type": "peakmemory",
+        "unit": "bytes",
+        "version": "2e340a318725c374d320a613da113eb4a4f20928fe042dd305f113ebc8ef72aa"
+    },
+    "benchmarks.TimeSuite.time_large_files": {
+        "code": "class TimeSuite:\n    def time_large_files(self):\n        parse(file)",
         "min_run_count": 2,
-        "name": "benchmarks.TimeSuite.time_parser_init",
+        "name": "benchmarks.TimeSuite.time_large_files",
         "number": 0,
         "param_names": [],
         "params": [],
@@ -29,7 +47,22 @@
         "sample_time": 0.01,
         "type": "time",
         "unit": "seconds",
-        "version": "f2c6ff395f3b5b2fa63f6bae6bfdc8bf1c5a82b6cfc1c4f86aea11182d6dc0ea",
+        "version": "8ff5636d4a0d1c39582d9ad629e6c1ec4041c4543378d5f03be4a0fc79b35043",
+        "warmup_time": -1
+    },
+    "benchmarks.TimeSuite.time_parse_small_string": {
+        "code": "class TimeSuite:\n    def time_parse_small_string(self):\n        parse(small_code)",
+        "min_run_count": 2,
+        "name": "benchmarks.TimeSuite.time_parse_small_string",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "repeat": 0,
+        "rounds": 2,
+        "sample_time": 0.01,
+        "type": "time",
+        "unit": "seconds",
+        "version": "dffdd003f5d676c9b9b82dce1e1bca08eb544cae17d3c02243f2dd09bb94393f",
         "warmup_time": -1
     },
     "version": 2
