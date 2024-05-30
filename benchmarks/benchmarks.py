@@ -21,13 +21,6 @@ class TimeSuite:
         parse(file)
 
 
-class MemSuite:
-    def mem_parse_small(self):
-        parse(small_code)
-
-    def mem_parser_large_file(self):
-        parse(file)
-
 class PeakMemSuite:
     def peakmem_parse_small(self):
         parse("![ls -alh]")

@@ -13,7 +13,11 @@ tasks:
   profile:
     cmds:
       - mkdir -p .local/logs
-      - python tasks/profile_mem.py | tee ".local/logs/xonsh-parser-$(date "+%Y%m%d-%H%M%S").$(git rev-parse --short HEAD).log"
+      - python tasks/profile_mem.py | tee {{.LOG_FILE}}
+      - asv profile benchmarks.TimeSuite.time_large_files | tee -a {{.LOG_FILE}}
+    vars:
+      LOG_FILE:
+        sh: echo ".local/logs/xonsh-parser-$(date "+%Y%m%d-%H%M%S").$(git rev-parse --short HEAD).log"
 
   ply-add:
     cmds:
