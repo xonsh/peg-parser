@@ -81,7 +81,7 @@ def memoize(method: F) -> F:
     """Memoize a symbol method."""
     method_name = method.__name__
 
-    def memoize_wrapper(self: P, *args: object) -> Any:
+    def memoize_wrapper(self: P, *args: str | Token) -> Any:
         mark = self._mark()
         key = mark, method_name, args
         # Fast path: cache hit, and not verbose.
@@ -90,9 +90,10 @@ def memoize(method: F) -> F:
             self._reset(endmark)
             return tree
         # Slow path: no cache hit, or verbose.
-        verbose = self._verbose
-        argsr = ",".join(repr(arg) for arg in args)
-        fill = "  " * self._level
+        verbose, argsr, fill = self._verbose, "", ""
+        if verbose:
+            argsr = ",".join(repr(arg) for arg in args)
+            fill = "  " * self._level
         if key not in self._cache:
             if verbose:
                 print(f"{fill}{method_name}({argsr}) ... (looking at {self.showpeek()})")
