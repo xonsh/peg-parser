@@ -417,9 +417,9 @@ class Parser:
         node.ctx = context
         return node
 
-    def ensure_real(self, number: TokenInfo) -> float:
+    def ensure_real(self, number: TokenInfo) -> float | int:
         value = ast.literal_eval(number.string)
-        if not isinstance(value, float):
+        if not isinstance(value, float | int):
             self.raise_syntax_error_known_location("real number required in complex literal", number)
         return value
 
