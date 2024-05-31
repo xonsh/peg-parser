@@ -128,8 +128,9 @@ def memoize_left_rec(method: Callable[[P], T | None]) -> Callable[[P], T | None]
             self._reset(endmark)
             return tree
         # Slow path: no cache hit, or verbose.
-        verbose = self._verbose
-        fill = "  " * self._level
+        verbose, fill = self._verbose, ""
+        if verbose:
+            fill = "  " * self._level
         if key not in self._cache:
             if verbose:
                 print(f"{fill}{method_name} ... (looking at {self.showpeek()})")

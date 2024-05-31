@@ -1,22 +1,4 @@
 {
-    "benchmarks.MemSuite.mem_parse_small": {
-        "code": "class MemSuite:\n    def mem_parse_small(self):\n        parse(small_code)",
-        "name": "benchmarks.MemSuite.mem_parse_small",
-        "param_names": [],
-        "params": [],
-        "type": "memory",
-        "unit": "bytes",
-        "version": "2980056e1c6a36c127d33192fdaf94834c4e9bb478e01f2115905fd2479f2641"
-    },
-    "benchmarks.MemSuite.mem_parser_large_file": {
-        "code": "class MemSuite:\n    def mem_parser_large_file(self):\n        parse(file)",
-        "name": "benchmarks.MemSuite.mem_parser_large_file",
-        "param_names": [],
-        "params": [],
-        "type": "memory",
-        "unit": "bytes",
-        "version": "8dc526837bb685865223e60aa9c39e265e1d8074dd2222fcce432218e31dd942"
-    },
     "benchmarks.PeakMemSuite.peakmem_parse_small": {
         "code": "class PeakMemSuite:\n    def peakmem_parse_small(self):\n        parse(\"![ls -alh]\")",
         "name": "benchmarks.PeakMemSuite.peakmem_parse_small",
