@@ -1,5 +1,9 @@
 version: '3'
 tasks:
+  generate-meta:
+    cmds:
+      - python3 tasks/generate_parser.py -g pegen/metagrammar.gram -o pegen/grammar_parser.py
+      - ruff format pegen/grammar_parser.py
   generate:
     cmds:
       - python3 tasks/generate_parser.py
@@ -14,7 +18,8 @@ tasks:
     cmds:
       - mkdir -p .local/logs
       - python tasks/profile_mem.py | tee {{.LOG_FILE}}
-      - asv profile benchmarks.TimeSuite.time_large_files | tee -a {{.LOG_FILE}}
+      - python tasks/simple.py | tee -a {{.LOG_FILE}}
+      - asv profile benchmarks.PeakMemSuite.peakmem_parser_large_file | tee -a {{.LOG_FILE}}
     vars:
       LOG_FILE:
         sh: echo ".local/logs/xonsh-parser-$(date "+%Y%m%d-%H%M%S").$(git rev-parse --short HEAD).log"

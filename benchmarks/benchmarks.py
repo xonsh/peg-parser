@@ -27,3 +27,9 @@ class PeakMemSuite:
 
     def peakmem_parser_large_file(self):
         parse(file)
+
+
+def timeraw_import_parser():
+    return """
+    from peg_parser.parser import XonshParser
+    """

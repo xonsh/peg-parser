@@ -47,5 +47,20 @@
         "version": "dffdd003f5d676c9b9b82dce1e1bca08eb544cae17d3c02243f2dd09bb94393f",
         "warmup_time": -1
     },
+    "benchmarks.timeraw_import_parser": {
+        "code": "def timeraw_import_parser():\n    return \"\"\"\n    from peg_parser.parser import XonshParser\n    \"\"\"",
+        "min_run_count": 2,
+        "name": "benchmarks.timeraw_import_parser",
+        "number": 1,
+        "param_names": [],
+        "params": [],
+        "repeat": 0,
+        "rounds": 2,
+        "sample_time": 0.01,
+        "type": "time",
+        "unit": "seconds",
+        "version": "7eb7742efc9295f8226cdb3db559e5325cbe04bae4286418469d3d40a56d4cd0",
+        "warmup_time": -1
+    },
     "version": 2
 }
