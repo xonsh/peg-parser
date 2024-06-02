@@ -27,7 +27,23 @@ def print_memstats() -> bool:
     return True
 
 
+def sm():
+    """The minimum program uses around 16MB memory"""
+    # Memory stats:
+    #   rss         :         16 MiB
+    #   vms         :     401345 MiB
+    #   maxrss      :         16 MiB
+    import ast
+
+    tree = ast.parse("print(1)")
+    print(ast.dump(tree))
+
+
 def main():
+    # Memory stats:
+    #   rss         :         19 MiB
+    #   vms         :     401474 MiB
+    #   maxrss      :         19 MiB
     from peg_parser.parser import XonshParser
 
     src_txt = "print(1)"
@@ -37,4 +53,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # sm()
     print_memstats()

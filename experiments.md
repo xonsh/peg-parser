@@ -143,3 +143,12 @@ current=1904.7KiB,  peak=1947.3KiB
 Total allocated size: 1901.8 KiB
 Took:  1.39s
 ```
+
+# PEG parser sizes
+
+- final `peg_parser/parser.py` sizes
+
+| step                        | size |
+|-----------------------------|------|
+| initial                     | 361K |
+| after removing extra spaces | 356K |
