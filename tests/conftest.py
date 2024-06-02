@@ -38,8 +38,7 @@ def nodes_equal(x, y):
 
 
 def build_parser(name: str):
-    print(Path(__file__).parent.parent.joinpath("peg_parser/parser.py").absolute())
-    if not Path(__file__).parent.joinpath("peg_parser/parser/parser.py").exists():
+    if not Path(__file__).parent.joinpath("peg_parser/parser.py").exists():
         from tasks import generate_parser
 
         generate_parser.main()

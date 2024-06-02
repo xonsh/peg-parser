@@ -59,7 +59,9 @@ class XonshParserGenerator(PythonParserGenerator):
         self.cleanup_statements: list[str] = []
 
 
-def main(output_file: Path, grammar_file: Path):
+def main(output_file=None, grammar_file=None):
+    output_file = output_file or Path(__file__).parent.parent / "peg_parser" / "parser.py"
+    grammar_file = grammar_file or Path(__file__).with_name("xonsh.gram")
     grammar, *_ = build_parser(str(grammar_file))
     with output_file.open("w") as file:
         gen = XonshParserGenerator(grammar, file)
@@ -71,8 +73,8 @@ def cli_parser():
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
-    parser.add_argument("-g", type=Path, default=Path(__file__).with_name("xonsh.gram"))
-    parser.add_argument("-o", type=Path, default=Path(__file__).parent.parent / "peg_parser" / "parser.py")
+    parser.add_argument("-g", type=Path)
+    parser.add_argument("-o", type=Path)
     return parser
 
 
