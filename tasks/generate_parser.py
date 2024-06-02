@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 from typing import IO, Any
 
@@ -57,6 +58,13 @@ class XonshParserGenerator(PythonParserGenerator):
             "end_lineno=end_lineno, end_col_offset=end_col_offset"
         )
         self.cleanup_statements: list[str] = []
+
+    def add_return(self, ret_val: str) -> None:
+        for stmt in self.cleanup_statements:
+            self.print(stmt)
+        # terse representation of return values
+        ret_val = ast.unparse(ast.parse(ret_val))
+        self.print(f"return {ret_val}")
 
 
 def main(output_file=None, grammar_file=None):
