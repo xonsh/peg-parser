@@ -152,3 +152,15 @@ Took:  1.39s
 |-----------------------------|------|
 | initial                     | 361K |
 | after removing extra spaces | 356K |
+| optimize LOCATIONS          | 322K |
+
+- optimized `get_last_non_whitespace_token` brought `benchmarks.PeakMemSuite.peakmem_parser_large_file` runtime to 5s from 10s
+
+```text
+ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+
+42517    6.443    0.000    6.529    0.000 tokenizer.py:169(get_last_non_whitespace_token)
+
+# after optimization
+39117    0.056    0.000    0.123    0.000 tokenizer.py:169(get_last_non_whitespace_token)
+```

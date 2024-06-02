@@ -18,9 +18,10 @@ tasks:
   profile:
     cmds:
       - mkdir -p .local/logs
-      - python tasks/profile_mem.py | tee {{.LOG_FILE}}
+      - asv run --python=same --show-stderr | tee -a {{.LOG_FILE}}
+      - python tasks/profile_mem.py | tee -a {{.LOG_FILE}}
       - python tasks/simple.py | tee -a {{.LOG_FILE}}
-      - asv profile benchmarks.PeakMemSuite.peakmem_parser_large_file | tee -a {{.LOG_FILE}}
+      - asv profile --python=same benchmarks.PeakMemSuite.peakmem_parser_large_file | tee -a {{.LOG_FILE}}
     vars:
       LOG_FILE:
         sh: echo ".local/logs/xonsh-parser-$(date "+%Y%m%d-%H%M%S").$(git rev-parse --short HEAD).log"
@@ -48,11 +49,6 @@ tasks:
       - watchexec -e py,gram --clear -- task test -- --ff -x -vv --testmon
 
   bench:
-    cmds:
-      - mkdir -p .local/logs
-      - asv run --python=same --show-stderr | tee .local/logs/bench.$(date "+%Y%m%d-%H%M%S").$(git rev-parse --short HEAD).txt
-
-  bench-view:
     cmds:
       - asv run "main^!" -v
       - asv publish

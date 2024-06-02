@@ -41,7 +41,6 @@ class XonshParserGenerator(PythonParserGenerator):
         self,
         grammar: grammar.Grammar,
         file: IO[str] | None,
-        location_formatting: str | None = None,
         unreachable_formatting: str | None = None,
     ):
         self.tokens_enum = Token
@@ -52,11 +51,7 @@ class XonshParserGenerator(PythonParserGenerator):
         self.invalidvisitor = InvalidNodeVisitor()
         self.usednamesvisitor = UsedNamesVisitor()
         self.unreachable_formatting = unreachable_formatting or "None  # pragma: no cover"
-        self.location_formatting = (
-            location_formatting
-            or "lineno=start_lineno, col_offset=start_col_offset, "
-            "end_lineno=end_lineno, end_col_offset=end_col_offset"
-        )
+        self.location_formatting = "**self.span(start_lineno, start_col_offset)"
         self.cleanup_statements: list[str] = []
 
     def add_return(self, ret_val: str) -> None:
@@ -65,6 +60,33 @@ class XonshParserGenerator(PythonParserGenerator):
         # terse representation of return values
         ret_val = ast.unparse(ast.parse(ret_val))
         self.print(f"return {ret_val}")
+
+    def print_action(
+        self,
+        action: str | None,
+        locations: bool,
+        unreachable: bool,
+        is_gather: bool,
+        is_loop: bool,
+        has_invalid: bool,
+    ) -> None:
+        if not action:
+            if is_gather:
+                assert len(self.local_variable_names) == 2
+                action = f"[{self.local_variable_names[0]}] + {self.local_variable_names[1]}"
+            elif has_invalid:
+                assert unreachable
+                assert isinstance(action, str)  # for type checker
+            elif len(self.local_variable_names) == 1:
+                action = f"{self.local_variable_names[0]}"
+            else:
+                action = f"[{', '.join(self.local_variable_names)}]"
+
+        if is_loop:
+            self.print(f"children.append({action})")
+            self.print("mark = self._mark()")
+        else:
+            self.add_return(f"{action}")
 
 
 def main(output_file=None, grammar_file=None):

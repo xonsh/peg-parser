@@ -167,10 +167,13 @@ class Tokenizer:
         return self._tokens[-1]
 
     def get_last_non_whitespace_token(self) -> TokenInfo:
-        for tok in reversed(self._tokens[: self._index]):
+        idx = self._index - 1
+        while idx >= 0:
+            tok = self._tokens[idx]
             if tok.type not in {Token.ENDMARKER, Token.NEWLINE, Token.DEDENT, Token.INDENT}:
-                break
-        return tok
+                return tok
+            idx -= 1
+        return self._tokens[-1]
 
     def get_lines(self, line_numbers: list[int]) -> list[str]:
         """Retrieve source lines corresponding to line numbers."""

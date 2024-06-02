@@ -321,6 +321,10 @@ class Parser:
         self._reset(mark)
         return not ok
 
+    def span(self, lnum: int, col: int) -> dict[str, int]:
+        end = self._tokenizer.get_last_non_whitespace_token().end
+        return {"lineno": lnum, "col_offset": col, "end_lineno": end[0], "end_col_offset": end[1]}
+
     def parse(self, rule: str, call_invalid_rules: bool = False) -> ast.AST | Any | None:
         self.call_invalid_rules = call_invalid_rules
         res = getattr(self, rule)()
