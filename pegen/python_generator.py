@@ -1,6 +1,6 @@
 import ast
 import re
-from enum import IntEnum
+import token
 from typing import IO, Any, Dict, List, Optional, Sequence, Set, Text, Tuple
 
 from pegen import grammar
@@ -92,7 +92,7 @@ class InvalidNodeVisitor(GrammarVisitor):
 
 
 class PythonCallMakerVisitor(GrammarVisitor):
-    def __init__(self, parser_generator: "PythonParserGenerator"):
+    def __init__(self, parser_generator: ParserGenerator):
         self.gen = parser_generator
         self.cache: Dict[Any, Any] = {}
         self.keywords: Set[str] = set()
@@ -100,13 +100,23 @@ class PythonCallMakerVisitor(GrammarVisitor):
 
     def visit_NameLeaf(self, node: NameLeaf) -> Tuple[Optional[str], str]:
         name = node.value
-        special = {"SOFT_KEYWORD", "KEYWORD", "NAME", "ANY_TOKEN"}
-        if name in special:
+        if name == "SOFT_KEYWORD":
+            return "soft_keyword", "self.soft_keyword()"
+        if name in (
+            "NAME",
+            "NUMBER",
+            "STRING",
+            "FSTRING_START",
+            "FSTRING_MIDDLE",
+            "FSTRING_END",
+            "OP",
+            "TYPE_COMMENT",
+        ):
             name = name.lower()
             return name, f"self.{name}()"
-        if name.isupper() and (name in self.gen.tokens):
-            token = self.gen.tokens_enum[name]
-            return "_" + name.lower(), f"self.token({token.__class__.__name__}.{token.name})"
+        if name in ("NEWLINE", "DEDENT", "INDENT", "ENDMARKER", "ASYNC", "AWAIT"):
+            # Avoid using names that can be Python keywords
+            return "_" + name.lower(), f"self.expect({name!r})"
         return name, f"self.{name}()"
 
     def visit_StringLeaf(self, node: StringLeaf) -> Tuple[str, str]:
@@ -218,15 +228,14 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
         self,
         grammar: grammar.Grammar,
         file: Optional[IO[Text]],
-        tokens_enum: IntEnum,
+        tokens: Set[str] = set(token.tok_name.values()),
         location_formatting: Optional[str] = None,
         unreachable_formatting: Optional[str] = None,
     ):
-        self.tokens_enum = tokens_enum
-        tokens = {t.name for t in tokens_enum}
         tokens.add("SOFT_KEYWORD")
-        tokens.add("KEYWORD")
-        tokens.add("ANY_TOKEN")
+        tokens.update(
+            ["FSTRING_START", "FSTRING_MIDDLE", "FSTRING_END"]
+        )  # used in metagrammar to support Python 3.12 f-strings; don't exist in 3.11
         super().__init__(grammar, tokens, file)
         self.callmakervisitor: PythonCallMakerVisitor = PythonCallMakerVisitor(self)
         self.invalidvisitor: InvalidNodeVisitor = InvalidNodeVisitor()
