@@ -309,6 +309,22 @@ class Parser:
             return self._tokenizer.getnext()
         return None
 
+    @memoize
+    def repeated(self, func: str | Token) -> list[Any]:
+        mark = self._mark()
+        children = []
+        if isinstance(func, str):
+            method = getattr(self, func)
+            args = []
+        else:
+            method = self.token
+            args = [func]
+        while result := method(*args):
+            children.append(result)
+            mark = self._mark()
+        self._reset(mark)
+        return children
+
     def positive_lookahead(self, func: Callable[..., T], *args: object) -> T:
         mark = self._mark()
         ok = func(*args)

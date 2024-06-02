@@ -148,11 +148,12 @@ Took:  1.39s
 
 - final `peg_parser/parser.py` sizes
 
-| step                        | size |
-|-----------------------------|------|
-| initial                     | 361K |
-| after removing extra spaces | 356K |
-| optimize LOCATIONS          | 322K |
+| step                            | size |
+|---------------------------------|------|
+| initial                         | 361K |
+| after removing extra spaces     | 356K |
+| optimize LOCATIONS              | 322K |
+| after repetitions deduplication | 294K |
 
 - optimized `get_last_non_whitespace_token` brought `benchmarks.PeakMemSuite.peakmem_parser_large_file` runtime to 5s from 10s
 

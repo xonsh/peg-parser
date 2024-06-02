@@ -5,9 +5,7 @@ from typing import IO, Any
 from peg_parser.tokenize import Token
 from pegen import grammar
 from pegen.build import build_parser
-from pegen.grammar import (
-    NameLeaf,
-)
+from pegen.grammar import Alt, NamedItem, NameLeaf, Repeat0, Repeat1, Rhs
 from pegen.parser_generator import ParserGenerator
 from pegen.python_generator import (
     InvalidNodeVisitor,
@@ -24,6 +22,15 @@ class XonshCallMakerVisitor(PythonCallMakerVisitor):
         self.keywords: set[str] = set()
         self.soft_keywords: set[str] = set()
 
+    def call_param(self, name: str) -> str | Token:
+        special = {"SOFT_KEYWORD", "KEYWORD", "NAME", "ANY_TOKEN"}
+        if name in special:
+            return repr(name.lower())
+        if name.isupper() and (name in self.gen.tokens):
+            token = self.gen.tokens_enum[name]
+            return f"{token.__class__.__name__}.{token.name}"
+        return repr(name)
+
     def visit_NameLeaf(self, node: NameLeaf) -> tuple[str | None, str]:
         name = node.value
         special = {"SOFT_KEYWORD", "KEYWORD", "NAME", "ANY_TOKEN"}
@@ -34,6 +41,26 @@ class XonshCallMakerVisitor(PythonCallMakerVisitor):
             token = self.gen.tokens_enum[name]
             return "_" + name.lower(), f"self.token({token.__class__.__name__}.{token.name})"
         return name, f"self.{name}()"
+
+    def get_repeated(self, node):
+        if isinstance(node.node, NameLeaf):
+            return f"self.repeated({self.call_param(node.node.value)})"
+        name, _ = self.visit(Rhs([Alt([NamedItem(None, node.node)])]))
+        return f"self.repeated({name!r})"
+
+    def visit_Repeat0(self, node: Repeat0) -> tuple[str, str]:
+        if node in self.cache:
+            return self.cache[node]
+        # Also a trailing comma! to make this a tuple result
+        func = self.get_repeated(node) + ","
+        self.cache[node] = "zero_or_more", func
+        return self.cache[node]
+
+    def visit_Repeat1(self, node: Repeat1) -> tuple[str, str]:
+        if node in self.cache:
+            return self.cache[node]
+        self.cache[node] = "one_or_more", self.get_repeated(node)
+        return self.cache[node]
 
 
 class XonshParserGenerator(PythonParserGenerator):

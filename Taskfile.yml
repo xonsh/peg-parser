@@ -11,7 +11,8 @@ tasks:
     generates:
       - peg_parser/parser.py
     sources:
-      - tasks/xonsh.gram
+      - tasks/*.py
+      - tasks/*.gram
       - peg_parser/*.py
       - pegen/*.py
 
