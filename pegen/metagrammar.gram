@@ -28,6 +28,18 @@ from pegen.grammar import (
     Grammar,
     StringLeaf,
 )
+from tokenize import TokenInfo
+
+def join_tokens(atoms: list) -> str:
+    first = atoms[0]
+    string = first.string
+    for at in atoms[1:]:
+        if first.end == at.start:
+            string += at.string
+        else:
+            string += " " + at.string
+        first = at
+    return string
 """
 
 start[Grammar]: grammar ENDMARKER { grammar }
@@ -112,27 +124,27 @@ atom[Plain]:
 
 # Mini-grammar for the actions and annotations
 
-action[str]: "{" ~ target_atoms "}" { target_atoms }
-annotation[str]: "[" ~ target_atoms "]" { target_atoms }
+action[str]: "{" ~ target_atoms "}" { join_tokens(target_atoms) }
+annotation[str]: "[" ~ target_atoms "]" { join_tokens(target_atoms) }
 
-target_atoms[str]:
-    | target_atom target_atoms { target_atom + " " + target_atoms }
+target_atoms[list]:
+    | target_atom target_atoms { [*target_atom, *target_atoms] }
     | target_atom { target_atom }
 
-target_atom[str]:
-    | "{" ~ atoms=target_atoms? "}" { "{" + (atoms or "") + "}" }
-    | "[" ~ atoms=target_atoms? "]" { "[" + (atoms or "") + "]" }
-    | NAME "*" { name.string + "*" }
-    | NAME { name.string }
-    | NUMBER { number.string }
-    | STRING { string.string }
-    | l=FSTRING_START m=target_fstring_middle* r=FSTRING_END { l.string + "".join(m) + r.string }
-    | "?" { "?" }
-    | ":" { ":" }
-    | !"}" !"]" OP { op.string }
+target_atom[list]:
+    | l="{" ~ atoms=target_atoms? r="}" { [l, *(atoms or []), r] }
+    | l="[" ~ atoms=target_atoms? r="]" { [l, *(atoms or []), r] }
+    | l=FSTRING_START m=target_fstring_middle* r=FSTRING_END {
+        [TokenInfo(
+            string=l.string + "".join(m) + r.string,
+            start=l.start,end=r.end,line=l.line,type=1)]
+     }
+    | a=NAME b="*" { [a, b] }
+    | a=(NAME | NUMBER | STRING | "?" | ":") { [a] }
+    | !"}" !"]" OP { [op] }
 
 target_fstring_middle[str]:
     | FSTRING_MIDDLE { fstring_middle.string }
     | "{" { "{" }
     | "}" { "}" }
-    | target_atom { target_atom }
+    | target_atom { join_tokens(target_atom) }

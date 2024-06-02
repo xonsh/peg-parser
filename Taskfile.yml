@@ -2,7 +2,8 @@ version: '3'
 tasks:
   generate-meta:
     cmds:
-      - python3 tasks/generate_parser.py -g pegen/metagrammar.gram -o pegen/grammar_parser.py
+      - git checkout pegen/grammar_parser.py
+      - python3 -m pegen pegen/metagrammar.gram -o pegen/grammar_parser.py
       - ruff format pegen/grammar_parser.py
   generate:
     cmds:
