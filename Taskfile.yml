@@ -74,3 +74,8 @@ tasks:
   clean:
     cmds:
       - find peg_parser -name "*.so" -delete -print
+
+  release:
+    # https://python-semantic-release.readthedocs.io/en/latest/commands.html
+    cmds:
+      - semantic-release version --push --no-vcs-release {{.CLI_ARGS}}
