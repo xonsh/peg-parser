@@ -5,7 +5,7 @@ from typing import IO, Any
 from peg_parser.tokenize import Token
 from pegen import grammar
 from pegen.build import build_parser
-from pegen.grammar import Alt, NamedItem, NameLeaf, Repeat0, Repeat1, Rhs
+from pegen.grammar import Alt, NamedItem, NameLeaf, Repeat0, Repeat1, Rhs, Rule
 from pegen.parser_generator import ParserGenerator
 from pegen.python_generator import (
     InvalidNodeVisitor,
@@ -78,7 +78,7 @@ class XonshParserGenerator(PythonParserGenerator):
         self.invalidvisitor = InvalidNodeVisitor()
         self.usednamesvisitor = UsedNamesVisitor()
         self.unreachable_formatting = unreachable_formatting or "None  # pragma: no cover"
-        self.location_formatting = "**self.span(start_lineno, start_col_offset)"
+        self.location_formatting = "**self.span(_lnum, _col)"
         self.cleanup_statements: list[str] = []
 
     def add_return(self, ret_val: str) -> None:
@@ -87,6 +87,45 @@ class XonshParserGenerator(PythonParserGenerator):
         # terse representation of return values
         ret_val = ast.unparse(ast.parse(ret_val))
         self.print(f"return {ret_val}")
+
+    def visit_Rule(self, node: Rule) -> None:
+        is_loop = node.is_loop()
+        is_gather = node.is_gather()
+        rhs = node.flatten()
+        if node.left_recursive:
+            if node.leader:
+                self.print("@memoize_left_rec")
+            else:
+                # Non-leader rules in a cycle are not memoized,
+                # but they must still be logged.
+                self.print("@logger")
+        else:
+            self.print("@memoize")
+        node_type = node.type or "Any"
+        self.print(f"def {node.name}(self) -> Optional[{node_type}]:")
+        with self.indent():
+            self.print(f"# {node.name}: {rhs}")
+            if node.nullable:
+                self.print(f"# nullable={node.nullable}")
+
+            if node.name.endswith("without_invalid"):
+                self.print("_prev_call_invalid = self.call_invalid_rules")
+                self.print("self.call_invalid_rules = False")
+                self.cleanup_statements.append("self.call_invalid_rules = _prev_call_invalid")
+
+            self.print("mark = self._mark()")
+            if self.alts_uses_locations(node.rhs.alts):
+                self.print("_lnum, _col = self._tokenizer.peek().start")
+            if is_loop:
+                self.print("children = []")
+            self.visit(rhs, is_loop=is_loop, is_gather=is_gather)
+            if is_loop:
+                self.add_return("children")
+            else:
+                self.add_return("None")
+
+        if node.name.endswith("without_invalid"):
+            self.cleanup_statements.pop()
 
     def print_action(
         self,

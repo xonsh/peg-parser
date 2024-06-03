@@ -8,6 +8,7 @@ tasks:
   generate:
     cmds:
       - python3 tasks/generate_parser.py
+      - scc peg_parser/parser.py --uloc
     generates:
       - peg_parser/parser.py
     sources:
