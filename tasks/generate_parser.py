@@ -5,7 +5,7 @@ from typing import IO, Any
 from peg_parser.tokenize import Token
 from pegen import grammar
 from pegen.build import build_parser
-from pegen.grammar import Alt, NamedItem, NameLeaf, Repeat0, Repeat1, Rhs, Rule
+from pegen.grammar import Alt, Gather, Item, NamedItem, NameLeaf, Repeat0, Repeat1, Rhs, Rule
 from pegen.parser_generator import ParserGenerator
 from pegen.python_generator import (
     InvalidNodeVisitor,
@@ -22,14 +22,12 @@ class XonshCallMakerVisitor(PythonCallMakerVisitor):
         self.keywords: set[str] = set()
         self.soft_keywords: set[str] = set()
 
-    def call_param(self, name: str) -> str | Token:
-        special = {"SOFT_KEYWORD", "KEYWORD", "NAME", "ANY_TOKEN"}
-        if name in special:
-            return repr(name.lower())
-        if name.isupper() and (name in self.gen.tokens):
-            token = self.gen.tokens_enum[name]
-            return f"{token.__class__.__name__}.{token.name}"
-        return repr(name)
+    def lookahead_call_helper(self, node: Item, nested=True) -> tuple[str, str]:
+        name, call = self.visit(node.node if nested else node)
+        head, tail = call.split("(", 1)
+        assert tail[-1] == ")"
+        tail = tail[:-1]
+        return head, tail
 
     def visit_NameLeaf(self, node: NameLeaf) -> tuple[str | None, str]:
         name = node.value
@@ -42,11 +40,21 @@ class XonshCallMakerVisitor(PythonCallMakerVisitor):
             return "_" + name.lower(), f"self.token({token.__class__.__name__}.{token.name})"
         return name, f"self.{name}()"
 
+    def visit_Gather(self, node: Gather) -> tuple[str, str]:
+        if node in self.cache:
+            return self.cache[node]
+        func, fn_args = self.lookahead_call_helper(node)
+        assert not fn_args
+        sep = ", ".join([a for a in self.lookahead_call_helper(node.separator, nested=False) if a])
+        self.cache[node] = "gathered", f"self.gathered({func}, {sep})"  # No trailing comma here either!
+        return self.cache[node]
+
     def get_repeated(self, node):
         if isinstance(node.node, NameLeaf):
-            return f"self.repeated({self.call_param(node.node.value)})"
+            args = ", ".join([a for a in self.lookahead_call_helper(node) if a])
+            return f"self.repeated({args})"
         name, _ = self.visit(Rhs([Alt([NamedItem(None, node.node)])]))
-        return f"self.repeated({name!r})"
+        return f"self.repeated(self.{name})"
 
     def visit_Repeat0(self, node: Repeat0) -> tuple[str, str]:
         if node in self.cache:

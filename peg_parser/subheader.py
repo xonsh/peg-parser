@@ -309,21 +309,33 @@ class Parser:
             return self._tokenizer.getnext()
         return None
 
-    @memoize
-    def repeated(self, func: str | Token) -> list[Any]:
+    def repeated(self, func: Callable[..., T], *args: Any) -> list[T]:
         mark = self._mark()
         children = []
-        if isinstance(func, str):
-            method = getattr(self, func)
-            args = []
-        else:
-            method = self.token
-            args = [func]
-        while result := method(*args):
+        while result := func(*args):
             children.append(result)
             mark = self._mark()
         self._reset(mark)
         return children
+
+    def sep_repeated(self, func: Callable[[], T], sep_func: Callable[..., T], *args: Any) -> list[T]:
+        mark = self._mark()
+        children = []
+        while (sep_func(*args)) and (elem := func()):
+            children.append(elem)
+            mark = self._mark()
+        self._reset(mark)
+        return children
+
+    def gathered(
+        self, func: Callable[[], T | None], sep: Callable[..., Any], *sep_args: Any
+    ) -> list[T] | None:
+        # gather: ','.e+
+        mark = self._mark()
+        if (elem := func()) is not None and (seq := self.sep_repeated(func, sep, *sep_args)) is not None:
+            return [elem, *seq]
+        self._reset(mark)
+        return None
 
     def positive_lookahead(self, func: Callable[..., T], *args: object) -> T:
         mark = self._mark()
