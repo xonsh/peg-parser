@@ -10,6 +10,8 @@ tasks:
       - python3 -m pegen pegen/metagrammar.gram -o pegen/grammar_parser.py
       - ruff format pegen/grammar_parser.py
   generate:
+    deps:
+      - dev
     cmds:
       - python3 tasks/generator.py
       - ruff check --fix peg_parser/parser.py
@@ -21,7 +23,6 @@ tasks:
     sources:
       - tasks/*.py
       - tasks/*.gram
-      - peg_parser/*.py
       - pegen/*.py
 
   check-duplicates:
@@ -36,6 +37,10 @@ tasks:
     vars:
       LOG_FILE:
         sh: echo ".local/logs/xonsh-parser-$(date "+%Y%m%d-%H%M%S").$(git rev-parse --short HEAD).log"
+
+  dev:
+    cmds:
+      - cd xonsh_tokenizer; maturin develop
 
   profile:
     deps:

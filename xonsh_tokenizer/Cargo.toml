@@ -9,4 +9,6 @@ name = "xonsh_tokenizer"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.21.1"
+pyo3 = {version="0.21" , features = ["extension-module", "experimental-inspect", "nightly"]}
+strum = { version = "0.26", features = ["derive"] }
+strum_macros = "0.26"
