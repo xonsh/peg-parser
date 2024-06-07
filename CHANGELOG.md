@@ -2,6 +2,23 @@
 
 
 
+## v0.3.0 (2024-06-07)
+
+### Chore
+
+* chore: add release command ([`89e8758`](https://github.com/jnoortheen/xonsh-parser/commit/89e8758cc9122152c9aae19b54db48f300fff228))
+
+### Feature
+
+* feat: optimize calling self._mark() ([`002d853`](https://github.com/jnoortheen/xonsh-parser/commit/002d853f897f9df2525eb5c4bd815943f43ba6e8))
+
+* feat: include generated parser in the repo ([`e87ed02`](https://github.com/jnoortheen/xonsh-parser/commit/e87ed020b3b44dd0f537733100bb67b686e3ee06))
+
+### Test
+
+* test: update test fixture ([`6999da8`](https://github.com/jnoortheen/xonsh-parser/commit/6999da80acf2009920aea363bc96721fdb68f4ae))
+
+
 ## v0.2.0 (2024-06-03)
 
 ### Chore
