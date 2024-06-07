@@ -10,6 +10,10 @@ if TYPE_CHECKING:
 Mark = NewType("Mark", int)
 
 
+WS_TOKENS = {Token.ENDMARKER, Token.NEWLINE, Token.DEDENT, Token.INDENT}
+SKIP_TOKENS = {Token.WS, Token.COMMENT, Token.NL}
+
+
 class Tokenizer:
     """Caching wrapper for the tokenize module"""
 
@@ -65,7 +69,7 @@ class Tokenizer:
     def is_blank(self, tok: TokenInfo) -> bool:
         if self._proc_macro and tok.type == Token.WS:
             return False
-        if tok.type in {Token.NL, Token.COMMENT, Token.WS}:
+        if tok.type in SKIP_TOKENS:
             return True
         if tok.type == Token.ERRORTOKEN and tok.string.isspace():
             return True
@@ -164,7 +168,7 @@ class Tokenizer:
         idx = self._index - 1
         while idx >= 0:
             tok = self._tokens[idx]
-            if tok.type not in {Token.ENDMARKER, Token.NEWLINE, Token.DEDENT, Token.INDENT}:
+            if tok.type not in WS_TOKENS:
                 return tok
             idx -= 1
         return self._tokens[-1]

@@ -11,10 +11,10 @@ from peg_parser.tokenize import TokenInfo
 
 def ensure_tuple(seq) -> str:
     if isinstance(seq, TokenInfo):
-        seq = (seq.type.name, seq.string, seq.start[1])
+        seq = (seq.type, seq.string, seq.start[1])
     if isinstance(seq, Sequence):
         typ, *rest = seq
-        seq = (typ.name if isinstance(typ, t) else t[typ].name, *rest)
+        seq = (getattr(t, typ) if isinstance(typ, str) else typ, *rest)
     return repr(tuple(seq))
 
 
