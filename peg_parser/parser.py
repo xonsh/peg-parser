@@ -3,44 +3,43 @@ from __future__ import annotations
 import ast
 import itertools
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from peg_parser.subheader import Del, Load, Parser, Store, Target, Token, logger, memoize, memoize_left_rec
+
+if TYPE_CHECKING:
+    from peg_parser.tokenizer import Mark
 
 
 # Keywords and soft keywords are listed at the end of the parser definition.
 class XonshParser(Parser):
     @memoize
-    def start(self) -> Any | None:
+    def start(self, mark: Mark) -> Any | None:
         # start: file
-        mark = self._mark()
         if file := self.file():
             return file
         self._reset(mark)
         return None
 
     @memoize
-    def file(self) -> ast.Module | None:
+    def file(self, mark: Mark) -> ast.Module | None:
         # file: statements? $
-        mark = self._mark()
         if (a := self.statements(),) and (self.token(Token.ENDMARKER)):
             return ast.Module(body=a or [], type_ignores=[])
         self._reset(mark)
         return None
 
     @memoize
-    def interactive(self) -> ast.Interactive | None:
+    def interactive(self, mark: Mark) -> ast.Interactive | None:
         # interactive: statement_newline
-        mark = self._mark()
         if a := self.statement_newline():
             return ast.Interactive(body=a)
         self._reset(mark)
         return None
 
     @memoize
-    def eval(self) -> ast.Expression | None:
+    def eval(self, mark: Mark) -> ast.Expression | None:
         # eval: expressions NEWLINE* $
-        mark = self._mark()
         if (
             (a := self.expressions())
             and (self.repeated(self.token, Token.NEWLINE),)
@@ -51,9 +50,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def func_type(self) -> ast.FunctionType | None:
+    def func_type(self, mark: Mark) -> ast.FunctionType | None:
         # func_type: '(' type_expressions? ')' '->' expression NEWLINE* $
-        mark = self._mark()
         if (
             (self.expect("("))
             and (a := self.type_expressions(),)
@@ -68,9 +66,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def fstring(self) -> Any | None:
+    def fstring(self, mark: Mark) -> Any | None:
         # fstring: FSTRING_START fstring_mid* FSTRING_END
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (a := self.token(Token.FSTRING_START))
@@ -82,18 +79,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def statements(self) -> list | None:
+    def statements(self, mark: Mark) -> list | None:
         # statements: statement+
-        mark = self._mark()
         if a := self.repeated(self.statement):
             return list(itertools.chain.from_iterable(a))
         self._reset(mark)
         return None
 
     @memoize
-    def statement(self) -> list | None:
+    def statement(self, mark: Mark) -> list | None:
         # statement: compound_stmt | simple_stmts
-        mark = self._mark()
         if a := self.compound_stmt():
             return [a]
         self._reset(mark)
@@ -103,9 +98,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def statement_newline(self) -> list | None:
+    def statement_newline(self, mark: Mark) -> list | None:
         # statement_newline: compound_stmt NEWLINE | simple_stmts | NEWLINE | $
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.compound_stmt()) and (self.token(Token.NEWLINE)):
             return [a]
@@ -122,9 +116,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def simple_stmts(self) -> list | None:
+    def simple_stmts(self, mark: Mark) -> list | None:
         # simple_stmts: simple_stmt !';' NEWLINE | ';'.simple_stmt+ ';'? NEWLINE
-        mark = self._mark()
         if (
             (a := self.simple_stmt())
             and (self.negative_lookahead(self.expect, ";"))
@@ -142,9 +135,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def simple_stmt(self) -> Any | None:
+    def simple_stmt(self, mark: Mark) -> Any | None:
         # simple_stmt: assignment | &"type" type_alias | star_expressions | &'return' return_stmt | &('import' | 'from') import_stmt | &'raise' raise_stmt | 'pass' | &'del' del_stmt | &'yield' yield_stmt | &'assert' assert_stmt | 'break' | 'continue' | &'global' global_stmt | &'nonlocal' nonlocal_stmt
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if assignment := self.assignment():
             return assignment
@@ -191,9 +183,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def compound_stmt(self) -> Any | None:
+    def compound_stmt(self, mark: Mark) -> Any | None:
         # compound_stmt: &('def' | '@' | 'async') function_def | &'if' if_stmt | &('class' | '@') class_def | &('with' | 'async') with_stmt | &'with' with_macro_stmt | &('for' | 'async') for_stmt | &'try' try_stmt | &'while' while_stmt | match_stmt
-        mark = self._mark()
         if (self.positive_lookahead(self._tmp_2)) and (function_def := self.function_def()):
             return function_def
         self._reset(mark)
@@ -224,9 +215,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def assignment(self) -> Any | None:
+    def assignment(self, mark: Mark) -> Any | None:
         # assignment: NAME ':' expression ['=' annotated_rhs] | ('(' single_target ')' | single_subscript_attribute_target) ':' expression ['=' annotated_rhs] | ((star_targets '='))+ annotated_rhs !'=' TYPE_COMMENT? | single_target augassign ~ annotated_rhs | invalid_assignment
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.name()) and (self.expect(":")) and (b := self.expression()) and (c := self._tmp_6(),):
             return ast.AnnAssign(
@@ -272,9 +262,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def annotated_rhs(self) -> Any | None:
+    def annotated_rhs(self, mark: Mark) -> Any | None:
         # annotated_rhs: yield_expr | star_expressions
-        mark = self._mark()
         if yield_expr := self.yield_expr():
             return yield_expr
         self._reset(mark)
@@ -284,9 +273,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def augassign(self) -> Any | None:
+    def augassign(self, mark: Mark) -> Any | None:
         # augassign: '+=' | '-=' | '*=' | '@=' | '/=' | '%=' | '&=' | '|=' | '^=' | '<<=' | '>>=' | '**=' | '//='
-        mark = self._mark()
         if self.expect("+="):
             return ast.Add()
         self._reset(mark)
@@ -329,9 +317,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def return_stmt(self) -> ast.Return | None:
+    def return_stmt(self, mark: Mark) -> ast.Return | None:
         # return_stmt: 'return' star_expressions?
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("return")) and (a := self.star_expressions(),):
             return ast.Return(value=a, **self.span(_lnum, _col))
@@ -339,9 +326,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def raise_stmt(self) -> ast.Raise | None:
+    def raise_stmt(self, mark: Mark) -> ast.Raise | None:
         # raise_stmt: 'raise' expression ['from' expression] | 'raise'
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("raise")) and (a := self.expression()) and (b := self._tmp_10(),):
             return ast.Raise(exc=a, cause=b, **self.span(_lnum, _col))
@@ -352,9 +338,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def global_stmt(self) -> ast.Global | None:
+    def global_stmt(self, mark: Mark) -> ast.Global | None:
         # global_stmt: 'global' ','.NAME+
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("global")) and (a := self.gathered(self.name, self.expect, ",")):
             return ast.Global(names=[n.string for n in a], **self.span(_lnum, _col))
@@ -362,9 +347,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def nonlocal_stmt(self) -> ast.Nonlocal | None:
+    def nonlocal_stmt(self, mark: Mark) -> ast.Nonlocal | None:
         # nonlocal_stmt: 'nonlocal' ','.NAME+
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("nonlocal")) and (a := self.gathered(self.name, self.expect, ",")):
             return ast.Nonlocal(names=[n.string for n in a], **self.span(_lnum, _col))
@@ -372,9 +356,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def del_stmt(self) -> ast.Delete | None:
+    def del_stmt(self, mark: Mark) -> ast.Delete | None:
         # del_stmt: 'del' del_targets &(';' | NEWLINE) | invalid_del_stmt
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("del")) and (a := self.del_targets()) and (self.positive_lookahead(self._tmp_11)):
             return ast.Delete(targets=a, **self.span(_lnum, _col))
@@ -385,9 +368,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def yield_stmt(self) -> ast.Expr | None:
+    def yield_stmt(self, mark: Mark) -> ast.Expr | None:
         # yield_stmt: yield_expr
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if y := self.yield_expr():
             return ast.Expr(value=y, **self.span(_lnum, _col))
@@ -395,9 +377,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def assert_stmt(self) -> ast.Assert | None:
+    def assert_stmt(self, mark: Mark) -> ast.Assert | None:
         # assert_stmt: 'assert' expression [',' expression]
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("assert")) and (a := self.expression()) and (b := self._tmp_12(),):
             return ast.Assert(test=a, msg=b, **self.span(_lnum, _col))
@@ -405,9 +386,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def import_stmt(self) -> ast.Import | None:
+    def import_stmt(self, mark: Mark) -> ast.Import | None:
         # import_stmt: invalid_import | import_name | import_from
-        mark = self._mark()
         if self.call_invalid_rules and (self.invalid_import()):
             return None
         self._reset(mark)
@@ -420,9 +400,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def import_name(self) -> ast.Import | None:
+    def import_name(self, mark: Mark) -> ast.Import | None:
         # import_name: 'import' dotted_as_names
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("import")) and (a := self.dotted_as_names()):
             return ast.Import(names=a, **self.span(_lnum, _col))
@@ -430,9 +409,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def import_from(self) -> ast.ImportFrom | None:
+    def import_from(self, mark: Mark) -> ast.ImportFrom | None:
         # import_from: 'from' (('.' | '...'))* dotted_name 'import' import_from_targets | 'from' (('.' | '...'))+ 'import' import_from_targets
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (self.expect("from"))
@@ -456,9 +434,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def import_from_targets(self) -> list[ast.alias] | None:
+    def import_from_targets(self, mark: Mark) -> list[ast.alias] | None:
         # import_from_targets: '(' import_from_as_names ','? ')' | import_from_as_names !',' | '*' | invalid_import_from_targets
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (self.expect("("))
@@ -482,18 +459,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def import_from_as_names(self) -> list[ast.alias] | None:
+    def import_from_as_names(self, mark: Mark) -> list[ast.alias] | None:
         # import_from_as_names: ','.import_from_as_name+
-        mark = self._mark()
         if a := self.gathered(self.import_from_as_name, self.expect, ","):
             return a
         self._reset(mark)
         return None
 
     @memoize
-    def import_from_as_name(self) -> ast.alias | None:
+    def import_from_as_name(self, mark: Mark) -> ast.alias | None:
         # import_from_as_name: NAME ['as' NAME]
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.name()) and (b := self._tmp_15(),):
             return ast.alias(name=a.string, asname=b, **self.span(_lnum, _col))
@@ -501,18 +476,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def dotted_as_names(self) -> list[ast.alias] | None:
+    def dotted_as_names(self, mark: Mark) -> list[ast.alias] | None:
         # dotted_as_names: ','.dotted_as_name+
-        mark = self._mark()
         if a := self.gathered(self.dotted_as_name, self.expect, ","):
             return a
         self._reset(mark)
         return None
 
     @memoize
-    def dotted_as_name(self) -> ast.alias | None:
+    def dotted_as_name(self, mark: Mark) -> ast.alias | None:
         # dotted_as_name: dotted_name ['as' NAME]
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.dotted_name()) and (b := self._tmp_16(),):
             return ast.alias(name=a, asname=b, **self.span(_lnum, _col))
@@ -532,9 +505,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def block(self) -> list | None:
+    def block(self, mark: Mark) -> list | None:
         # block: NEWLINE INDENT statements DEDENT | simple_stmts | invalid_block
-        mark = self._mark()
         if (
             (self.token(Token.NEWLINE))
             and (self.token(Token.INDENT))
@@ -552,18 +524,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def decorators(self) -> Any | None:
+    def decorators(self, mark: Mark) -> Any | None:
         # decorators: decorator+
-        mark = self._mark()
         if one_or_more := self.repeated(self.decorator):
             return one_or_more
         self._reset(mark)
         return None
 
     @memoize
-    def decorator(self) -> Any | None:
+    def decorator(self, mark: Mark) -> Any | None:
         # decorator: ('@' dec_maybe_call NEWLINE) | ('@' named_expression NEWLINE)
-        mark = self._mark()
         if a := self._tmp_17():
             return a
         self._reset(mark)
@@ -573,9 +543,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def dec_maybe_call(self) -> Any | None:
+    def dec_maybe_call(self, mark: Mark) -> Any | None:
         # dec_maybe_call: dec_primary '(' arguments? ')' | dec_primary
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (dn := self.dec_primary())
@@ -606,9 +575,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def class_def(self) -> ast.ClassDef | None:
+    def class_def(self, mark: Mark) -> ast.ClassDef | None:
         # class_def: decorators class_def_raw | class_def_raw
-        mark = self._mark()
         if (a := self.decorators()) and (b := self.class_def_raw()):
             return self.set_decorators(b, a)
         self._reset(mark)
@@ -618,9 +586,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def class_def_raw(self) -> ast.ClassDef | None:
+    def class_def_raw(self, mark: Mark) -> ast.ClassDef | None:
         # class_def_raw: invalid_class_def_raw | 'class' NAME type_params? ['(' arguments? ')'] &&':' block
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_class_def_raw()):
             return None
@@ -657,9 +624,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def function_def(self) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+    def function_def(self, mark: Mark) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
         # function_def: decorators function_def_raw | function_def_raw
-        mark = self._mark()
         if (d := self.decorators()) and (f := self.function_def_raw()):
             return self.set_decorators(f, d)
         self._reset(mark)
@@ -669,9 +635,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def function_def_raw(self) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+    def function_def_raw(self, mark: Mark) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
         # function_def_raw: invalid_def_raw | 'def' NAME type_params? &&'(' params? ')' ['->' expression] &&':' func_type_comment? block | 'async' 'def' NAME type_params? &&'(' params? ')' ['->' expression] &&':' func_type_comment? block
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_def_raw()):
             return None
@@ -746,9 +711,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def params(self) -> Any | None:
+    def params(self, mark: Mark) -> Any | None:
         # params: invalid_parameters | parameters
-        mark = self._mark()
         if self.call_invalid_rules and (self.invalid_parameters()):
             return None
         self._reset(mark)
@@ -758,9 +722,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def parameters(self) -> ast.arguments | None:
+    def parameters(self, mark: Mark) -> ast.arguments | None:
         # parameters: slash_no_default param_no_default* param_with_default* star_etc? | slash_with_default param_with_default* star_etc? | param_no_default+ param_with_default* star_etc? | param_with_default+ star_etc? | star_etc
-        mark = self._mark()
         if (
             (a := self.slash_no_default())
             and (b := self.repeated(self.param_no_default),)
@@ -792,9 +755,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def slash_no_default(self) -> list[tuple[ast.arg, None]] | None:
+    def slash_no_default(self, mark: Mark) -> list[tuple[ast.arg, None]] | None:
         # slash_no_default: param_no_default+ '/' ',' | param_no_default+ '/' &')'
-        mark = self._mark()
         if (a := self.repeated(self.param_no_default)) and (self.expect("/")) and (self.expect(",")):
             return [(p, None) for p in a]
         self._reset(mark)
@@ -808,9 +770,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def slash_with_default(self) -> list[tuple[ast.arg, Any]] | None:
+    def slash_with_default(self, mark: Mark) -> list[tuple[ast.arg, Any]] | None:
         # slash_with_default: param_no_default* param_with_default+ '/' ',' | param_no_default* param_with_default+ '/' &')'
-        mark = self._mark()
         if (
             (a := self.repeated(self.param_no_default),)
             and (b := self.repeated(self.param_with_default))
@@ -830,9 +791,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def star_etc(self) -> tuple[ast.arg | None, list[tuple[ast.arg, Any]], ast.arg | None] | None:
+    def star_etc(self, mark: Mark) -> tuple[ast.arg | None, list[tuple[ast.arg, Any]], ast.arg | None] | None:
         # star_etc: invalid_star_etc | '*' param_no_default param_maybe_default* kwds? | '*' param_no_default_star_annotation param_maybe_default* kwds? | '*' ',' param_maybe_default+ kwds? | kwds
-        mark = self._mark()
         if self.call_invalid_rules and (self.invalid_star_etc()):
             return None
         self._reset(mark)
@@ -866,9 +826,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def kwds(self) -> ast.arg | None:
+    def kwds(self, mark: Mark) -> ast.arg | None:
         # kwds: invalid_kwds | '**' param_no_default
-        mark = self._mark()
         if self.call_invalid_rules and (self.invalid_kwds()):
             return None
         self._reset(mark)
@@ -878,9 +837,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def param_no_default(self) -> ast.arg | None:
+    def param_no_default(self, mark: Mark) -> ast.arg | None:
         # param_no_default: param ',' TYPE_COMMENT? | param TYPE_COMMENT? &')'
-        mark = self._mark()
         if (a := self.param()) and (self.expect(",")) and (self.token(Token.TYPE_COMMENT),):
             return a
         self._reset(mark)
@@ -894,9 +852,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def param_no_default_star_annotation(self) -> ast.arg | None:
+    def param_no_default_star_annotation(self, mark: Mark) -> ast.arg | None:
         # param_no_default_star_annotation: param_star_annotation ',' TYPE_COMMENT? | param_star_annotation TYPE_COMMENT? &')'
-        mark = self._mark()
         if (a := self.param_star_annotation()) and (self.expect(",")) and (self.token(Token.TYPE_COMMENT),):
             return a
         self._reset(mark)
@@ -910,9 +867,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def param_with_default(self) -> tuple[ast.arg, Any] | None:
+    def param_with_default(self, mark: Mark) -> tuple[ast.arg, Any] | None:
         # param_with_default: param default ',' TYPE_COMMENT? | param default TYPE_COMMENT? &')'
-        mark = self._mark()
         if (
             (a := self.param())
             and (c := self.default())
@@ -932,9 +888,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def param_maybe_default(self) -> tuple[ast.arg, Any] | None:
+    def param_maybe_default(self, mark: Mark) -> tuple[ast.arg, Any] | None:
         # param_maybe_default: param default? ',' TYPE_COMMENT? | param default? TYPE_COMMENT? &')'
-        mark = self._mark()
         if (
             (a := self.param())
             and (c := self.default(),)
@@ -954,9 +909,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def param(self) -> Any | None:
+    def param(self, mark: Mark) -> Any | None:
         # param: NAME annotation?
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.name()) and (b := self.annotation(),):
             return ast.arg(arg=a.string, annotation=b, **self.span(_lnum, _col))
@@ -964,9 +918,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def param_star_annotation(self) -> Any | None:
+    def param_star_annotation(self, mark: Mark) -> Any | None:
         # param_star_annotation: NAME star_annotation
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.name()) and (b := self.star_annotation()):
             return ast.arg(arg=a.string, annotations=b, **self.span(_lnum, _col))
@@ -974,27 +927,24 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def annotation(self) -> Any | None:
+    def annotation(self, mark: Mark) -> Any | None:
         # annotation: ':' expression
-        mark = self._mark()
         if (self.expect(":")) and (a := self.expression()):
             return a
         self._reset(mark)
         return None
 
     @memoize
-    def star_annotation(self) -> Any | None:
+    def star_annotation(self, mark: Mark) -> Any | None:
         # star_annotation: ':' star_expression
-        mark = self._mark()
         if (self.expect(":")) and (a := self.star_expression()):
             return a
         self._reset(mark)
         return None
 
     @memoize
-    def default(self) -> Any | None:
+    def default(self, mark: Mark) -> Any | None:
         # default: '=' expression | invalid_default
-        mark = self._mark()
         if (self.expect("=")) and (a := self.expression()):
             return a
         self._reset(mark)
@@ -1004,9 +954,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def if_stmt(self) -> ast.If | None:
+    def if_stmt(self, mark: Mark) -> ast.If | None:
         # if_stmt: invalid_if_stmt | 'if' named_expression ':' block elif_stmt | 'if' named_expression ':' block else_block?
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_if_stmt()):
             return None
@@ -1032,9 +981,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def elif_stmt(self) -> list[ast.If] | None:
+    def elif_stmt(self, mark: Mark) -> list[ast.If] | None:
         # elif_stmt: invalid_elif_stmt | 'elif' named_expression ':' block elif_stmt | 'elif' named_expression ':' block else_block?
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_elif_stmt()):
             return None
@@ -1060,9 +1008,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def else_block(self) -> list | None:
+    def else_block(self, mark: Mark) -> list | None:
         # else_block: invalid_else_stmt | 'else' &&':' block
-        mark = self._mark()
         if self.call_invalid_rules and (self.invalid_else_stmt()):
             return None
         self._reset(mark)
@@ -1072,9 +1019,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def while_stmt(self) -> ast.While | None:
+    def while_stmt(self, mark: Mark) -> ast.While | None:
         # while_stmt: invalid_while_stmt | 'while' named_expression ':' block else_block?
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_while_stmt()):
             return None
@@ -1091,9 +1037,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def for_stmt(self) -> ast.For | ast.AsyncFor | None:
+    def for_stmt(self, mark: Mark) -> ast.For | ast.AsyncFor | None:
         # for_stmt: invalid_for_stmt | 'for' star_targets 'in' ~ star_expressions &&':' TYPE_COMMENT? block else_block? | 'async' 'for' star_targets 'in' ~ star_expressions ':' TYPE_COMMENT? block else_block? | invalid_for_target
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_for_stmt()):
             return None
@@ -1141,9 +1086,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def with_stmt(self) -> ast.With | ast.AsyncWith | None:
+    def with_stmt(self, mark: Mark) -> ast.With | ast.AsyncWith | None:
         # with_stmt: invalid_with_stmt_indent | 'with' '(' ','.with_item+ ','? ')' ':' block | 'with' ','.with_item+ ':' TYPE_COMMENT? block | 'async' 'with' '(' ','.with_item+ ','? ')' ':' block | 'async' 'with' ','.with_item+ ':' TYPE_COMMENT? block | invalid_with_stmt
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_with_stmt_indent()):
             return None
@@ -1196,9 +1140,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def with_item(self) -> ast.withitem | None:
+    def with_item(self, mark: Mark) -> ast.withitem | None:
         # with_item: expression 'as' star_target &(',' | ')' | ':') | invalid_with_item | expression
-        mark = self._mark()
         if (
             (e := self.expression())
             and (self.expect("as"))
@@ -1216,9 +1159,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def with_macro_stmt(self) -> Any | None:
+    def with_macro_stmt(self, mark: Mark) -> Any | None:
         # with_macro_stmt: with_macro_start MACRO_PARAM
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.with_macro_start()) and (b := self.token(Token.MACRO_PARAM)):
             return self.handle_with_macro_stmt(a, b, **self.span(_lnum, _col))
@@ -1226,9 +1168,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def with_macro_start(self) -> Any | None:
+    def with_macro_start(self, mark: Mark) -> Any | None:
         # with_macro_start: 'with' '!' ~ with_item ':'
-        mark = self._mark()
         cut = False
         if (
             (self.expect("with"))
@@ -1244,9 +1185,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def try_stmt(self) -> ast.Try | None:
+    def try_stmt(self, mark: Mark) -> ast.Try | None:
         # try_stmt: invalid_try_stmt | 'try' &&':' block finally_block | 'try' &&':' block except_block+ else_block? finally_block? | 'try' &&':' block except_star_block+ else_block? finally_block?
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_try_stmt()):
             return None
@@ -1288,9 +1228,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def except_block(self) -> ast.ExceptHandler | None:
+    def except_block(self, mark: Mark) -> ast.ExceptHandler | None:
         # except_block: invalid_except_stmt_indent | 'except' expression ['as' NAME] ':' block | 'except' ':' block | invalid_except_stmt
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_except_stmt_indent()):
             return None
@@ -1313,9 +1252,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def except_star_block(self) -> ast.ExceptHandler | None:
+    def except_star_block(self, mark: Mark) -> ast.ExceptHandler | None:
         # except_star_block: invalid_except_star_stmt_indent | 'except' '*' expression ['as' NAME] ':' block | invalid_except_stmt
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_except_star_stmt_indent()):
             return None
@@ -1336,9 +1274,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def finally_block(self) -> list | None:
+    def finally_block(self, mark: Mark) -> list | None:
         # finally_block: invalid_finally_stmt | 'finally' &&':' block
-        mark = self._mark()
         if self.call_invalid_rules and (self.invalid_finally_stmt()):
             return None
         self._reset(mark)
@@ -1348,9 +1285,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def match_stmt(self) -> ast.Match | None:
+    def match_stmt(self, mark: Mark) -> ast.Match | None:
         # match_stmt: "match" subject_expr ':' NEWLINE INDENT case_block+ DEDENT | invalid_match_stmt
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (self.expect("match"))
@@ -1369,9 +1305,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def subject_expr(self) -> Any | None:
+    def subject_expr(self, mark: Mark) -> Any | None:
         # subject_expr: star_named_expression ',' star_named_expressions? | named_expression
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (value := self.star_named_expression())
@@ -1386,9 +1321,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def case_block(self) -> ast.match_case | None:
+    def case_block(self, mark: Mark) -> ast.match_case | None:
         # case_block: invalid_case_block | "case" patterns guard? ':' block
-        mark = self._mark()
         if self.call_invalid_rules and (self.invalid_case_block()):
             return None
         self._reset(mark)
@@ -1404,18 +1338,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def guard(self) -> Any | None:
+    def guard(self, mark: Mark) -> Any | None:
         # guard: 'if' named_expression
-        mark = self._mark()
         if (self.expect("if")) and (guard := self.named_expression()):
             return guard
         self._reset(mark)
         return None
 
     @memoize
-    def patterns(self) -> Any | None:
+    def patterns(self, mark: Mark) -> Any | None:
         # patterns: open_sequence_pattern | pattern
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if patterns := self.open_sequence_pattern():
             return ast.MatchSequence(patterns=patterns, **self.span(_lnum, _col))
@@ -1426,9 +1358,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def pattern(self) -> Any | None:
+    def pattern(self, mark: Mark) -> Any | None:
         # pattern: as_pattern | or_pattern
-        mark = self._mark()
         if as_pattern := self.as_pattern():
             return as_pattern
         self._reset(mark)
@@ -1438,9 +1369,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def as_pattern(self) -> ast.MatchAs | None:
+    def as_pattern(self, mark: Mark) -> ast.MatchAs | None:
         # as_pattern: or_pattern 'as' pattern_capture_target | invalid_as_pattern
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (pattern := self.or_pattern())
@@ -1455,9 +1385,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def or_pattern(self) -> ast.MatchOr | None:
+    def or_pattern(self, mark: Mark) -> ast.MatchOr | None:
         # or_pattern: '|'.closed_pattern+
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if patterns := self.gathered(self.closed_pattern, self.expect, "|"):
             return (
@@ -1467,9 +1396,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def closed_pattern(self) -> Any | None:
+    def closed_pattern(self, mark: Mark) -> Any | None:
         # closed_pattern: literal_pattern | capture_pattern | wildcard_pattern | value_pattern | group_pattern | sequence_pattern | mapping_pattern | class_pattern
-        mark = self._mark()
         if literal_pattern := self.literal_pattern():
             return literal_pattern
         self._reset(mark)
@@ -1497,9 +1425,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def literal_pattern(self) -> Any | None:
+    def literal_pattern(self, mark: Mark) -> Any | None:
         # literal_pattern: signed_number !('+' | '-') | complex_number | strings | 'None' | 'True' | 'False'
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (value := self.signed_number()) and (self.negative_lookahead(self._tmp_25)):
             return ast.MatchValue(value=value, **self.span(_lnum, _col))
@@ -1522,9 +1449,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def literal_expr(self) -> Any | None:
+    def literal_expr(self, mark: Mark) -> Any | None:
         # literal_expr: signed_number !('+' | '-') | complex_number | strings | 'None' | 'True' | 'False'
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (signed_number := self.signed_number()) and (self.negative_lookahead(self._tmp_26)):
             return signed_number
@@ -1547,9 +1473,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def complex_number(self) -> Any | None:
+    def complex_number(self, mark: Mark) -> Any | None:
         # complex_number: signed_real_number '+' imaginary_number | signed_real_number '-' imaginary_number
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (real := self.signed_real_number()) and (self.expect("+")) and (imag := self.imaginary_number()):
             return ast.BinOp(left=real, op=ast.Add(), right=imag, **self.span(_lnum, _col))
@@ -1560,9 +1485,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def signed_number(self) -> Any | None:
+    def signed_number(self, mark: Mark) -> Any | None:
         # signed_number: NUMBER | '-' NUMBER
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if a := self.token(Token.NUMBER):
             return ast.Constant(value=ast.literal_eval(a.string), **self.span(_lnum, _col))
@@ -1583,9 +1507,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def signed_real_number(self) -> Any | None:
+    def signed_real_number(self, mark: Mark) -> Any | None:
         # signed_real_number: real_number | '-' real_number
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if real_number := self.real_number():
             return real_number
@@ -1596,9 +1519,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def real_number(self) -> ast.Constant | None:
+    def real_number(self, mark: Mark) -> ast.Constant | None:
         # real_number: NUMBER
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if real := self.token(Token.NUMBER):
             return ast.Constant(value=self.ensure_real(real), **self.span(_lnum, _col))
@@ -1606,9 +1528,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def imaginary_number(self) -> ast.Constant | None:
+    def imaginary_number(self, mark: Mark) -> ast.Constant | None:
         # imaginary_number: NUMBER
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if imag := self.token(Token.NUMBER):
             return ast.Constant(value=self.ensure_imaginary(imag), **self.span(_lnum, _col))
@@ -1616,9 +1537,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def capture_pattern(self) -> Any | None:
+    def capture_pattern(self, mark: Mark) -> Any | None:
         # capture_pattern: pattern_capture_target
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if target := self.pattern_capture_target():
             return ast.MatchAs(pattern=None, name=target, **self.span(_lnum, _col))
@@ -1626,9 +1546,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def pattern_capture_target(self) -> str | None:
+    def pattern_capture_target(self, mark: Mark) -> str | None:
         # pattern_capture_target: !"_" NAME !('.' | '(' | '=')
-        mark = self._mark()
         if (
             (self.negative_lookahead(self.expect, "_"))
             and (name := self.name())
@@ -1639,9 +1558,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def wildcard_pattern(self) -> ast.MatchAs | None:
+    def wildcard_pattern(self, mark: Mark) -> ast.MatchAs | None:
         # wildcard_pattern: "_"
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.expect("_"):
             return ast.MatchAs(pattern=None, target=None, **self.span(_lnum, _col))
@@ -1649,9 +1567,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def value_pattern(self) -> ast.MatchValue | None:
+    def value_pattern(self, mark: Mark) -> ast.MatchValue | None:
         # value_pattern: attr !('.' | '(' | '=')
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (attr := self.attr()) and (self.negative_lookahead(self._tmp_28)):
             return ast.MatchValue(value=attr, **self.span(_lnum, _col))
@@ -1682,18 +1599,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def group_pattern(self) -> Any | None:
+    def group_pattern(self, mark: Mark) -> Any | None:
         # group_pattern: '(' pattern ')'
-        mark = self._mark()
         if (self.expect("(")) and (pattern := self.pattern()) and (self.expect(")")):
             return pattern
         self._reset(mark)
         return None
 
     @memoize
-    def sequence_pattern(self) -> ast.MatchSequence | None:
+    def sequence_pattern(self, mark: Mark) -> ast.MatchSequence | None:
         # sequence_pattern: '[' maybe_sequence_pattern? ']' | '(' open_sequence_pattern? ')'
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("[")) and (patterns := self.maybe_sequence_pattern(),) and (self.expect("]")):
             return ast.MatchSequence(patterns=patterns or [], **self.span(_lnum, _col))
@@ -1704,9 +1619,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def open_sequence_pattern(self) -> Any | None:
+    def open_sequence_pattern(self, mark: Mark) -> Any | None:
         # open_sequence_pattern: maybe_star_pattern ',' maybe_sequence_pattern?
-        mark = self._mark()
         if (
             (pattern := self.maybe_star_pattern())
             and (self.expect(","))
@@ -1717,18 +1631,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def maybe_sequence_pattern(self) -> Any | None:
+    def maybe_sequence_pattern(self, mark: Mark) -> Any | None:
         # maybe_sequence_pattern: ','.maybe_star_pattern+ ','?
-        mark = self._mark()
         if (patterns := self.gathered(self.maybe_star_pattern, self.expect, ",")) and (self.expect(","),):
             return patterns
         self._reset(mark)
         return None
 
     @memoize
-    def maybe_star_pattern(self) -> Any | None:
+    def maybe_star_pattern(self, mark: Mark) -> Any | None:
         # maybe_star_pattern: star_pattern | pattern
-        mark = self._mark()
         if star_pattern := self.star_pattern():
             return star_pattern
         self._reset(mark)
@@ -1738,9 +1650,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def star_pattern(self) -> Any | None:
+    def star_pattern(self, mark: Mark) -> Any | None:
         # star_pattern: '*' pattern_capture_target | '*' wildcard_pattern
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("*")) and (target := self.pattern_capture_target()):
             return ast.MatchStar(name=target, **self.span(_lnum, _col))
@@ -1751,9 +1662,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def mapping_pattern(self) -> Any | None:
+    def mapping_pattern(self, mark: Mark) -> Any | None:
         # mapping_pattern: '{' '}' | '{' double_star_pattern ','? '}' | '{' items_pattern ',' double_star_pattern ','? '}' | '{' items_pattern ','? '}'
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("{")) and (self.expect("}")):
             return ast.MatchMapping(keys=[], patterns=[], rest=None, **self.span(_lnum, _col))
@@ -1797,36 +1707,32 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def items_pattern(self) -> Any | None:
+    def items_pattern(self, mark: Mark) -> Any | None:
         # items_pattern: ','.key_value_pattern+
-        mark = self._mark()
         if gathered := self.gathered(self.key_value_pattern, self.expect, ","):
             return gathered
         self._reset(mark)
         return None
 
     @memoize
-    def key_value_pattern(self) -> Any | None:
+    def key_value_pattern(self, mark: Mark) -> Any | None:
         # key_value_pattern: (literal_expr | attr) ':' pattern
-        mark = self._mark()
         if (key := self._tmp_29()) and (self.expect(":")) and (pattern := self.pattern()):
             return (key, pattern)
         self._reset(mark)
         return None
 
     @memoize
-    def double_star_pattern(self) -> Any | None:
+    def double_star_pattern(self, mark: Mark) -> Any | None:
         # double_star_pattern: '**' pattern_capture_target
-        mark = self._mark()
         if (self.expect("**")) and (target := self.pattern_capture_target()):
             return target
         self._reset(mark)
         return None
 
     @memoize
-    def class_pattern(self) -> ast.MatchClass | None:
+    def class_pattern(self, mark: Mark) -> ast.MatchClass | None:
         # class_pattern: name_or_attr '(' ')' | name_or_attr '(' positional_patterns ','? ')' | name_or_attr '(' keyword_patterns ','? ')' | name_or_attr '(' positional_patterns ',' keyword_patterns ','? ')' | invalid_class_pattern
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (cls := self.name_or_attr()) and (self.expect("(")) and (self.expect(")")):
             return ast.MatchClass(
@@ -1882,36 +1788,32 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def positional_patterns(self) -> Any | None:
+    def positional_patterns(self, mark: Mark) -> Any | None:
         # positional_patterns: ','.pattern+
-        mark = self._mark()
         if args := self.gathered(self.pattern, self.expect, ","):
             return args
         self._reset(mark)
         return None
 
     @memoize
-    def keyword_patterns(self) -> Any | None:
+    def keyword_patterns(self, mark: Mark) -> Any | None:
         # keyword_patterns: ','.keyword_pattern+
-        mark = self._mark()
         if gathered := self.gathered(self.keyword_pattern, self.expect, ","):
             return gathered
         self._reset(mark)
         return None
 
     @memoize
-    def keyword_pattern(self) -> Any | None:
+    def keyword_pattern(self, mark: Mark) -> Any | None:
         # keyword_pattern: NAME '=' pattern
-        mark = self._mark()
         if (arg := self.name()) and (self.expect("=")) and (value := self.pattern()):
             return (arg.string, value)
         self._reset(mark)
         return None
 
     @memoize
-    def type_alias(self) -> ast.TypeAlias | None:
+    def type_alias(self, mark: Mark) -> ast.TypeAlias | None:
         # type_alias: "type" NAME type_params? '=' expression
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (self.expect("type"))
@@ -1943,27 +1845,24 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def type_params(self) -> list | None:
+    def type_params(self, mark: Mark) -> list | None:
         # type_params: '[' type_param_seq ']'
-        mark = self._mark()
         if (self.expect("[")) and (t := self.type_param_seq()) and (self.expect("]")):
             return self.check_version((3, 12), "Type parameter lists are", t)
         self._reset(mark)
         return None
 
     @memoize
-    def type_param_seq(self) -> Any | None:
+    def type_param_seq(self, mark: Mark) -> Any | None:
         # type_param_seq: ','.type_param+ ','?
-        mark = self._mark()
         if (a := self.gathered(self.type_param, self.expect, ",")) and (self.expect(","),):
             return a
         self._reset(mark)
         return None
 
     @memoize
-    def type_param(self) -> Any | None:
+    def type_param(self, mark: Mark) -> Any | None:
         # type_param: NAME type_param_bound? | '*' NAME ':' expression | '*' NAME | '**' NAME ':' expression | '**' NAME
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.name()) and (b := self.type_param_bound(),):
             return (
@@ -2005,18 +1904,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def type_param_bound(self) -> Any | None:
+    def type_param_bound(self, mark: Mark) -> Any | None:
         # type_param_bound: ':' expression
-        mark = self._mark()
         if (self.expect(":")) and (e := self.expression()):
             return e
         self._reset(mark)
         return None
 
     @memoize
-    def expressions(self) -> Any | None:
+    def expressions(self, mark: Mark) -> Any | None:
         # expressions: expression ((',' expression))+ ','? | expression ',' | expression
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.expression()) and (b := self.repeated(self._tmp_30)) and (self.expect(","),):
             return ast.Tuple(elts=[a] + b, ctx=Load, **self.span(_lnum, _col))
@@ -2030,9 +1927,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def expression(self) -> Any | None:
+    def expression(self, mark: Mark) -> Any | None:
         # expression: invalid_expression | invalid_legacy_expression | disjunction 'if' disjunction 'else' expression | disjunction | lambdef
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_expression()):
             return None
@@ -2058,9 +1954,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def yield_expr(self) -> Any | None:
+    def yield_expr(self, mark: Mark) -> Any | None:
         # yield_expr: 'yield' 'from' expression | 'yield' star_expressions?
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("yield")) and (self.expect("from")) and (a := self.expression()):
             return ast.YieldFrom(value=a, **self.span(_lnum, _col))
@@ -2071,9 +1966,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def star_expressions(self) -> Any | None:
+    def star_expressions(self, mark: Mark) -> Any | None:
         # star_expressions: star_expression ((',' star_expression))+ ','? | star_expression ',' | star_expression
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.star_expression()) and (b := self.repeated(self._tmp_31)) and (self.expect(","),):
             return ast.Tuple(elts=[a] + b, ctx=Load, **self.span(_lnum, _col))
@@ -2087,9 +1981,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def star_expression(self) -> Any | None:
+    def star_expression(self, mark: Mark) -> Any | None:
         # star_expression: '*' bitwise_or | expression
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("*")) and (a := self.bitwise_or()):
             return ast.Starred(value=a, ctx=Load, **self.span(_lnum, _col))
@@ -2100,18 +1993,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def star_named_expressions(self) -> Any | None:
+    def star_named_expressions(self, mark: Mark) -> Any | None:
         # star_named_expressions: ','.star_named_expression+ ','?
-        mark = self._mark()
         if (a := self.gathered(self.star_named_expression, self.expect, ",")) and (self.expect(","),):
             return a
         self._reset(mark)
         return None
 
     @memoize
-    def star_named_expression(self) -> Any | None:
+    def star_named_expression(self, mark: Mark) -> Any | None:
         # star_named_expression: '*' bitwise_or | named_expression
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("*")) and (a := self.bitwise_or()):
             return ast.Starred(value=a, ctx=Load, **self.span(_lnum, _col))
@@ -2122,9 +2013,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def assignment_expression(self) -> Any | None:
+    def assignment_expression(self, mark: Mark) -> Any | None:
         # assignment_expression: NAME ':=' ~ expression
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         cut = False
         if (a := self.name()) and (self.expect(":=")) and (cut := True) and (b := self.expression()):
@@ -2146,9 +2036,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def named_expression(self) -> Any | None:
+    def named_expression(self, mark: Mark) -> Any | None:
         # named_expression: assignment_expression | invalid_named_expression | expression !':='
-        mark = self._mark()
         if assignment_expression := self.assignment_expression():
             return assignment_expression
         self._reset(mark)
@@ -2161,9 +2050,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def disjunction(self) -> Any | None:
+    def disjunction(self, mark: Mark) -> Any | None:
         # disjunction: conjunction ((('or' | '||') conjunction))+ | conjunction
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.conjunction()) and (b := self.repeated(self._tmp_32)):
             return ast.BoolOp(op=ast.Or(), values=[a] + b, **self.span(_lnum, _col))
@@ -2174,9 +2062,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def conjunction(self) -> Any | None:
+    def conjunction(self, mark: Mark) -> Any | None:
         # conjunction: inversion ((('and' | '&&') inversion))+ | inversion
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.inversion()) and (b := self.repeated(self._tmp_33)):
             return ast.BoolOp(op=ast.And(), values=[a] + b, **self.span(_lnum, _col))
@@ -2187,9 +2074,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def inversion(self) -> Any | None:
+    def inversion(self, mark: Mark) -> Any | None:
         # inversion: 'not' inversion | comparison
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("not")) and (a := self.inversion()):
             return ast.UnaryOp(op=ast.Not(), operand=a, **self.span(_lnum, _col))
@@ -2200,9 +2086,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def comparison(self) -> Any | None:
+    def comparison(self, mark: Mark) -> Any | None:
         # comparison: bitwise_or compare_op_bitwise_or_pair+ | bitwise_or
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.bitwise_or()) and (b := self.repeated(self.compare_op_bitwise_or_pair)):
             return ast.Compare(
@@ -2218,9 +2103,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def compare_op_bitwise_or_pair(self) -> Any | None:
+    def compare_op_bitwise_or_pair(self, mark: Mark) -> Any | None:
         # compare_op_bitwise_or_pair: eq_bitwise_or | noteq_bitwise_or | lte_bitwise_or | lt_bitwise_or | gte_bitwise_or | gt_bitwise_or | notin_bitwise_or | in_bitwise_or | isnot_bitwise_or | is_bitwise_or
-        mark = self._mark()
         if eq_bitwise_or := self.eq_bitwise_or():
             return eq_bitwise_or
         self._reset(mark)
@@ -2254,90 +2138,80 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def eq_bitwise_or(self) -> Any | None:
+    def eq_bitwise_or(self, mark: Mark) -> Any | None:
         # eq_bitwise_or: '==' bitwise_or
-        mark = self._mark()
         if (self.expect("==")) and (a := self.bitwise_or()):
             return (ast.Eq(), a)
         self._reset(mark)
         return None
 
     @memoize
-    def noteq_bitwise_or(self) -> tuple | None:
+    def noteq_bitwise_or(self, mark: Mark) -> tuple | None:
         # noteq_bitwise_or: '!=' bitwise_or
-        mark = self._mark()
         if (self.expect("!=")) and (a := self.bitwise_or()):
             return (ast.NotEq(), a)
         self._reset(mark)
         return None
 
     @memoize
-    def lte_bitwise_or(self) -> Any | None:
+    def lte_bitwise_or(self, mark: Mark) -> Any | None:
         # lte_bitwise_or: '<=' bitwise_or
-        mark = self._mark()
         if (self.expect("<=")) and (a := self.bitwise_or()):
             return (ast.LtE(), a)
         self._reset(mark)
         return None
 
     @memoize
-    def lt_bitwise_or(self) -> Any | None:
+    def lt_bitwise_or(self, mark: Mark) -> Any | None:
         # lt_bitwise_or: '<' bitwise_or
-        mark = self._mark()
         if (self.expect("<")) and (a := self.bitwise_or()):
             return (ast.Lt(), a)
         self._reset(mark)
         return None
 
     @memoize
-    def gte_bitwise_or(self) -> Any | None:
+    def gte_bitwise_or(self, mark: Mark) -> Any | None:
         # gte_bitwise_or: '>=' bitwise_or
-        mark = self._mark()
         if (self.expect(">=")) and (a := self.bitwise_or()):
             return (ast.GtE(), a)
         self._reset(mark)
         return None
 
     @memoize
-    def gt_bitwise_or(self) -> Any | None:
+    def gt_bitwise_or(self, mark: Mark) -> Any | None:
         # gt_bitwise_or: '>' bitwise_or
-        mark = self._mark()
         if (self.expect(">")) and (a := self.bitwise_or()):
             return (ast.Gt(), a)
         self._reset(mark)
         return None
 
     @memoize
-    def notin_bitwise_or(self) -> Any | None:
+    def notin_bitwise_or(self, mark: Mark) -> Any | None:
         # notin_bitwise_or: 'not' 'in' bitwise_or
-        mark = self._mark()
         if (self.expect("not")) and (self.expect("in")) and (a := self.bitwise_or()):
             return (ast.NotIn(), a)
         self._reset(mark)
         return None
 
     @memoize
-    def in_bitwise_or(self) -> Any | None:
+    def in_bitwise_or(self, mark: Mark) -> Any | None:
         # in_bitwise_or: 'in' bitwise_or
-        mark = self._mark()
         if (self.expect("in")) and (a := self.bitwise_or()):
             return (ast.In(), a)
         self._reset(mark)
         return None
 
     @memoize
-    def isnot_bitwise_or(self) -> Any | None:
+    def isnot_bitwise_or(self, mark: Mark) -> Any | None:
         # isnot_bitwise_or: 'is' 'not' bitwise_or
-        mark = self._mark()
         if (self.expect("is")) and (self.expect("not")) and (a := self.bitwise_or()):
             return (ast.IsNot(), a)
         self._reset(mark)
         return None
 
     @memoize
-    def is_bitwise_or(self) -> Any | None:
+    def is_bitwise_or(self, mark: Mark) -> Any | None:
         # is_bitwise_or: 'is' bitwise_or
-        mark = self._mark()
         if (self.expect("is")) and (a := self.bitwise_or()):
             return (ast.Is(), a)
         self._reset(mark)
@@ -2440,9 +2314,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def factor(self) -> Any | None:
+    def factor(self, mark: Mark) -> Any | None:
         # factor: '+' factor | '-' factor | '~' factor | power
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("+")) and (a := self.factor()):
             return ast.UnaryOp(op=ast.UAdd(), operand=a, **self.span(_lnum, _col))
@@ -2459,9 +2332,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def power(self) -> Any | None:
+    def power(self, mark: Mark) -> Any | None:
         # power: await_primary '**' factor | await_primary
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.await_primary()) and (self.expect("**")) and (b := self.factor()):
             return ast.BinOp(left=a, op=ast.Pow(), right=b, **self.span(_lnum, _col))
@@ -2472,9 +2344,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def await_primary(self) -> Any | None:
+    def await_primary(self, mark: Mark) -> Any | None:
         # await_primary: 'await' primary | primary
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("await")) and (a := self.primary()):
             return ast.Await(a, **self.span(_lnum, _col))
@@ -2538,9 +2409,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def sub_procs(self) -> Any | None:
+    def sub_procs(self, mark: Mark) -> Any | None:
         # sub_procs: '$(' ~ proc_cmds ')' | '$[' ~ proc_cmds ']' | '![' ~ proc_cmds ']' | '!(' ~ proc_cmds ')'
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         cut = False
         if (a := self.expect("$(")) and (cut := True) and (args := self.proc_cmds()) and (self.expect(")")):
@@ -2569,18 +2439,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def help_atom(self) -> Any | None:
+    def help_atom(self, mark: Mark) -> Any | None:
         # help_atom: atom ('??' | '?')
-        mark = self._mark()
         if (a := self.atom()) and (b := self._tmp_34()):
             return (a, b)
         self._reset(mark)
         return None
 
     @memoize
-    def env_atom(self) -> Any | None:
+    def env_atom(self, mark: Mark) -> Any | None:
         # env_atom: '$' NAME | '${' slices '}'
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("$")) and (a := self.name()):
             return self.expand_env_name(a, **self.span(_lnum, _col))
@@ -2591,18 +2459,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def proc_cmds(self) -> Any | None:
+    def proc_cmds(self, mark: Mark) -> Any | None:
         # proc_cmds: proc_cmd+
-        mark = self._mark()
         if a := self.repeated(self.proc_cmd):
             return self.proc_args(a)
         self._reset(mark)
         return None
 
     @memoize
-    def proc_cmd(self) -> Any | None:
+    def proc_cmd(self, mark: Mark) -> Any | None:
         # proc_cmd: sub_procs | '@(' ~ (bare_genexp | expressions) ')' | '@$(' ~ proc_cmds ')' | env_atom | help_atom | search_path | proc_macro_start ~ ((cmd_group | any_cmd))* | cmd_name
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if sub_procs := self.sub_procs():
             return sub_procs
@@ -2640,18 +2506,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def proc_macro_start(self) -> Any | None:
+    def proc_macro_start(self, mark: Mark) -> Any | None:
         # proc_macro_start: &cmd_name '!'
-        mark = self._mark()
         if (self.positive_lookahead(self.cmd_name)) and (a := self.expect("!")):
             return self.handle_proc_macro_start(a)
         self._reset(mark)
         return None
 
     @memoize
-    def cmd_name(self) -> Any | None:
+    def cmd_name(self, mark: Mark) -> Any | None:
         # cmd_name: NAME | NUMBER | STRING | !']' !')' !'}' OP
-        mark = self._mark()
         if name := self.name():
             return name
         self._reset(mark)
@@ -2672,9 +2536,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def any_cmd(self) -> Any | None:
+    def any_cmd(self, mark: Mark) -> Any | None:
         # any_cmd: cmd_name | WS | KEYWORD
-        mark = self._mark()
         if cmd_name := self.cmd_name():
             return cmd_name
         self._reset(mark)
@@ -2687,9 +2550,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def cmd_group(self) -> Any | None:
+    def cmd_group(self, mark: Mark) -> Any | None:
         # cmd_group: ('(' | '!(' | '$(') any_cmd* ')' | ('[' | '![' | '$[') any_cmd* ']'
-        mark = self._mark()
         if (a := self._tmp_37()) and (b := self.repeated(self.any_cmd),) and (c := self.expect(")")):
             return "".join(i.string for i in [a, *b, c])
         self._reset(mark)
@@ -2699,9 +2561,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def slices(self) -> Any | None:
+    def slices(self, mark: Mark) -> Any | None:
         # slices: slice !',' | ','.(slice | starred_expression)+ ','?
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.slice()) and (self.negative_lookahead(self.expect, ",")):
             return a
@@ -2712,9 +2573,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def slice(self) -> Any | None:
+    def slice(self, mark: Mark) -> Any | None:
         # slice: expression? ':' expression? [':' expression?] | named_expression
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (a := self.expression(),)
@@ -2730,9 +2590,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def atom(self) -> Any | None:
+    def atom(self, mark: Mark) -> Any | None:
         # atom: search_path | NAME | 'True' | 'False' | 'None' | &(STRING | FSTRING_START) strings | NUMBER | &'(' (tuple | group | genexp) | &'[' (list | listcomp) | &'{' (dict | set | dictcomp | setcomp) | '...'
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if search_path := self.search_path():
             return search_path
@@ -2770,9 +2629,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def search_path(self) -> Any | None:
+    def search_path(self, mark: Mark) -> Any | None:
         # search_path: SEARCH_PATH
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if a := self.token(Token.SEARCH_PATH):
             return self.expand_search_path(a, **self.span(_lnum, _col))
@@ -2780,9 +2638,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def group(self) -> Any | None:
+    def group(self, mark: Mark) -> Any | None:
         # group: '(' (yield_expr | named_expression) ')' | invalid_group
-        mark = self._mark()
         if (self.expect("(")) and (a := self._tmp_45()) and (self.expect(")")):
             return a
         self._reset(mark)
@@ -2792,9 +2649,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def lambdef(self) -> Any | None:
+    def lambdef(self, mark: Mark) -> Any | None:
         # lambdef: 'lambda' lambda_params? ':' expression
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (self.expect("lambda"))
@@ -2811,9 +2667,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def lambda_params(self) -> Any | None:
+    def lambda_params(self, mark: Mark) -> Any | None:
         # lambda_params: invalid_lambda_parameters | lambda_parameters
-        mark = self._mark()
         if self.call_invalid_rules and (self.invalid_lambda_parameters()):
             return None
         self._reset(mark)
@@ -2823,9 +2678,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def lambda_parameters(self) -> ast.arguments | None:
+    def lambda_parameters(self, mark: Mark) -> ast.arguments | None:
         # lambda_parameters: lambda_slash_no_default lambda_param_no_default* lambda_param_with_default* lambda_star_etc? | lambda_slash_with_default lambda_param_with_default* lambda_star_etc? | lambda_param_no_default+ lambda_param_with_default* lambda_star_etc? | lambda_param_with_default+ lambda_star_etc? | lambda_star_etc
-        mark = self._mark()
         if (
             (a := self.lambda_slash_no_default())
             and (b := self.repeated(self.lambda_param_no_default),)
@@ -2857,9 +2711,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def lambda_slash_no_default(self) -> list[tuple[ast.arg, None]] | None:
+    def lambda_slash_no_default(self, mark: Mark) -> list[tuple[ast.arg, None]] | None:
         # lambda_slash_no_default: lambda_param_no_default+ '/' ',' | lambda_param_no_default+ '/' &':'
-        mark = self._mark()
         if (a := self.repeated(self.lambda_param_no_default)) and (self.expect("/")) and (self.expect(",")):
             return [(p, None) for p in a]
         self._reset(mark)
@@ -2873,9 +2726,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def lambda_slash_with_default(self) -> list[tuple[ast.arg, Any]] | None:
+    def lambda_slash_with_default(self, mark: Mark) -> list[tuple[ast.arg, Any]] | None:
         # lambda_slash_with_default: lambda_param_no_default* lambda_param_with_default+ '/' ',' | lambda_param_no_default* lambda_param_with_default+ '/' &':'
-        mark = self._mark()
         if (
             (a := self.repeated(self.lambda_param_no_default),)
             and (b := self.repeated(self.lambda_param_with_default))
@@ -2895,9 +2747,10 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def lambda_star_etc(self) -> tuple[ast.arg | None, list[tuple[ast.arg, Any]], ast.arg | None] | None:
+    def lambda_star_etc(
+        self, mark: Mark
+    ) -> tuple[ast.arg | None, list[tuple[ast.arg, Any]], ast.arg | None] | None:
         # lambda_star_etc: invalid_lambda_star_etc | '*' lambda_param_no_default lambda_param_maybe_default* lambda_kwds? | '*' ',' lambda_param_maybe_default+ lambda_kwds? | lambda_kwds
-        mark = self._mark()
         if self.call_invalid_rules and (self.invalid_lambda_star_etc()):
             return None
         self._reset(mark)
@@ -2923,9 +2776,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def lambda_kwds(self) -> ast.arg | None:
+    def lambda_kwds(self, mark: Mark) -> ast.arg | None:
         # lambda_kwds: invalid_lambda_kwds | '**' lambda_param_no_default
-        mark = self._mark()
         if self.call_invalid_rules and (self.invalid_lambda_kwds()):
             return None
         self._reset(mark)
@@ -2935,9 +2787,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def lambda_param_no_default(self) -> ast.arg | None:
+    def lambda_param_no_default(self, mark: Mark) -> ast.arg | None:
         # lambda_param_no_default: lambda_param ',' | lambda_param &':'
-        mark = self._mark()
         if (a := self.lambda_param()) and (self.expect(",")):
             return a
         self._reset(mark)
@@ -2947,9 +2798,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def lambda_param_with_default(self) -> tuple[ast.arg, Any] | None:
+    def lambda_param_with_default(self, mark: Mark) -> tuple[ast.arg, Any] | None:
         # lambda_param_with_default: lambda_param default ',' | lambda_param default &':'
-        mark = self._mark()
         if (a := self.lambda_param()) and (c := self.default()) and (self.expect(",")):
             return (a, c)
         self._reset(mark)
@@ -2963,9 +2813,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def lambda_param_maybe_default(self) -> tuple[ast.arg, Any] | None:
+    def lambda_param_maybe_default(self, mark: Mark) -> tuple[ast.arg, Any] | None:
         # lambda_param_maybe_default: lambda_param default? ',' | lambda_param default? &':'
-        mark = self._mark()
         if (a := self.lambda_param()) and (c := self.default(),) and (self.expect(",")):
             return (a, c)
         self._reset(mark)
@@ -2979,9 +2828,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def lambda_param(self) -> ast.arg | None:
+    def lambda_param(self, mark: Mark) -> ast.arg | None:
         # lambda_param: NAME
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if a := self.name():
             return ast.arg(arg=a.string, annotation=None, **self.span(_lnum, _col))
@@ -2989,9 +2837,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def fstring_mid(self) -> Any | None:
+    def fstring_mid(self, mark: Mark) -> Any | None:
         # fstring_mid: fstring_replacement_field | FSTRING_MIDDLE
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if fstring_replacement_field := self.fstring_replacement_field():
             return fstring_replacement_field
@@ -3002,9 +2849,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def fstring_replacement_field(self) -> Any | None:
+    def fstring_replacement_field(self, mark: Mark) -> Any | None:
         # fstring_replacement_field: '{' annotated_rhs '='? fstring_conversion? fstring_full_format_spec? '}' | invalid_replacement_field
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (self.expect("{"))
@@ -3027,18 +2873,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def fstring_conversion(self) -> int | None:
+    def fstring_conversion(self, mark: Mark) -> int | None:
         # fstring_conversion: '!' NAME
-        mark = self._mark()
         if (conv_token := self.expect("!")) and (conv := self.name()):
             return self.check_fstring_conversion(conv_token, conv)
         self._reset(mark)
         return None
 
     @memoize
-    def fstring_full_format_spec(self) -> Any | None:
+    def fstring_full_format_spec(self, mark: Mark) -> Any | None:
         # fstring_full_format_spec: ':' fstring_format_spec*
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect(":")) and (spec := self.repeated(self.fstring_format_spec),):
             return ast.JoinedStr(
@@ -3048,9 +2892,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def fstring_format_spec(self) -> Any | None:
+    def fstring_format_spec(self, mark: Mark) -> Any | None:
         # fstring_format_spec: FSTRING_MIDDLE | fstring_replacement_field
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if t := self.token(Token.FSTRING_MIDDLE):
             return ast.Constant(value=t.string, **self.span(_lnum, _col))
@@ -3061,18 +2904,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def strings(self) -> Any | None:
+    def strings(self, mark: Mark) -> Any | None:
         # strings: ((fstring | STRING))+
-        mark = self._mark()
         if a := self.repeated(self._tmp_46):
             return self.concatenate_strings(a)
         self._reset(mark)
         return None
 
     @memoize
-    def list(self) -> ast.List | None:
+    def list(self, mark: Mark) -> ast.List | None:
         # list: '[' star_named_expressions? ']'
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("[")) and (a := self.star_named_expressions(),) and (self.expect("]")):
             return ast.List(elts=a or [], ctx=Load, **self.span(_lnum, _col))
@@ -3080,9 +2921,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def tuple(self) -> ast.Tuple | None:
+    def tuple(self, mark: Mark) -> ast.Tuple | None:
         # tuple: '(' [star_named_expression ',' star_named_expressions?] ')'
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("(")) and (a := self._tmp_47(),) and (self.expect(")")):
             return ast.Tuple(elts=a or [], ctx=Load, **self.span(_lnum, _col))
@@ -3090,9 +2930,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def set(self) -> ast.Set | None:
+    def set(self, mark: Mark) -> ast.Set | None:
         # set: '{' star_named_expressions '}'
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("{")) and (a := self.star_named_expressions()) and (self.expect("}")):
             return ast.Set(elts=a, **self.span(_lnum, _col))
@@ -3100,9 +2939,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def dict(self) -> ast.Dict | None:
+    def dict(self, mark: Mark) -> ast.Dict | None:
         # dict: '{' double_starred_kvpairs? '}' | '{' invalid_double_starred_kvpairs '}'
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("{")) and (a := self.double_starred_kvpairs(),) and (self.expect("}")):
             return ast.Dict(
@@ -3120,18 +2958,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def double_starred_kvpairs(self) -> list | None:
+    def double_starred_kvpairs(self, mark: Mark) -> list | None:
         # double_starred_kvpairs: ','.double_starred_kvpair+ ','?
-        mark = self._mark()
         if (a := self.gathered(self.double_starred_kvpair, self.expect, ",")) and (self.expect(","),):
             return a
         self._reset(mark)
         return None
 
     @memoize
-    def double_starred_kvpair(self) -> Any | None:
+    def double_starred_kvpair(self, mark: Mark) -> Any | None:
         # double_starred_kvpair: '**' bitwise_or | kvpair
-        mark = self._mark()
         if (self.expect("**")) and (a := self.bitwise_or()):
             return (None, a)
         self._reset(mark)
@@ -3141,27 +2977,24 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def kvpair(self) -> tuple | None:
+    def kvpair(self, mark: Mark) -> tuple | None:
         # kvpair: expression ':' expression
-        mark = self._mark()
         if (a := self.expression()) and (self.expect(":")) and (b := self.expression()):
             return (a, b)
         self._reset(mark)
         return None
 
     @memoize
-    def for_if_clauses(self) -> list[ast.comprehension] | None:
+    def for_if_clauses(self, mark: Mark) -> list[ast.comprehension] | None:
         # for_if_clauses: for_if_clause+
-        mark = self._mark()
         if a := self.repeated(self.for_if_clause):
             return a
         self._reset(mark)
         return None
 
     @memoize
-    def for_if_clause(self) -> ast.comprehension | None:
+    def for_if_clause(self, mark: Mark) -> ast.comprehension | None:
         # for_if_clause: 'async' 'for' star_targets 'in' ~ disjunction (('if' disjunction))* | 'for' star_targets 'in' ~ disjunction (('if' disjunction))* | invalid_for_target
-        mark = self._mark()
         cut = False
         if (
             (self.expect("async"))
@@ -3195,9 +3028,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def listcomp(self) -> ast.ListComp | None:
+    def listcomp(self, mark: Mark) -> ast.ListComp | None:
         # listcomp: '[' named_expression for_if_clauses ']' | invalid_comprehension
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (self.expect("["))
@@ -3213,9 +3045,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def setcomp(self) -> ast.SetComp | None:
+    def setcomp(self, mark: Mark) -> ast.SetComp | None:
         # setcomp: '{' named_expression for_if_clauses '}' | invalid_comprehension
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (self.expect("{"))
@@ -3231,9 +3062,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def genexp(self) -> ast.GeneratorExp | None:
+    def genexp(self, mark: Mark) -> ast.GeneratorExp | None:
         # genexp: '(' (assignment_expression | expression !':=') for_if_clauses ')' | invalid_comprehension
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (self.expect("("))
@@ -3249,9 +3079,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def bare_genexp(self) -> Any | None:
+    def bare_genexp(self, mark: Mark) -> Any | None:
         # bare_genexp: (assignment_expression | expression !':=') for_if_clauses
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self._tmp_51()) and (b := self.for_if_clauses()):
             return ast.GeneratorExp(elt=a, generators=b, **self.span(_lnum, _col))
@@ -3259,9 +3088,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def dictcomp(self) -> ast.DictComp | None:
+    def dictcomp(self, mark: Mark) -> ast.DictComp | None:
         # dictcomp: '{' kvpair for_if_clauses '}' | invalid_dict_comprehension
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (self.expect("{"))
@@ -3277,9 +3105,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def arguments(self) -> tuple[list, list] | None:
+    def arguments(self, mark: Mark) -> tuple[list, list] | None:
         # arguments: args ','? &')' | invalid_arguments
-        mark = self._mark()
         if (a := self.args()) and (self.expect(","),) and (self.positive_lookahead(self.expect, ")")):
             return a
         self._reset(mark)
@@ -3289,9 +3116,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def args(self) -> tuple[list, list] | None:
+    def args(self, mark: Mark) -> tuple[list, list] | None:
         # args: ','.(starred_expression | (assignment_expression | expression !':=') !'=')+ [',' kwargs] | kwargs
-        mark = self._mark()
         if (a := self.gathered(self._tmp_52, self.expect, ",")) and (b := self._tmp_53(),):
             return (
                 a + ([e for e in b if isinstance(e, ast.Starred)] if b else []),
@@ -3307,9 +3133,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def kwargs(self) -> list | None:
+    def kwargs(self, mark: Mark) -> list | None:
         # kwargs: ','.kwarg_or_starred+ ',' ','.kwarg_or_double_starred+ | ','.kwarg_or_starred+ | ','.kwarg_or_double_starred+
-        mark = self._mark()
         if (
             (a := self.gathered(self.kwarg_or_starred, self.expect, ","))
             and (self.expect(","))
@@ -3326,9 +3151,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def starred_expression(self) -> Any | None:
+    def starred_expression(self, mark: Mark) -> Any | None:
         # starred_expression: invalid_starred_expression | '*' expression
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_starred_expression()):
             return None
@@ -3339,9 +3163,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def kwarg_or_starred(self) -> Any | None:
+    def kwarg_or_starred(self, mark: Mark) -> Any | None:
         # kwarg_or_starred: invalid_kwarg | NAME '=' expression | starred_expression
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_kwarg()):
             return None
@@ -3355,9 +3178,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def kwarg_or_double_starred(self) -> Any | None:
+    def kwarg_or_double_starred(self, mark: Mark) -> Any | None:
         # kwarg_or_double_starred: invalid_kwarg | NAME '=' expression | '**' expression
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_kwarg()):
             return None
@@ -3371,9 +3193,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def star_targets(self) -> Any | None:
+    def star_targets(self, mark: Mark) -> Any | None:
         # star_targets: star_target !',' | star_target ((',' star_target))* ','?
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.star_target()) and (self.negative_lookahead(self.expect, ",")):
             return a
@@ -3384,18 +3205,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def star_targets_list_seq(self) -> list | None:
+    def star_targets_list_seq(self, mark: Mark) -> list | None:
         # star_targets_list_seq: ','.star_target+ ','?
-        mark = self._mark()
         if (a := self.gathered(self.star_target, self.expect, ",")) and (self.expect(","),):
             return a
         self._reset(mark)
         return None
 
     @memoize
-    def star_targets_tuple_seq(self) -> list | None:
+    def star_targets_tuple_seq(self, mark: Mark) -> list | None:
         # star_targets_tuple_seq: star_target ((',' star_target))+ ','? | star_target ','
-        mark = self._mark()
         if (a := self.star_target()) and (b := self.repeated(self._tmp_55)) and (self.expect(","),):
             return [a] + b
         self._reset(mark)
@@ -3405,9 +3224,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def star_target(self) -> Any | None:
+    def star_target(self, mark: Mark) -> Any | None:
         # star_target: '*' (!'*' star_target) | target_with_star_atom
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("*")) and (a := self._tmp_56()):
             return ast.Starred(value=self.set_expr_context(a, Store), ctx=Store, **self.span(_lnum, _col))
@@ -3418,9 +3236,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def target_with_star_atom(self) -> Any | None:
+    def target_with_star_atom(self, mark: Mark) -> Any | None:
         # target_with_star_atom: t_primary '.' NAME !t_lookahead | t_primary '[' slices ']' !t_lookahead | '$' NAME | '${' slices '}' | star_atom
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (a := self.t_primary())
@@ -3451,9 +3268,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def star_atom(self) -> Any | None:
+    def star_atom(self, mark: Mark) -> Any | None:
         # star_atom: NAME | '(' target_with_star_atom ')' | '(' star_targets_tuple_seq? ')' | '[' star_targets_list_seq? ']'
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if a := self.name():
             return ast.Name(id=a.string, ctx=Store, **self.span(_lnum, _col))
@@ -3470,9 +3286,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def single_target(self) -> Any | None:
+    def single_target(self, mark: Mark) -> Any | None:
         # single_target: single_subscript_attribute_target | NAME | '(' single_target ')'
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if single_subscript_attribute_target := self.single_subscript_attribute_target():
             return single_subscript_attribute_target
@@ -3486,9 +3301,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def single_subscript_attribute_target(self) -> Any | None:
+    def single_subscript_attribute_target(self, mark: Mark) -> Any | None:
         # single_subscript_attribute_target: t_primary '.' NAME !t_lookahead | t_primary '[' slices ']' !t_lookahead
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (a := self.t_primary())
@@ -3551,9 +3365,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def t_lookahead(self) -> Any | None:
+    def t_lookahead(self, mark: Mark) -> Any | None:
         # t_lookahead: '(' | '[' | '.'
-        mark = self._mark()
         if literal := self.expect("("):
             return literal
         self._reset(mark)
@@ -3566,18 +3379,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def del_targets(self) -> Any | None:
+    def del_targets(self, mark: Mark) -> Any | None:
         # del_targets: ','.del_target+ ','?
-        mark = self._mark()
         if (a := self.gathered(self.del_target, self.expect, ",")) and (self.expect(","),):
             return a
         self._reset(mark)
         return None
 
     @memoize
-    def del_target(self) -> Any | None:
+    def del_target(self, mark: Mark) -> Any | None:
         # del_target: t_primary '.' NAME !t_lookahead | t_primary '[' slices ']' !t_lookahead | del_t_atom
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (a := self.t_primary())
@@ -3602,9 +3413,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def del_t_atom(self) -> Any | None:
+    def del_t_atom(self, mark: Mark) -> Any | None:
         # del_t_atom: NAME | '(' del_target ')' | '(' del_targets? ')' | '[' del_targets? ']'
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if a := self.name():
             return ast.Name(id=a.string, ctx=Del, **self.span(_lnum, _col))
@@ -3621,9 +3431,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def type_expressions(self) -> list | None:
+    def type_expressions(self, mark: Mark) -> list | None:
         # type_expressions: ','.expression+ ',' '*' expression ',' '**' expression | ','.expression+ ',' '*' expression | ','.expression+ ',' '**' expression | '*' expression ',' '**' expression | '*' expression | '**' expression | ','.expression+
-        mark = self._mark()
         if (
             (a := self.gathered(self.expression, self.expect, ","))
             and (self.expect(","))
@@ -3672,9 +3481,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def func_type_comment(self) -> Any | None:
+    def func_type_comment(self, mark: Mark) -> Any | None:
         # func_type_comment: NEWLINE TYPE_COMMENT &(NEWLINE INDENT) | invalid_double_type_comments | TYPE_COMMENT
-        mark = self._mark()
         if (
             (self.token(Token.NEWLINE))
             and (t := self.token(Token.TYPE_COMMENT))
@@ -3691,9 +3499,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_arguments(self) -> None:
+    def invalid_arguments(self, mark: Mark) -> None:
         # invalid_arguments: args ',' '*' | expression for_if_clauses ',' [args | expression for_if_clauses] | NAME '=' expression for_if_clauses | [(args ',')] NAME '=' &(',' | ')') | args for_if_clauses | args ',' expression for_if_clauses | args ',' args
-        mark = self._mark()
         if (a := self.args()) and (self.expect(",")) and (self.expect("*")):
             return self.raise_syntax_error_known_location(
                 "iterable argument unpacking follows keyword argument unpacking",
@@ -3749,9 +3556,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_kwarg(self) -> None:
+    def invalid_kwarg(self, mark: Mark) -> None:
         # invalid_kwarg: ('True' | 'False' | 'None') '=' | NAME '=' expression for_if_clauses | !(NAME '=') expression '=' | '**' expression '=' expression
-        mark = self._mark()
         if (a := self._tmp_61()) and (b := self.expect("=")):
             return self.raise_syntax_error_known_range(f"cannot assign to {a.string}", a, b)
         self._reset(mark)
@@ -3776,11 +3582,10 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def expression_without_invalid(self) -> ast.AST | None:
+    def expression_without_invalid(self, mark: Mark) -> ast.AST | None:
         # expression_without_invalid: disjunction 'if' disjunction 'else' expression | disjunction | lambdef
         _prev_call_invalid = self.call_invalid_rules
         self.call_invalid_rules = False
-        mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
             (a := self.disjunction())
@@ -3804,9 +3609,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_legacy_expression(self) -> Any | None:
+    def invalid_legacy_expression(self, mark: Mark) -> Any | None:
         # invalid_legacy_expression: NAME !'(' star_expressions
-        mark = self._mark()
         if (
             (a := self.name())
             and (self.negative_lookahead(self.expect, "("))
@@ -3823,9 +3627,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_expression(self) -> None:
+    def invalid_expression(self, mark: Mark) -> None:
         # invalid_expression: !(NAME STRING | SOFT_KEYWORD) disjunction expression_without_invalid | disjunction 'if' disjunction !('else' | ':') | 'lambda' lambda_params? ':' &(FSTRING_MIDDLE | fstring_replacement_field)
-        mark = self._mark()
         if (
             (self.negative_lookahead(self._tmp_63))
             and (a := self.disjunction())
@@ -3858,9 +3661,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_named_expression(self) -> None:
+    def invalid_named_expression(self, mark: Mark) -> None:
         # invalid_named_expression: expression ':=' expression | NAME '=' bitwise_or !('=' | ':=') | !(list | tuple | genexp | 'True' | 'None' | 'False') bitwise_or '=' bitwise_or !('=' | ':=')
-        mark = self._mark()
         if (a := self.expression()) and (self.expect(":=")) and (self.expression()):
             return self.raise_syntax_error_known_location(
                 f"cannot use assignment expressions with {self.get_expr_name(a)}", a
@@ -3898,9 +3700,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_assignment(self) -> None:
+    def invalid_assignment(self, mark: Mark) -> None:
         # invalid_assignment: invalid_ann_assign_target ':' expression | star_named_expression ',' star_named_expressions* ':' expression | expression ':' expression | ((star_targets '='))* star_expressions '=' | ((star_targets '='))* yield_expr '=' | star_expressions augassign annotated_rhs
-        mark = self._mark()
         if (
             self.call_invalid_rules
             and (a := self.invalid_ann_assign_target())
@@ -3939,9 +3740,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_ann_assign_target(self) -> ast.AST | None:
+    def invalid_ann_assign_target(self, mark: Mark) -> ast.AST | None:
         # invalid_ann_assign_target: list | tuple | '(' invalid_ann_assign_target ')'
-        mark = self._mark()
         if a := self.list():
             return a
         self._reset(mark)
@@ -3959,27 +3759,24 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_del_stmt(self) -> None:
+    def invalid_del_stmt(self, mark: Mark) -> None:
         # invalid_del_stmt: 'del' star_expressions
-        mark = self._mark()
         if (self.expect("del")) and (a := self.star_expressions()):
             return self.raise_syntax_error_invalid_target(Target.DEL_TARGETS, a)
         self._reset(mark)
         return None
 
     @memoize
-    def invalid_block(self) -> None:
+    def invalid_block(self, mark: Mark) -> None:
         # invalid_block: NEWLINE !INDENT
-        mark = self._mark()
         if (self.token(Token.NEWLINE)) and (self.negative_lookahead(self.token, Token.INDENT)):
             return self.raise_indentation_error("expected an indented block")
         self._reset(mark)
         return None
 
     @memoize
-    def invalid_comprehension(self) -> None:
+    def invalid_comprehension(self, mark: Mark) -> None:
         # invalid_comprehension: ('[' | '(' | '{') starred_expression for_if_clauses | ('[' | '{') star_named_expression ',' star_named_expressions for_if_clauses | ('[' | '{') star_named_expression ',' for_if_clauses
-        mark = self._mark()
         if (self._tmp_71()) and (a := self.starred_expression()) and (self.for_if_clauses()):
             return self.raise_syntax_error_known_location(
                 "iterable unpacking cannot be used in comprehension", a
@@ -4009,9 +3806,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_dict_comprehension(self) -> None:
+    def invalid_dict_comprehension(self, mark: Mark) -> None:
         # invalid_dict_comprehension: '{' '**' bitwise_or for_if_clauses '}'
-        mark = self._mark()
         if (
             (self.expect("{"))
             and (a := self.expect("**"))
@@ -4026,9 +3822,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_parameters(self) -> None:
+    def invalid_parameters(self, mark: Mark) -> None:
         # invalid_parameters: "/" ',' | (slash_no_default | slash_with_default) param_maybe_default* '/' | slash_no_default? param_no_default* invalid_parameters_helper param_no_default | param_no_default* '(' param_no_default+ ','? ')' | [(slash_no_default | slash_with_default)] param_maybe_default* '*' (',' | param_no_default) param_maybe_default* '/' | param_maybe_default+ '/' '*'
-        mark = self._mark()
         if (a := self.expect("/")) and (self.expect(",")):
             return self.raise_syntax_error_known_location("at least one argument must precede /", a)
         self._reset(mark)
@@ -4071,18 +3866,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_default(self) -> Any | None:
+    def invalid_default(self, mark: Mark) -> Any | None:
         # invalid_default: '=' &(')' | ',')
-        mark = self._mark()
         if (a := self.expect("=")) and (self.positive_lookahead(self._tmp_77)):
             return self.raise_syntax_error_known_location("expected default value expression", a)
         self._reset(mark)
         return None
 
     @memoize
-    def invalid_star_etc(self) -> Any | None:
+    def invalid_star_etc(self, mark: Mark) -> Any | None:
         # invalid_star_etc: '*' (')' | ',' (')' | '**')) | '*' ',' TYPE_COMMENT | '*' param '=' | '*' (param_no_default | ',') param_maybe_default* '*' (param_no_default | ',')
-        mark = self._mark()
         if (a := self.expect("*")) and (self._tmp_78()):
             return self.raise_syntax_error_known_location("named arguments must follow bare *", a)
         self._reset(mark)
@@ -4106,9 +3899,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_kwds(self) -> Any | None:
+    def invalid_kwds(self, mark: Mark) -> Any | None:
         # invalid_kwds: '**' param '=' | '**' param ',' param | '**' param ',' ('*' | '**' | '/')
-        mark = self._mark()
         if (self.expect("**")) and (self.param()) and (a := self.expect("=")):
             return self.raise_syntax_error_known_location("var-keyword argument cannot have default value", a)
         self._reset(mark)
@@ -4121,9 +3913,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_parameters_helper(self) -> Any | None:
+    def invalid_parameters_helper(self, mark: Mark) -> Any | None:
         # invalid_parameters_helper: slash_with_default | param_with_default+
-        mark = self._mark()
         if a := self.slash_with_default():
             return [a]
         self._reset(mark)
@@ -4133,9 +3924,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_lambda_parameters(self) -> None:
+    def invalid_lambda_parameters(self, mark: Mark) -> None:
         # invalid_lambda_parameters: "/" ',' | (lambda_slash_no_default | lambda_slash_with_default) lambda_param_maybe_default* '/' | lambda_slash_no_default? lambda_param_no_default* invalid_lambda_parameters_helper lambda_param_no_default | lambda_param_no_default* '(' ','.lambda_param+ ','? ')' | [(lambda_slash_no_default | lambda_slash_with_default)] lambda_param_maybe_default* '*' (',' | lambda_param_no_default) lambda_param_maybe_default* '/' | lambda_param_maybe_default+ '/' '*'
-        mark = self._mark()
         if (a := self.expect("/")) and (self.expect(",")):
             return self.raise_syntax_error_known_location("at least one argument must precede /", a)
         self._reset(mark)
@@ -4184,9 +3974,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_lambda_parameters_helper(self) -> None:
+    def invalid_lambda_parameters_helper(self, mark: Mark) -> None:
         # invalid_lambda_parameters_helper: lambda_slash_with_default | lambda_param_with_default+
-        mark = self._mark()
         if a := self.lambda_slash_with_default():
             return [a]
         self._reset(mark)
@@ -4196,9 +3985,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_lambda_star_etc(self) -> None:
+    def invalid_lambda_star_etc(self, mark: Mark) -> None:
         # invalid_lambda_star_etc: '*' (':' | ',' (':' | '**')) | '*' lambda_param '=' | '*' (lambda_param_no_default | ',') lambda_param_maybe_default* '*' (lambda_param_no_default | ',')
-        mark = self._mark()
         if (self.expect("*")) and (self._tmp_85()):
             return self.raise_syntax_error("named arguments must follow bare *")
         self._reset(mark)
@@ -4219,9 +4007,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_lambda_kwds(self) -> Any | None:
+    def invalid_lambda_kwds(self, mark: Mark) -> Any | None:
         # invalid_lambda_kwds: '**' lambda_param '=' | '**' lambda_param ',' lambda_param | '**' lambda_param ',' ('*' | '**' | '/')
-        mark = self._mark()
         if (self.expect("**")) and (self.lambda_param()) and (a := self.expect("=")):
             return self.raise_syntax_error_known_location("var-keyword argument cannot have default value", a)
         self._reset(mark)
@@ -4239,9 +4026,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_double_type_comments(self) -> None:
+    def invalid_double_type_comments(self, mark: Mark) -> None:
         # invalid_double_type_comments: TYPE_COMMENT NEWLINE TYPE_COMMENT NEWLINE INDENT
-        mark = self._mark()
         if (
             (self.token(Token.TYPE_COMMENT))
             and (self.token(Token.NEWLINE))
@@ -4254,9 +4040,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_with_item(self) -> None:
+    def invalid_with_item(self, mark: Mark) -> None:
         # invalid_with_item: expression 'as' expression &(',' | ')' | ':')
-        mark = self._mark()
         if (
             (self.expression())
             and (self.expect("as"))
@@ -4268,18 +4053,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_for_target(self) -> None:
+    def invalid_for_target(self, mark: Mark) -> None:
         # invalid_for_target: 'async'? 'for' star_expressions
-        mark = self._mark()
         if (self.expect("async"),) and (self.expect("for")) and (a := self.star_expressions()):
             return self.raise_syntax_error_invalid_target(Target.FOR_TARGETS, a)
         self._reset(mark)
         return None
 
     @memoize
-    def invalid_group(self) -> None:
+    def invalid_group(self, mark: Mark) -> None:
         # invalid_group: '(' starred_expression ')' | '(' '**' expression ')'
-        mark = self._mark()
         if (self.expect("(")) and (a := self.starred_expression()) and (self.expect(")")):
             return self.raise_syntax_error_known_location("cannot use starred expression here", a)
         self._reset(mark)
@@ -4289,9 +4072,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_import(self) -> Any | None:
+    def invalid_import(self, mark: Mark) -> Any | None:
         # invalid_import: 'import' ','.dotted_name+ 'from' dotted_name
-        mark = self._mark()
         if (
             (a := self.expect("import"))
             and (self.gathered(self.dotted_name, self.expect, ","))
@@ -4305,18 +4087,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_import_from_targets(self) -> None:
+    def invalid_import_from_targets(self, mark: Mark) -> None:
         # invalid_import_from_targets: import_from_as_names ',' NEWLINE
-        mark = self._mark()
         if (self.import_from_as_names()) and (self.expect(",")) and (self.token(Token.NEWLINE)):
             return self.raise_syntax_error("trailing comma not allowed without surrounding parentheses")
         self._reset(mark)
         return None
 
     @memoize
-    def invalid_with_stmt(self) -> None | None:
+    def invalid_with_stmt(self, mark: Mark) -> None | None:
         # invalid_with_stmt: 'async'? 'with' ','.(expression ['as' star_target])+ &&':' | 'async'? 'with' '(' ','.(expressions ['as' star_target])+ ','? ')' &&':'
-        mark = self._mark()
         if (
             (self.expect("async"),)
             and (self.expect("with"))
@@ -4339,9 +4119,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_with_stmt_indent(self) -> None:
+    def invalid_with_stmt_indent(self, mark: Mark) -> None:
         # invalid_with_stmt_indent: 'async'? 'with' ','.(expression ['as' star_target])+ ':' NEWLINE !INDENT | 'async'? 'with' '(' ','.(expressions ['as' star_target])+ ','? ')' ':' NEWLINE !INDENT
-        mark = self._mark()
         if (
             (self.expect("async"),)
             and (a := self.expect("with"))
@@ -4372,9 +4151,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_try_stmt(self) -> None:
+    def invalid_try_stmt(self, mark: Mark) -> None:
         # invalid_try_stmt: 'try' ':' NEWLINE !INDENT | 'try' ':' block !('except' | 'finally') | 'try' ':' block* except_block+ 'except' '*' expression ['as' NAME] ':' | 'try' ':' block* except_star_block+ 'except' [expression ['as' NAME]] ':'
-        mark = self._mark()
         if (
             (a := self.expect("try"))
             and (self.expect(":"))
@@ -4424,9 +4202,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_except_stmt(self) -> None | None:
+    def invalid_except_stmt(self, mark: Mark) -> None | None:
         # invalid_except_stmt: 'except' '*'? expression ',' expressions ['as' NAME] ':' | 'except' '*'? expression ['as' NAME] NEWLINE | 'except' '*'? NEWLINE | 'except' '*' (NEWLINE | ':')
-        mark = self._mark()
         if (
             (self.expect("except"))
             and (self.expect("*"),)
@@ -4456,9 +4233,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_finally_stmt(self) -> None:
+    def invalid_finally_stmt(self, mark: Mark) -> None:
         # invalid_finally_stmt: 'finally' ':' NEWLINE !INDENT
-        mark = self._mark()
         if (
             (a := self.expect("finally"))
             and (self.expect(":"))
@@ -4472,9 +4248,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_except_stmt_indent(self) -> None:
+    def invalid_except_stmt_indent(self, mark: Mark) -> None:
         # invalid_except_stmt_indent: 'except' expression ['as' NAME] ':' NEWLINE !INDENT | 'except' ':' NEWLINE !INDENT
-        mark = self._mark()
         if (
             (a := self.expect("except"))
             and (self.expression())
@@ -4500,9 +4275,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_except_star_stmt_indent(self) -> Any | None:
+    def invalid_except_star_stmt_indent(self, mark: Mark) -> Any | None:
         # invalid_except_star_stmt_indent: 'except' '*' expression ['as' NAME] ':' NEWLINE !INDENT
-        mark = self._mark()
         if (
             (a := self.expect("except"))
             and (self.expect("*"))
@@ -4519,9 +4293,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_match_stmt(self) -> None:
+    def invalid_match_stmt(self, mark: Mark) -> None:
         # invalid_match_stmt: "match" subject_expr !':' | "match" subject_expr ':' NEWLINE !INDENT
-        mark = self._mark()
         if (self.expect("match")) and (self.subject_expr()) and (self.negative_lookahead(self.expect, ":")):
             return self.raise_syntax_error("expected ':'")
         self._reset(mark)
@@ -4539,9 +4312,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_case_block(self) -> None:
+    def invalid_case_block(self, mark: Mark) -> None:
         # invalid_case_block: "case" patterns guard? !':' | "case" patterns guard? ':' NEWLINE !INDENT
-        mark = self._mark()
         if (
             (self.expect("case"))
             and (self.patterns())
@@ -4565,9 +4337,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_as_pattern(self) -> None:
+    def invalid_as_pattern(self, mark: Mark) -> None:
         # invalid_as_pattern: or_pattern 'as' "_" | or_pattern 'as' !NAME expression
-        mark = self._mark()
         if (self.or_pattern()) and (self.expect("as")) and (a := self.expect("_")):
             return self.raise_syntax_error_known_location("cannot use '_' as a target", a)
         self._reset(mark)
@@ -4582,9 +4353,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_class_pattern(self) -> None:
+    def invalid_class_pattern(self, mark: Mark) -> None:
         # invalid_class_pattern: name_or_attr '(' invalid_class_argument_pattern
-        mark = self._mark()
         if (
             self.call_invalid_rules
             and (self.name_or_attr())
@@ -4598,9 +4368,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_class_argument_pattern(self) -> list | None:
+    def invalid_class_argument_pattern(self, mark: Mark) -> list | None:
         # invalid_class_argument_pattern: [positional_patterns ','] keyword_patterns ',' positional_patterns
-        mark = self._mark()
         if (
             (self._tmp_102(),)
             and (self.keyword_patterns())
@@ -4612,9 +4381,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_if_stmt(self) -> None:
+    def invalid_if_stmt(self, mark: Mark) -> None:
         # invalid_if_stmt: 'if' named_expression NEWLINE | 'if' named_expression ':' NEWLINE !INDENT
-        mark = self._mark()
         if (self.expect("if")) and (self.named_expression()) and (self.token(Token.NEWLINE)):
             return self.raise_syntax_error("expected ':'")
         self._reset(mark)
@@ -4632,9 +4400,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_elif_stmt(self) -> None:
+    def invalid_elif_stmt(self, mark: Mark) -> None:
         # invalid_elif_stmt: 'elif' named_expression NEWLINE | 'elif' named_expression ':' NEWLINE !INDENT
-        mark = self._mark()
         if (self.expect("elif")) and (self.named_expression()) and (self.token(Token.NEWLINE)):
             return self.raise_syntax_error("expected ':'")
         self._reset(mark)
@@ -4652,9 +4419,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_else_stmt(self) -> None:
+    def invalid_else_stmt(self, mark: Mark) -> None:
         # invalid_else_stmt: 'else' ':' NEWLINE !INDENT
-        mark = self._mark()
         if (
             (a := self.expect("else"))
             and (self.expect(":"))
@@ -4668,9 +4434,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_while_stmt(self) -> None:
+    def invalid_while_stmt(self, mark: Mark) -> None:
         # invalid_while_stmt: 'while' named_expression NEWLINE | 'while' named_expression ':' NEWLINE !INDENT
-        mark = self._mark()
         if (self.expect("while")) and (self.named_expression()) and (self.token(Token.NEWLINE)):
             return self.raise_syntax_error("expected ':'")
         self._reset(mark)
@@ -4688,9 +4453,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_for_stmt(self) -> None:
+    def invalid_for_stmt(self, mark: Mark) -> None:
         # invalid_for_stmt: ASYNC? 'for' star_targets 'in' star_expressions NEWLINE | 'async'? 'for' star_targets 'in' star_expressions ':' NEWLINE !INDENT
-        mark = self._mark()
         if (
             (self.token(Token.ASYNC),)
             and (self.expect("for"))
@@ -4718,9 +4482,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_def_raw(self) -> None:
+    def invalid_def_raw(self, mark: Mark) -> None:
         # invalid_def_raw: 'async'? 'def' NAME type_params? '(' params? ')' ['->' expression] ':' NEWLINE !INDENT
-        mark = self._mark()
         if (
             (self.expect("async"),)
             and (a := self.expect("def"))
@@ -4741,9 +4504,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_class_def_raw(self) -> None:
+    def invalid_class_def_raw(self, mark: Mark) -> None:
         # invalid_class_def_raw: 'class' NAME type_params? ['(' arguments? ')'] NEWLINE | 'class' NAME type_params? ['(' arguments? ')'] ':' NEWLINE !INDENT
-        mark = self._mark()
         if (
             (self.expect("class"))
             and (self.name())
@@ -4769,9 +4531,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_double_starred_kvpairs(self) -> None | None:
+    def invalid_double_starred_kvpairs(self, mark: Mark) -> None | None:
         # invalid_double_starred_kvpairs: ','.double_starred_kvpair+ ',' invalid_kvpair | expression ':' '*' bitwise_or | expression ':' &('}' | ',')
-        mark = self._mark()
         if (
             self.call_invalid_rules
             and (self.gathered(self.double_starred_kvpair, self.expect, ","))
@@ -4793,9 +4554,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_kvpair(self) -> None | None:
+    def invalid_kvpair(self, mark: Mark) -> None | None:
         # invalid_kvpair: expression !(':') | expression ':' '*' bitwise_or | expression ':' &('}' | ',') | expression ':'
-        mark = self._mark()
         if (a := self.expression()) and (self.negative_lookahead(self.expect, ":")):
             return self.raise_raw_syntax_error(
                 "':' expected after dictionary key",
@@ -4821,9 +4581,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_starred_expression(self) -> Any | None:
+    def invalid_starred_expression(self, mark: Mark) -> Any | None:
         # invalid_starred_expression: '*' expression '=' expression
-        mark = self._mark()
         if (
             (a := self.expect("*"))
             and (self.expression())
@@ -4835,9 +4594,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_replacement_field(self) -> Any | None:
+    def invalid_replacement_field(self, mark: Mark) -> Any | None:
         # invalid_replacement_field: '{' '=' | '{' '!' | '{' ':' | '{' '}' | '{' !annotated_rhs | '{' annotated_rhs !('=' | '!' | ':' | '}') | '{' annotated_rhs '=' !('!' | ':' | '}') | '{' annotated_rhs '='? invalid_conversion_character | '{' annotated_rhs '='? ['!' NAME] !(':' | '}') | '{' annotated_rhs '='? ['!' NAME] ':' fstring_format_spec* !'}' | '{' annotated_rhs '='? ['!' NAME] !'}'
-        mark = self._mark()
         if (self.expect("{")) and (a := self.expect("=")):
             return self.raise_syntax_error_known_location("f-string: valid expression required before '='", a)
         self._reset(mark)
@@ -4905,9 +4663,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_conversion_character(self) -> Any | None:
+    def invalid_conversion_character(self, mark: Mark) -> Any | None:
         # invalid_conversion_character: '!' &(':' | '}') | '!' !NAME
-        mark = self._mark()
         if (self.expect("!")) and (self.positive_lookahead(self._tmp_114)):
             return self.raise_syntax_error_on_next_token("f-string: missing conversion character")
         self._reset(mark)
@@ -4917,9 +4674,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_1(self) -> Any | None:
+    def _tmp_1(self, mark: Mark) -> Any | None:
         # _tmp_1: 'import' | 'from'
-        mark = self._mark()
         if literal := self.expect("import"):
             return literal
         self._reset(mark)
@@ -4929,9 +4685,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_2(self) -> Any | None:
+    def _tmp_2(self, mark: Mark) -> Any | None:
         # _tmp_2: 'def' | '@' | 'async'
-        mark = self._mark()
         if literal := self.expect("def"):
             return literal
         self._reset(mark)
@@ -4944,9 +4699,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_3(self) -> Any | None:
+    def _tmp_3(self, mark: Mark) -> Any | None:
         # _tmp_3: 'class' | '@'
-        mark = self._mark()
         if literal := self.expect("class"):
             return literal
         self._reset(mark)
@@ -4956,9 +4710,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_4(self) -> Any | None:
+    def _tmp_4(self, mark: Mark) -> Any | None:
         # _tmp_4: 'with' | 'async'
-        mark = self._mark()
         if literal := self.expect("with"):
             return literal
         self._reset(mark)
@@ -4968,9 +4721,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_5(self) -> Any | None:
+    def _tmp_5(self, mark: Mark) -> Any | None:
         # _tmp_5: 'for' | 'async'
-        mark = self._mark()
         if literal := self.expect("for"):
             return literal
         self._reset(mark)
@@ -4980,18 +4732,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_6(self) -> Any | None:
+    def _tmp_6(self, mark: Mark) -> Any | None:
         # _tmp_6: '=' annotated_rhs
-        mark = self._mark()
         if (self.expect("=")) and (d := self.annotated_rhs()):
             return d
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_7(self) -> Any | None:
+    def _tmp_7(self, mark: Mark) -> Any | None:
         # _tmp_7: '(' single_target ')' | single_subscript_attribute_target
-        mark = self._mark()
         if (self.expect("(")) and (b := self.single_target()) and (self.expect(")")):
             return b
         self._reset(mark)
@@ -5001,36 +4751,32 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_8(self) -> Any | None:
+    def _tmp_8(self, mark: Mark) -> Any | None:
         # _tmp_8: '=' annotated_rhs
-        mark = self._mark()
         if (self.expect("=")) and (d := self.annotated_rhs()):
             return d
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_9(self) -> Any | None:
+    def _tmp_9(self, mark: Mark) -> Any | None:
         # _tmp_9: star_targets '='
-        mark = self._mark()
         if (z := self.star_targets()) and (self.expect("=")):
             return z
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_10(self) -> Any | None:
+    def _tmp_10(self, mark: Mark) -> Any | None:
         # _tmp_10: 'from' expression
-        mark = self._mark()
         if (self.expect("from")) and (z := self.expression()):
             return z
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_11(self) -> Any | None:
+    def _tmp_11(self, mark: Mark) -> Any | None:
         # _tmp_11: ';' | NEWLINE
-        mark = self._mark()
         if literal := self.expect(";"):
             return literal
         self._reset(mark)
@@ -5040,18 +4786,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_12(self) -> Any | None:
+    def _tmp_12(self, mark: Mark) -> Any | None:
         # _tmp_12: ',' expression
-        mark = self._mark()
         if (self.expect(",")) and (z := self.expression()):
             return z
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_13(self) -> Any | None:
+    def _tmp_13(self, mark: Mark) -> Any | None:
         # _tmp_13: '.' | '...'
-        mark = self._mark()
         if literal := self.expect("."):
             return literal
         self._reset(mark)
@@ -5061,9 +4805,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_14(self) -> Any | None:
+    def _tmp_14(self, mark: Mark) -> Any | None:
         # _tmp_14: '.' | '...'
-        mark = self._mark()
         if literal := self.expect("."):
             return literal
         self._reset(mark)
@@ -5073,72 +4816,64 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_15(self) -> Any | None:
+    def _tmp_15(self, mark: Mark) -> Any | None:
         # _tmp_15: 'as' NAME
-        mark = self._mark()
         if (self.expect("as")) and (z := self.name()):
             return z.string
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_16(self) -> Any | None:
+    def _tmp_16(self, mark: Mark) -> Any | None:
         # _tmp_16: 'as' NAME
-        mark = self._mark()
         if (self.expect("as")) and (z := self.name()):
             return z.string
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_17(self) -> Any | None:
+    def _tmp_17(self, mark: Mark) -> Any | None:
         # _tmp_17: '@' dec_maybe_call NEWLINE
-        mark = self._mark()
         if (self.expect("@")) and (f := self.dec_maybe_call()) and (self.token(Token.NEWLINE)):
             return f
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_18(self) -> Any | None:
+    def _tmp_18(self, mark: Mark) -> Any | None:
         # _tmp_18: '@' named_expression NEWLINE
-        mark = self._mark()
         if (self.expect("@")) and (f := self.named_expression()) and (self.token(Token.NEWLINE)):
             return f
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_19(self) -> Any | None:
+    def _tmp_19(self, mark: Mark) -> Any | None:
         # _tmp_19: '(' arguments? ')'
-        mark = self._mark()
         if (self.expect("(")) and (z := self.arguments(),) and (self.expect(")")):
             return z
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_20(self) -> Any | None:
+    def _tmp_20(self, mark: Mark) -> Any | None:
         # _tmp_20: '->' expression
-        mark = self._mark()
         if (self.expect("->")) and (z := self.expression()):
             return z
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_21(self) -> Any | None:
+    def _tmp_21(self, mark: Mark) -> Any | None:
         # _tmp_21: '->' expression
-        mark = self._mark()
         if (self.expect("->")) and (z := self.expression()):
             return z
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_22(self) -> Any | None:
+    def _tmp_22(self, mark: Mark) -> Any | None:
         # _tmp_22: ',' | ')' | ':'
-        mark = self._mark()
         if literal := self.expect(","):
             return literal
         self._reset(mark)
@@ -5151,27 +4886,24 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_23(self) -> Any | None:
+    def _tmp_23(self, mark: Mark) -> Any | None:
         # _tmp_23: 'as' NAME
-        mark = self._mark()
         if (self.expect("as")) and (z := self.name()):
             return z.string
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_24(self) -> Any | None:
+    def _tmp_24(self, mark: Mark) -> Any | None:
         # _tmp_24: 'as' NAME
-        mark = self._mark()
         if (self.expect("as")) and (z := self.name()):
             return z.string
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_25(self) -> Any | None:
+    def _tmp_25(self, mark: Mark) -> Any | None:
         # _tmp_25: '+' | '-'
-        mark = self._mark()
         if literal := self.expect("+"):
             return literal
         self._reset(mark)
@@ -5181,9 +4913,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_26(self) -> Any | None:
+    def _tmp_26(self, mark: Mark) -> Any | None:
         # _tmp_26: '+' | '-'
-        mark = self._mark()
         if literal := self.expect("+"):
             return literal
         self._reset(mark)
@@ -5193,9 +4924,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_27(self) -> Any | None:
+    def _tmp_27(self, mark: Mark) -> Any | None:
         # _tmp_27: '.' | '(' | '='
-        mark = self._mark()
         if literal := self.expect("."):
             return literal
         self._reset(mark)
@@ -5208,9 +4938,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_28(self) -> Any | None:
+    def _tmp_28(self, mark: Mark) -> Any | None:
         # _tmp_28: '.' | '(' | '='
-        mark = self._mark()
         if literal := self.expect("."):
             return literal
         self._reset(mark)
@@ -5223,9 +4952,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_29(self) -> Any | None:
+    def _tmp_29(self, mark: Mark) -> Any | None:
         # _tmp_29: literal_expr | attr
-        mark = self._mark()
         if literal_expr := self.literal_expr():
             return literal_expr
         self._reset(mark)
@@ -5235,45 +4963,40 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_30(self) -> Any | None:
+    def _tmp_30(self, mark: Mark) -> Any | None:
         # _tmp_30: ',' expression
-        mark = self._mark()
         if (self.expect(",")) and (c := self.expression()):
             return c
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_31(self) -> Any | None:
+    def _tmp_31(self, mark: Mark) -> Any | None:
         # _tmp_31: ',' star_expression
-        mark = self._mark()
         if (self.expect(",")) and (c := self.star_expression()):
             return c
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_32(self) -> Any | None:
+    def _tmp_32(self, mark: Mark) -> Any | None:
         # _tmp_32: ('or' | '||') conjunction
-        mark = self._mark()
         if (self._tmp_115()) and (c := self.conjunction()):
             return c
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_33(self) -> Any | None:
+    def _tmp_33(self, mark: Mark) -> Any | None:
         # _tmp_33: ('and' | '&&') inversion
-        mark = self._mark()
         if (self._tmp_116()) and (c := self.inversion()):
             return c
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_34(self) -> Any | None:
+    def _tmp_34(self, mark: Mark) -> Any | None:
         # _tmp_34: '??' | '?'
-        mark = self._mark()
         if literal := self.expect("??"):
             return literal
         self._reset(mark)
@@ -5283,9 +5006,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_35(self) -> Any | None:
+    def _tmp_35(self, mark: Mark) -> Any | None:
         # _tmp_35: bare_genexp | expressions
-        mark = self._mark()
         if bare_genexp := self.bare_genexp():
             return bare_genexp
         self._reset(mark)
@@ -5295,9 +5017,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_36(self) -> Any | None:
+    def _tmp_36(self, mark: Mark) -> Any | None:
         # _tmp_36: cmd_group | any_cmd
-        mark = self._mark()
         if cmd_group := self.cmd_group():
             return cmd_group
         self._reset(mark)
@@ -5307,9 +5028,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_37(self) -> Any | None:
+    def _tmp_37(self, mark: Mark) -> Any | None:
         # _tmp_37: '(' | '!(' | '$('
-        mark = self._mark()
         if literal := self.expect("("):
             return literal
         self._reset(mark)
@@ -5322,9 +5042,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_38(self) -> Any | None:
+    def _tmp_38(self, mark: Mark) -> Any | None:
         # _tmp_38: '[' | '![' | '$['
-        mark = self._mark()
         if literal := self.expect("["):
             return literal
         self._reset(mark)
@@ -5337,9 +5056,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_39(self) -> Any | None:
+    def _tmp_39(self, mark: Mark) -> Any | None:
         # _tmp_39: slice | starred_expression
-        mark = self._mark()
         if slice := self.slice():
             return slice
         self._reset(mark)
@@ -5349,18 +5067,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_40(self) -> Any | None:
+    def _tmp_40(self, mark: Mark) -> Any | None:
         # _tmp_40: ':' expression?
-        mark = self._mark()
         if (self.expect(":")) and (d := self.expression(),):
             return d
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_41(self) -> Any | None:
+    def _tmp_41(self, mark: Mark) -> Any | None:
         # _tmp_41: STRING | FSTRING_START
-        mark = self._mark()
         if _string := self.token(Token.STRING):
             return _string
         self._reset(mark)
@@ -5370,9 +5086,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_42(self) -> Any | None:
+    def _tmp_42(self, mark: Mark) -> Any | None:
         # _tmp_42: tuple | group | genexp
-        mark = self._mark()
         if tuple := self.tuple():
             return tuple
         self._reset(mark)
@@ -5385,9 +5100,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_43(self) -> Any | None:
+    def _tmp_43(self, mark: Mark) -> Any | None:
         # _tmp_43: list | listcomp
-        mark = self._mark()
         if list := self.list():
             return list
         self._reset(mark)
@@ -5397,9 +5111,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_44(self) -> Any | None:
+    def _tmp_44(self, mark: Mark) -> Any | None:
         # _tmp_44: dict | set | dictcomp | setcomp
-        mark = self._mark()
         if dict := self.dict():
             return dict
         self._reset(mark)
@@ -5415,9 +5128,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_45(self) -> Any | None:
+    def _tmp_45(self, mark: Mark) -> Any | None:
         # _tmp_45: yield_expr | named_expression
-        mark = self._mark()
         if yield_expr := self.yield_expr():
             return yield_expr
         self._reset(mark)
@@ -5427,9 +5139,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_46(self) -> Any | None:
+    def _tmp_46(self, mark: Mark) -> Any | None:
         # _tmp_46: fstring | STRING
-        mark = self._mark()
         if fstring := self.fstring():
             return fstring
         self._reset(mark)
@@ -5439,9 +5150,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_47(self) -> Any | None:
+    def _tmp_47(self, mark: Mark) -> Any | None:
         # _tmp_47: star_named_expression ',' star_named_expressions?
-        mark = self._mark()
         if (
             (y := self.star_named_expression())
             and (self.expect(","))
@@ -5452,27 +5162,24 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_48(self) -> Any | None:
+    def _tmp_48(self, mark: Mark) -> Any | None:
         # _tmp_48: 'if' disjunction
-        mark = self._mark()
         if (self.expect("if")) and (z := self.disjunction()):
             return z
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_49(self) -> Any | None:
+    def _tmp_49(self, mark: Mark) -> Any | None:
         # _tmp_49: 'if' disjunction
-        mark = self._mark()
         if (self.expect("if")) and (z := self.disjunction()):
             return z
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_50(self) -> Any | None:
+    def _tmp_50(self, mark: Mark) -> Any | None:
         # _tmp_50: assignment_expression | expression !':='
-        mark = self._mark()
         if assignment_expression := self.assignment_expression():
             return assignment_expression
         self._reset(mark)
@@ -5482,9 +5189,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_51(self) -> Any | None:
+    def _tmp_51(self, mark: Mark) -> Any | None:
         # _tmp_51: assignment_expression | expression !':='
-        mark = self._mark()
         if assignment_expression := self.assignment_expression():
             return assignment_expression
         self._reset(mark)
@@ -5494,9 +5200,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_52(self) -> Any | None:
+    def _tmp_52(self, mark: Mark) -> Any | None:
         # _tmp_52: starred_expression | (assignment_expression | expression !':=') !'='
-        mark = self._mark()
         if starred_expression := self.starred_expression():
             return starred_expression
         self._reset(mark)
@@ -5506,54 +5211,48 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_53(self) -> Any | None:
+    def _tmp_53(self, mark: Mark) -> Any | None:
         # _tmp_53: ',' kwargs
-        mark = self._mark()
         if (self.expect(",")) and (k := self.kwargs()):
             return k
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_54(self) -> Any | None:
+    def _tmp_54(self, mark: Mark) -> Any | None:
         # _tmp_54: ',' star_target
-        mark = self._mark()
         if (self.expect(",")) and (c := self.star_target()):
             return c
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_55(self) -> Any | None:
+    def _tmp_55(self, mark: Mark) -> Any | None:
         # _tmp_55: ',' star_target
-        mark = self._mark()
         if (self.expect(",")) and (c := self.star_target()):
             return c
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_56(self) -> Any | None:
+    def _tmp_56(self, mark: Mark) -> Any | None:
         # _tmp_56: !'*' star_target
-        mark = self._mark()
         if (self.negative_lookahead(self.expect, "*")) and (star_target := self.star_target()):
             return star_target
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_57(self) -> Any | None:
+    def _tmp_57(self, mark: Mark) -> Any | None:
         # _tmp_57: NEWLINE INDENT
-        mark = self._mark()
         if (_newline := self.token(Token.NEWLINE)) and (_indent := self.token(Token.INDENT)):
             return [_newline, _indent]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_58(self) -> Any | None:
+    def _tmp_58(self, mark: Mark) -> Any | None:
         # _tmp_58: args | expression for_if_clauses
-        mark = self._mark()
         if args := self.args():
             return args
         self._reset(mark)
@@ -5563,18 +5262,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_59(self) -> Any | None:
+    def _tmp_59(self, mark: Mark) -> Any | None:
         # _tmp_59: args ','
-        mark = self._mark()
         if (args := self.args()) and (literal := self.expect(",")):
             return [args, literal]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_60(self) -> Any | None:
+    def _tmp_60(self, mark: Mark) -> Any | None:
         # _tmp_60: ',' | ')'
-        mark = self._mark()
         if literal := self.expect(","):
             return literal
         self._reset(mark)
@@ -5584,9 +5281,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_61(self) -> Any | None:
+    def _tmp_61(self, mark: Mark) -> Any | None:
         # _tmp_61: 'True' | 'False' | 'None'
-        mark = self._mark()
         if literal := self.expect("True"):
             return literal
         self._reset(mark)
@@ -5599,18 +5295,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_62(self) -> Any | None:
+    def _tmp_62(self, mark: Mark) -> Any | None:
         # _tmp_62: NAME '='
-        mark = self._mark()
         if (name := self.name()) and (literal := self.expect("=")):
             return [name, literal]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_63(self) -> Any | None:
+    def _tmp_63(self, mark: Mark) -> Any | None:
         # _tmp_63: NAME STRING | SOFT_KEYWORD
-        mark = self._mark()
         if (name := self.name()) and (_string := self.token(Token.STRING)):
             return [name, _string]
         self._reset(mark)
@@ -5620,9 +5314,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_64(self) -> Any | None:
+    def _tmp_64(self, mark: Mark) -> Any | None:
         # _tmp_64: 'else' | ':'
-        mark = self._mark()
         if literal := self.expect("else"):
             return literal
         self._reset(mark)
@@ -5632,9 +5325,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_65(self) -> Any | None:
+    def _tmp_65(self, mark: Mark) -> Any | None:
         # _tmp_65: FSTRING_MIDDLE | fstring_replacement_field
-        mark = self._mark()
         if _fstring_middle := self.token(Token.FSTRING_MIDDLE):
             return _fstring_middle
         self._reset(mark)
@@ -5644,9 +5336,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_66(self) -> Any | None:
+    def _tmp_66(self, mark: Mark) -> Any | None:
         # _tmp_66: '=' | ':='
-        mark = self._mark()
         if literal := self.expect("="):
             return literal
         self._reset(mark)
@@ -5656,9 +5347,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_67(self) -> Any | None:
+    def _tmp_67(self, mark: Mark) -> Any | None:
         # _tmp_67: list | tuple | genexp | 'True' | 'None' | 'False'
-        mark = self._mark()
         if list := self.list():
             return list
         self._reset(mark)
@@ -5680,9 +5370,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_68(self) -> Any | None:
+    def _tmp_68(self, mark: Mark) -> Any | None:
         # _tmp_68: '=' | ':='
-        mark = self._mark()
         if literal := self.expect("="):
             return literal
         self._reset(mark)
@@ -5692,27 +5381,24 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_69(self) -> Any | None:
+    def _tmp_69(self, mark: Mark) -> Any | None:
         # _tmp_69: star_targets '='
-        mark = self._mark()
         if (star_targets := self.star_targets()) and (literal := self.expect("=")):
             return [star_targets, literal]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_70(self) -> Any | None:
+    def _tmp_70(self, mark: Mark) -> Any | None:
         # _tmp_70: star_targets '='
-        mark = self._mark()
         if (star_targets := self.star_targets()) and (literal := self.expect("=")):
             return [star_targets, literal]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_71(self) -> Any | None:
+    def _tmp_71(self, mark: Mark) -> Any | None:
         # _tmp_71: '[' | '(' | '{'
-        mark = self._mark()
         if literal := self.expect("["):
             return literal
         self._reset(mark)
@@ -5725,9 +5411,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_72(self) -> Any | None:
+    def _tmp_72(self, mark: Mark) -> Any | None:
         # _tmp_72: '[' | '{'
-        mark = self._mark()
         if literal := self.expect("["):
             return literal
         self._reset(mark)
@@ -5737,9 +5422,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_73(self) -> Any | None:
+    def _tmp_73(self, mark: Mark) -> Any | None:
         # _tmp_73: '[' | '{'
-        mark = self._mark()
         if literal := self.expect("["):
             return literal
         self._reset(mark)
@@ -5749,9 +5433,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_74(self) -> Any | None:
+    def _tmp_74(self, mark: Mark) -> Any | None:
         # _tmp_74: slash_no_default | slash_with_default
-        mark = self._mark()
         if slash_no_default := self.slash_no_default():
             return slash_no_default
         self._reset(mark)
@@ -5761,9 +5444,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_75(self) -> Any | None:
+    def _tmp_75(self, mark: Mark) -> Any | None:
         # _tmp_75: slash_no_default | slash_with_default
-        mark = self._mark()
         if slash_no_default := self.slash_no_default():
             return slash_no_default
         self._reset(mark)
@@ -5773,9 +5455,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_76(self) -> Any | None:
+    def _tmp_76(self, mark: Mark) -> Any | None:
         # _tmp_76: ',' | param_no_default
-        mark = self._mark()
         if literal := self.expect(","):
             return literal
         self._reset(mark)
@@ -5785,9 +5466,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_77(self) -> Any | None:
+    def _tmp_77(self, mark: Mark) -> Any | None:
         # _tmp_77: ')' | ','
-        mark = self._mark()
         if literal := self.expect(")"):
             return literal
         self._reset(mark)
@@ -5797,9 +5477,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_78(self) -> Any | None:
+    def _tmp_78(self, mark: Mark) -> Any | None:
         # _tmp_78: ')' | ',' (')' | '**')
-        mark = self._mark()
         if literal := self.expect(")"):
             return literal
         self._reset(mark)
@@ -5809,9 +5488,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_79(self) -> Any | None:
+    def _tmp_79(self, mark: Mark) -> Any | None:
         # _tmp_79: param_no_default | ','
-        mark = self._mark()
         if param_no_default := self.param_no_default():
             return param_no_default
         self._reset(mark)
@@ -5821,9 +5499,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_80(self) -> Any | None:
+    def _tmp_80(self, mark: Mark) -> Any | None:
         # _tmp_80: param_no_default | ','
-        mark = self._mark()
         if param_no_default := self.param_no_default():
             return param_no_default
         self._reset(mark)
@@ -5833,9 +5510,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_81(self) -> Any | None:
+    def _tmp_81(self, mark: Mark) -> Any | None:
         # _tmp_81: '*' | '**' | '/'
-        mark = self._mark()
         if literal := self.expect("*"):
             return literal
         self._reset(mark)
@@ -5848,9 +5524,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_82(self) -> Any | None:
+    def _tmp_82(self, mark: Mark) -> Any | None:
         # _tmp_82: lambda_slash_no_default | lambda_slash_with_default
-        mark = self._mark()
         if lambda_slash_no_default := self.lambda_slash_no_default():
             return lambda_slash_no_default
         self._reset(mark)
@@ -5860,9 +5535,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_83(self) -> Any | None:
+    def _tmp_83(self, mark: Mark) -> Any | None:
         # _tmp_83: lambda_slash_no_default | lambda_slash_with_default
-        mark = self._mark()
         if lambda_slash_no_default := self.lambda_slash_no_default():
             return lambda_slash_no_default
         self._reset(mark)
@@ -5872,9 +5546,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_84(self) -> Any | None:
+    def _tmp_84(self, mark: Mark) -> Any | None:
         # _tmp_84: ',' | lambda_param_no_default
-        mark = self._mark()
         if literal := self.expect(","):
             return literal
         self._reset(mark)
@@ -5884,9 +5557,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_85(self) -> Any | None:
+    def _tmp_85(self, mark: Mark) -> Any | None:
         # _tmp_85: ':' | ',' (':' | '**')
-        mark = self._mark()
         if literal := self.expect(":"):
             return literal
         self._reset(mark)
@@ -5896,9 +5568,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_86(self) -> Any | None:
+    def _tmp_86(self, mark: Mark) -> Any | None:
         # _tmp_86: lambda_param_no_default | ','
-        mark = self._mark()
         if lambda_param_no_default := self.lambda_param_no_default():
             return lambda_param_no_default
         self._reset(mark)
@@ -5908,9 +5579,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_87(self) -> Any | None:
+    def _tmp_87(self, mark: Mark) -> Any | None:
         # _tmp_87: lambda_param_no_default | ','
-        mark = self._mark()
         if lambda_param_no_default := self.lambda_param_no_default():
             return lambda_param_no_default
         self._reset(mark)
@@ -5920,9 +5590,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_88(self) -> Any | None:
+    def _tmp_88(self, mark: Mark) -> Any | None:
         # _tmp_88: '*' | '**' | '/'
-        mark = self._mark()
         if literal := self.expect("*"):
             return literal
         self._reset(mark)
@@ -5935,9 +5604,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_89(self) -> Any | None:
+    def _tmp_89(self, mark: Mark) -> Any | None:
         # _tmp_89: ',' | ')' | ':'
-        mark = self._mark()
         if literal := self.expect(","):
             return literal
         self._reset(mark)
@@ -5950,45 +5618,40 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_90(self) -> Any | None:
+    def _tmp_90(self, mark: Mark) -> Any | None:
         # _tmp_90: expression ['as' star_target]
-        mark = self._mark()
         if (expression := self.expression()) and (opt := self._tmp_120(),):
             return [expression, opt]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_91(self) -> Any | None:
+    def _tmp_91(self, mark: Mark) -> Any | None:
         # _tmp_91: expressions ['as' star_target]
-        mark = self._mark()
         if (expressions := self.expressions()) and (opt := self._tmp_121(),):
             return [expressions, opt]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_92(self) -> Any | None:
+    def _tmp_92(self, mark: Mark) -> Any | None:
         # _tmp_92: expression ['as' star_target]
-        mark = self._mark()
         if (expression := self.expression()) and (opt := self._tmp_122(),):
             return [expression, opt]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_93(self) -> Any | None:
+    def _tmp_93(self, mark: Mark) -> Any | None:
         # _tmp_93: expressions ['as' star_target]
-        mark = self._mark()
         if (expressions := self.expressions()) and (opt := self._tmp_123(),):
             return [expressions, opt]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_94(self) -> Any | None:
+    def _tmp_94(self, mark: Mark) -> Any | None:
         # _tmp_94: 'except' | 'finally'
-        mark = self._mark()
         if literal := self.expect("except"):
             return literal
         self._reset(mark)
@@ -5998,45 +5661,40 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_95(self) -> Any | None:
+    def _tmp_95(self, mark: Mark) -> Any | None:
         # _tmp_95: 'as' NAME
-        mark = self._mark()
         if (literal := self.expect("as")) and (name := self.name()):
             return [literal, name]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_96(self) -> Any | None:
+    def _tmp_96(self, mark: Mark) -> Any | None:
         # _tmp_96: expression ['as' NAME]
-        mark = self._mark()
         if (expression := self.expression()) and (opt := self._tmp_124(),):
             return [expression, opt]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_97(self) -> Any | None:
+    def _tmp_97(self, mark: Mark) -> Any | None:
         # _tmp_97: 'as' NAME
-        mark = self._mark()
         if (literal := self.expect("as")) and (name := self.name()):
             return [literal, name]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_98(self) -> Any | None:
+    def _tmp_98(self, mark: Mark) -> Any | None:
         # _tmp_98: 'as' NAME
-        mark = self._mark()
         if (literal := self.expect("as")) and (name := self.name()):
             return [literal, name]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_99(self) -> Any | None:
+    def _tmp_99(self, mark: Mark) -> Any | None:
         # _tmp_99: NEWLINE | ':'
-        mark = self._mark()
         if _newline := self.token(Token.NEWLINE):
             return _newline
         self._reset(mark)
@@ -6046,63 +5704,56 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_100(self) -> Any | None:
+    def _tmp_100(self, mark: Mark) -> Any | None:
         # _tmp_100: 'as' NAME
-        mark = self._mark()
         if (literal := self.expect("as")) and (name := self.name()):
             return [literal, name]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_101(self) -> Any | None:
+    def _tmp_101(self, mark: Mark) -> Any | None:
         # _tmp_101: 'as' NAME
-        mark = self._mark()
         if (literal := self.expect("as")) and (name := self.name()):
             return [literal, name]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_102(self) -> Any | None:
+    def _tmp_102(self, mark: Mark) -> Any | None:
         # _tmp_102: positional_patterns ','
-        mark = self._mark()
         if (positional_patterns := self.positional_patterns()) and (literal := self.expect(",")):
             return [positional_patterns, literal]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_103(self) -> Any | None:
+    def _tmp_103(self, mark: Mark) -> Any | None:
         # _tmp_103: '->' expression
-        mark = self._mark()
         if (literal := self.expect("->")) and (expression := self.expression()):
             return [literal, expression]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_104(self) -> Any | None:
+    def _tmp_104(self, mark: Mark) -> Any | None:
         # _tmp_104: '(' arguments? ')'
-        mark = self._mark()
         if (literal := self.expect("(")) and (opt := self.arguments(),) and (literal_1 := self.expect(")")):
             return [literal, opt, literal_1]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_105(self) -> Any | None:
+    def _tmp_105(self, mark: Mark) -> Any | None:
         # _tmp_105: '(' arguments? ')'
-        mark = self._mark()
         if (literal := self.expect("(")) and (opt := self.arguments(),) and (literal_1 := self.expect(")")):
             return [literal, opt, literal_1]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_106(self) -> Any | None:
+    def _tmp_106(self, mark: Mark) -> Any | None:
         # _tmp_106: '}' | ','
-        mark = self._mark()
         if literal := self.expect("}"):
             return literal
         self._reset(mark)
@@ -6112,9 +5763,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_107(self) -> Any | None:
+    def _tmp_107(self, mark: Mark) -> Any | None:
         # _tmp_107: '}' | ','
-        mark = self._mark()
         if literal := self.expect("}"):
             return literal
         self._reset(mark)
@@ -6124,9 +5774,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_108(self) -> Any | None:
+    def _tmp_108(self, mark: Mark) -> Any | None:
         # _tmp_108: '=' | '!' | ':' | '}'
-        mark = self._mark()
         if literal := self.expect("="):
             return literal
         self._reset(mark)
@@ -6142,9 +5791,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_109(self) -> Any | None:
+    def _tmp_109(self, mark: Mark) -> Any | None:
         # _tmp_109: '!' | ':' | '}'
-        mark = self._mark()
         if literal := self.expect("!"):
             return literal
         self._reset(mark)
@@ -6157,18 +5805,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_110(self) -> Any | None:
+    def _tmp_110(self, mark: Mark) -> Any | None:
         # _tmp_110: '!' NAME
-        mark = self._mark()
         if (literal := self.expect("!")) and (name := self.name()):
             return [literal, name]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_111(self) -> Any | None:
+    def _tmp_111(self, mark: Mark) -> Any | None:
         # _tmp_111: ':' | '}'
-        mark = self._mark()
         if literal := self.expect(":"):
             return literal
         self._reset(mark)
@@ -6178,27 +5824,24 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_112(self) -> Any | None:
+    def _tmp_112(self, mark: Mark) -> Any | None:
         # _tmp_112: '!' NAME
-        mark = self._mark()
         if (literal := self.expect("!")) and (name := self.name()):
             return [literal, name]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_113(self) -> Any | None:
+    def _tmp_113(self, mark: Mark) -> Any | None:
         # _tmp_113: '!' NAME
-        mark = self._mark()
         if (literal := self.expect("!")) and (name := self.name()):
             return [literal, name]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_114(self) -> Any | None:
+    def _tmp_114(self, mark: Mark) -> Any | None:
         # _tmp_114: ':' | '}'
-        mark = self._mark()
         if literal := self.expect(":"):
             return literal
         self._reset(mark)
@@ -6208,9 +5851,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_115(self) -> Any | None:
+    def _tmp_115(self, mark: Mark) -> Any | None:
         # _tmp_115: 'or' | '||'
-        mark = self._mark()
         if literal := self.expect("or"):
             return literal
         self._reset(mark)
@@ -6220,9 +5862,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_116(self) -> Any | None:
+    def _tmp_116(self, mark: Mark) -> Any | None:
         # _tmp_116: 'and' | '&&'
-        mark = self._mark()
         if literal := self.expect("and"):
             return literal
         self._reset(mark)
@@ -6232,9 +5873,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_117(self) -> Any | None:
+    def _tmp_117(self, mark: Mark) -> Any | None:
         # _tmp_117: assignment_expression | expression !':='
-        mark = self._mark()
         if assignment_expression := self.assignment_expression():
             return assignment_expression
         self._reset(mark)
@@ -6244,9 +5884,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_118(self) -> Any | None:
+    def _tmp_118(self, mark: Mark) -> Any | None:
         # _tmp_118: ')' | '**'
-        mark = self._mark()
         if literal := self.expect(")"):
             return literal
         self._reset(mark)
@@ -6256,9 +5895,8 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_119(self) -> Any | None:
+    def _tmp_119(self, mark: Mark) -> Any | None:
         # _tmp_119: ':' | '**'
-        mark = self._mark()
         if literal := self.expect(":"):
             return literal
         self._reset(mark)
@@ -6268,45 +5906,40 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def _tmp_120(self) -> Any | None:
+    def _tmp_120(self, mark: Mark) -> Any | None:
         # _tmp_120: 'as' star_target
-        mark = self._mark()
         if (literal := self.expect("as")) and (star_target := self.star_target()):
             return [literal, star_target]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_121(self) -> Any | None:
+    def _tmp_121(self, mark: Mark) -> Any | None:
         # _tmp_121: 'as' star_target
-        mark = self._mark()
         if (literal := self.expect("as")) and (star_target := self.star_target()):
             return [literal, star_target]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_122(self) -> Any | None:
+    def _tmp_122(self, mark: Mark) -> Any | None:
         # _tmp_122: 'as' star_target
-        mark = self._mark()
         if (literal := self.expect("as")) and (star_target := self.star_target()):
             return [literal, star_target]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_123(self) -> Any | None:
+    def _tmp_123(self, mark: Mark) -> Any | None:
         # _tmp_123: 'as' star_target
-        mark = self._mark()
         if (literal := self.expect("as")) and (star_target := self.star_target()):
             return [literal, star_target]
         self._reset(mark)
         return None
 
     @memoize
-    def _tmp_124(self) -> Any | None:
+    def _tmp_124(self, mark: Mark) -> Any | None:
         # _tmp_124: 'as' NAME
-        mark = self._mark()
         if (literal := self.expect("as")) and (name := self.name()):
             return [literal, name]
         self._reset(mark)

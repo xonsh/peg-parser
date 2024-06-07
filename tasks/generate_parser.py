@@ -149,6 +149,7 @@ class XonshParserGenerator(PythonParserGenerator):
         is_loop = node.is_loop()
         is_gather = node.is_gather()
         rhs = node.flatten()
+        method_args = ""
         if node.left_recursive:
             if node.leader:
                 self.print("@memoize_left_rec")
@@ -158,8 +159,9 @@ class XonshParserGenerator(PythonParserGenerator):
                 self.print("@logger")
         else:
             self.print("@memoize")
+            method_args = ", mark: Mark"
         node_type = node.type or "Any"
-        self.print(f"def {node.name}(self) -> Optional[{node_type}]:")
+        self.print(f"def {node.name}(self{method_args}) -> {node_type} | None:")
         with self.indent():
             self.print(f"# {node.name}: {rhs}")
             if node.nullable:
@@ -170,7 +172,8 @@ class XonshParserGenerator(PythonParserGenerator):
                 self.print("self.call_invalid_rules = False")
                 self.cleanup_statements.append("self.call_invalid_rules = _prev_call_invalid")
 
-            self.print("mark = self._mark()")
+            if node.left_recursive:
+                self.print("mark = self._mark()")
             if self.alts_uses_locations(node.rhs.alts):
                 self.print("_lnum, _col = self._tokenizer.peek().start")
             if is_loop:
