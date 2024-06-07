@@ -5,9 +5,23 @@ from typing import IO, Any
 from peg_parser.tokenize import Token
 from pegen import grammar
 from pegen.build import build_parser
-from pegen.grammar import Alt, Gather, Item, NamedItem, NameLeaf, Repeat0, Repeat1, Rhs, Rule
+from pegen.grammar import (
+    Alt,
+    Gather,
+    Item,
+    NamedItem,
+    NameLeaf,
+    NegativeLookahead,
+    PositiveLookahead,
+    Repeat0,
+    Repeat1,
+    Rhs,
+    Rule,
+)
 from pegen.parser_generator import ParserGenerator
 from pegen.python_generator import (
+    MODULE_PREFIX,
+    MODULE_SUFFIX,
     InvalidNodeVisitor,
     PythonCallMakerVisitor,
     PythonParserGenerator,
@@ -49,6 +63,15 @@ class XonshCallMakerVisitor(PythonCallMakerVisitor):
         self.cache[node] = "gathered", f"self.gathered({func}, {sep})"  # No trailing comma here either!
         return self.cache[node]
 
+    def call_helper(self, node: Item) -> str:
+        return ", ".join(a for a in self.lookahead_call_helper(node) if a)
+
+    def visit_PositiveLookahead(self, node: PositiveLookahead) -> tuple[None, str]:
+        return None, f"self.positive_lookahead({self.call_helper(node)})"
+
+    def visit_NegativeLookahead(self, node: NegativeLookahead) -> tuple[None, str]:
+        return None, f"self.negative_lookahead({self.call_helper(node)})"
+
     def get_repeated(self, node):
         if isinstance(node.node, NameLeaf):
             args = ", ".join([a for a in self.lookahead_call_helper(node) if a])
@@ -88,6 +111,32 @@ class XonshParserGenerator(PythonParserGenerator):
         self.unreachable_formatting = unreachable_formatting or "None  # pragma: no cover"
         self.location_formatting = "**self.span(_lnum, _col)"
         self.cleanup_statements: list[str] = []
+
+    def generate(self, filename: str) -> None:
+        header = self.grammar.metas.get("header", MODULE_PREFIX)
+        if header is not None:
+            self.print(header.rstrip("\n").format(filename=filename))
+        subheader = self.grammar.metas.get("subheader", "")
+        if subheader:
+            self.print(subheader)
+        cls_name = self.grammar.metas.get("class", "GeneratedParser")
+        self.print("# Keywords and soft keywords are listed at the end of the parser definition.")
+        self.print(f"class {cls_name}(Parser):")
+        while self.todo:
+            for rulename, rule in list(self.todo.items()):
+                del self.todo[rulename]
+                self.print()
+                with self.indent():
+                    self.visit(rule)
+
+        self.print()
+        with self.indent():
+            self.print(f"KEYWORDS = {tuple(sorted(self.callmakervisitor.keywords))} # fmt: skip")
+            self.print(f"SOFT_KEYWORDS = {tuple(sorted(self.callmakervisitor.soft_keywords))} # fmt: skip")
+
+        trailer = self.grammar.metas.get("trailer", MODULE_SUFFIX.format(class_name=cls_name))
+        if trailer is not None:
+            self.print(trailer.rstrip("\n"))
 
     def add_return(self, ret_val: str) -> None:
         for stmt in self.cleanup_statements:

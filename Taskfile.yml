@@ -8,6 +8,8 @@ tasks:
   generate:
     cmds:
       - python3 tasks/generate_parser.py
+      - ruff check --fix peg_parser/parser.py
+      - ruff format peg_parser/parser.py
       - scc peg_parser/parser.py --uloc
     generates:
       - peg_parser/parser.py

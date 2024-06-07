@@ -31,6 +31,9 @@ class CustomBuild(build):
 
 options = {}
 
+if os.environ.get("REGENERATE_PARSER"):
+    cmdclass = {"build": CustomBuild, "build_custom": CustomCommand}
+    options["cmdclass"] = cmdclass
 
 if os.environ.get("COMPILE_WITH_MYPYC"):
     from mypyc.build import mypycify
@@ -43,7 +46,5 @@ if os.environ.get("COMPILE_WITH_MYPYC"):
         ]
     )
 
-setup(
-    cmdclass={"build": CustomBuild, "build_custom": CustomCommand},
-    **options,
-)
+
+setup(**options)

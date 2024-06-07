@@ -3,10 +3,12 @@
 @class XonshParser
 
 @header'''\
+from __future__ import annotations
+
 import ast
 import itertools
 import sys
-from typing import *
+from typing import Any, Optional, Union, List, Tuple, NoReturn
 
 from peg_parser.subheader import memoize, memoize_left_rec, logger, Parser, Load, Store, Del, Target, Token
 '''
@@ -492,7 +494,7 @@ finally_block[list]:
 
 # We cannot do version checks here since the production will occur after any other
 # production which will have failed since the ast module does not have the right nodes.
-match_stmt["ast.Match"]:
+match_stmt[ast.Match]:
     | "match" subject=subject_expr ':' NEWLINE INDENT cases=case_block+ DEDENT {
         ast.Match(subject=subject, cases=cases, LOCATIONS)
      }
@@ -501,13 +503,9 @@ match_stmt["ast.Match"]:
 # Version checking here allows to avoid tracking down every single possible production
 subject_expr:
     | value=star_named_expression ',' values=star_named_expressions? {
-        self.check_version(
-            (3, 10),
-            "Pattern matching is",
-            ast.Tuple(elts=[value] + (values or []), ctx=Load, LOCATIONS)
-        )
+        ast.Tuple(elts=[value] + (values or []), ctx=Load, LOCATIONS)
      }
-    | e=named_expression { self.check_version((3, 10), "Pattern matching is", e)}
+    | e=named_expression { e }
 
 case_block["ast.match_case"]:
     | invalid_case_block
@@ -1736,19 +1734,11 @@ invalid_except_star_stmt_indent:
      }
 invalid_match_stmt[NoReturn]:
     | "match" subject_expr !':' {
-        self.check_version(
-            (3, 10),
-            "Pattern matching is",
-            self.raise_syntax_error("expected ':'")
-        )
+        self.raise_syntax_error("expected ':'")
      }
     | a="match" subject=subject_expr ':' NEWLINE !INDENT {
-        self.check_version(
-            (3, 10),
-            "Pattern matching is",
-            self.raise_indentation_error(
-                f"expected an indented block after 'match' statement on line {a.start[0]}"
-            )
+        self.raise_indentation_error(
+            f"expected an indented block after 'match' statement on line {a.start[0]}"
         )
      }
 invalid_case_block[NoReturn]:

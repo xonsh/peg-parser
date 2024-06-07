@@ -36,6 +36,13 @@ extend-safe-fixes = ["FA", "TCH", "PT"]
     "PT007", # Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
     "RUF001", # similar chars
 ]
+"peg_parser/parser.py" = [
+    "A", # flake8-builtins
+    "C90", # mccaabe complexity
+    "PLR0", # Too many arguments
+    "RUF005", # concatenation
+    "F841", # [*] Local variable `strstart` is assigned to but never used
+]
 "tests/test_subproc_macros.py" = [
     "PT014"
 ]

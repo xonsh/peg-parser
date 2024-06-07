@@ -156,6 +156,7 @@ Took:  1.39s
 | after repetitions deduplication | 294K |                 |
 | after short location names      | 287K | 2336/9775/10083 |
 | optimize gathered               | 261K | 2104/8665/8973  |
+| after ruff formatting           | 229K | 2257/6006/6316  |
 
 - optimized `get_last_non_whitespace_token` brought `benchmarks.PeakMemSuite.peakmem_parser_large_file` runtime to 5s from 10s
 
