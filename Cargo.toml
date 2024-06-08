@@ -1,0 +1,5 @@
+[workspace]
+
+members = [
+    "xonsh_tokenizer",
+]
