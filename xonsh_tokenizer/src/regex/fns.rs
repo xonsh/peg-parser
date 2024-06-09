@@ -1,7 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::Mutex;
 use itertools::{Itertools}; // Import the Itertools library
 
@@ -34,7 +33,7 @@ pub fn maybe<T: AsRef<str>>(choices: &[T]) -> String {
 
 pub fn all_string_prefixes() -> Vec<String> {
     let valid_string_prefixes = vec!["b", "r", "u", "f", "br", "fr", "p", "pr", "pf"];
-    let mut result = HashSet::new();
+    let mut result = BTreeSet::new();
     result.insert(String::new());
 
     for prefix in valid_string_prefixes {
