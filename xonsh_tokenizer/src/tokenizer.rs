@@ -44,7 +44,7 @@ struct TokInfo {
     string: String,
     start: (usize, usize),
     end: (usize, usize),
-    line: String,
+    // line: String,
 }
 
 #[allow(unused)]
@@ -61,7 +61,7 @@ impl TokInfo {
             string,
             start,
             end,
-            line,
+            // line,
         }
     }
 
@@ -204,7 +204,7 @@ impl State {
             string: endprog.text.clone(),
             start: endprog.start.clone(),
             end: epos,
-            line: endprog.contline.clone(),
+            // line: endprog.contline.clone(),
         };
     }
 
@@ -223,7 +223,7 @@ impl State {
                 }
             }
         }
-        Some(Match { start: m.start(), end: m.end(), name: first_name, text: m.as_str().to_string(), sub_names: matches })
+        Some(Match { start: m.start() + self.line.pos, end: m.end() + self.line.pos, name: first_name, text: m.as_str().to_string(), sub_names: matches })
     }
 
     fn current_mode(&self) -> Option<&Mode> {
@@ -258,9 +258,10 @@ impl State {
     }
     fn collect_until(&mut self) -> Result<Vec<TokInfo>, String> {
         let mut pos = self.line.pos;
-        let mut results  = Vec::new();
+        let mut results = Vec::new();
         while self.line.pos < self.line.max {
-            results.extend(handle_end_progs(self)?);
+            let res = handle_end_progs(self)?;
+            results.extend(res);
 
             if let Some(t) = next_psuedo_matches(self)? {
                 results.push(t);
@@ -271,12 +272,11 @@ impl State {
                     string: self.line.text[self.line.pos..pos].to_string(),
                     start: (self.line.num, self.line.pos),
                     end: (self.line.num, pos),
-                    line: self.line.text.to_string(),
+                    // line: self.line.text.to_string(),
                 });
                 self.line.pos = pos;
-            } else {
-                return Err(format!("Invalid tokenizer state at {}:{}", self.line.num, self.line.pos));
             }
+            // else {return Err(format!("Invalid tokenizer state at {}:{}", self.line.num, self.line.pos));}
         }
         return Ok(results);
     }
@@ -318,6 +318,7 @@ struct EndProg {
     quote: String,
     mode: Mode,
 }
+
 
 enum LoopAction {
     Break,
@@ -434,9 +435,6 @@ fn next_statement(state: &mut State) -> Result<LoopResult, String> {
 }
 
 fn handle_string_start(state: &mut State, m: &Match) -> Option<Token> {
-    if m.name != "StringStart" {
-        return None;
-    }
     let quote = m.sub_names["Quote"].as_str();
     let pattern = END_PATTERNS[quote];
     if m.text.to_ascii_lowercase().contains("f") {
@@ -447,12 +445,13 @@ fn handle_string_start(state: &mut State, m: &Match) -> Option<Token> {
         state.add_prog(m.end, m.end, pattern.as_str(), quote, Mode::Middle);
         return Some(Token::FstringStart);
     }
-    state.add_prog(m.start, m.end, pattern, quote, Mode::InColon);
+    state.add_prog(m.start, m.end, pattern, quote, Mode::Nil);
     return None;
 }
 
 fn handle_psuedo(state: &mut State, m: &Match) -> Option<Token> {
     match m.name.as_str() {
+        "StringStart" => handle_string_start(state, m),
         "ws" => Some(Token::WS),
         "Comment" => Some(Token::Comment),
         "SearchPath" => Some(Token::SearchPath),
@@ -474,6 +473,10 @@ fn handle_psuedo(state: &mut State, m: &Match) -> Option<Token> {
             }
             Some(Token::OP)
         }
+        "End" => {
+            state.continued = true;
+            None
+        },
         _ => None,
     }
 }
@@ -487,18 +490,15 @@ fn next_psuedo_matches(state: &mut State) -> Result<Option<TokInfo>, String> {
         return Ok(None);
     }
     let m = m.unwrap();
-    let token_type = handle_string_start(state, &m).or(handle_psuedo(state, &m));
+    let token_type = handle_psuedo(state, &m);
     let (spos, epos) = ((state.line.num, m.start), (state.line.num, m.end));
     state.line.pos = m.end;
 
     if let Some(token_type) = token_type {
         let tok = TokInfo::new(token_type, m.text, spos, epos, state.line.text.clone());
         return Ok(Some(tok));
-    } else if m.name == "End" {
-        state.continued = true;
-        return Ok(None);
     }
-    return Err(format!("Bad token: {m:?} at {}:{}", state.line.num, state.line.pos));
+    return Ok(None);
 }
 
 fn next_end_tokens(state: &State) -> Vec<TokInfo> {
@@ -510,7 +510,7 @@ fn next_end_tokens(state: &State) -> Vec<TokInfo> {
                 string: "".to_string(),
                 start: (state.line.num - 1, last_line.text.len()),
                 end: (state.line.num - 1, last_line.text.len() + 1),
-                line: "".to_string(),
+                // line: "".to_string(),
             };
             tokens.push(token);
         }
@@ -521,7 +521,7 @@ fn next_end_tokens(state: &State) -> Vec<TokInfo> {
             string: "".to_string(),
             start: (state.line.num, 0),
             end: (state.line.num, 0),
-            line: "".to_string(),
+            // line: "".to_string(),
         })
     );
 
@@ -530,7 +530,7 @@ fn next_end_tokens(state: &State) -> Vec<TokInfo> {
         string: "".to_string(),
         start: (state.line.num, 0),
         end: (state.line.num, 0),
-        line: "".to_string(),
+        // line: "".to_string(),
     });
     return tokens;
 }
@@ -551,7 +551,7 @@ fn handle_fstring_progs(state: &mut State) -> Vec<TokInfo> {
                 string: endquote, // Copy the quote string
                 start: (state.line.num, state.line.pos),
                 end: (state.line.num, m.end),
-                line: state.line.text.clone(),
+                // line: state.line.text.clone(),
             });
             state.pop_prog();
         } else { // "{" or "}"
@@ -566,7 +566,7 @@ fn handle_fstring_progs(state: &mut State) -> Vec<TokInfo> {
                     string: "{".to_string(),
                     start: (state.line.num, state.line.pos),
                     end: (state.line.num, m.end),
-                    line: state.line.text.to_string(),
+                    // line: state.line.text.to_string(),
                 });
                 state.parenlev += 1;
                 state.add_prog(m.end, m.end, "", "", Mode::InBraces(state.parenlev));
@@ -576,7 +576,7 @@ fn handle_fstring_progs(state: &mut State) -> Vec<TokInfo> {
                     string: "}".to_string(),
                     start: (state.line.num, state.line.pos),
                     end: (state.line.num, m.end),
-                    line: state.line.text.to_string(),
+                    // line: state.line.text.to_string(),
                 });
                 state.parenlev -= 1;
                 state.pop_prog(); // in-colon
@@ -613,7 +613,6 @@ fn handle_end_progs<'a>(state: &mut State) -> Result<Vec<TokInfo>, String> {
         }
     } else if let Some(endprog) = state.end_progs.last() {
         if let Some(m) = state.match_pattern(endprog.pattern.as_str()) {  // all on one line
-            state.line.pos = m.end;
             results.push(state.prog_token(m.end, Token::STRING));
             state.pop_prog();
             return Ok(results);
@@ -668,7 +667,7 @@ impl<R: Read> Iterator for Tokenizer<R> {
             let mut current = String::new();
 
             if let Ok(read_bytes) = self.reader.read_line(&mut current) {
-                if read_bytes == 0 {
+                if read_bytes == 0 { // EOF
                     self.stopped = true;
                     self.stash.extend(next_end_tokens(&self.state))
                 } else {
