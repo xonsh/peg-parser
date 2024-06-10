@@ -4,9 +4,11 @@ use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor, Read};
 use std::iter::Iterator;
-use std::mem::{Discriminant, discriminant};
+use std::mem::{discriminant, Discriminant};
 
-use crate::regex::consts::{END_PATTERNS, END_RBRACE, Mode, OPERATORS, PSEUDO_TOKENS, START_LBRACE, TABSIZE};
+use crate::regex::consts::{
+    Mode, END_PATTERNS, END_RBRACE, OPERATORS, PSEUDO_TOKENS, START_LBRACE, TABSIZE,
+};
 use crate::regex::fns::{choice, compile};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -36,7 +38,6 @@ enum Token {
     // MacroParam,
     WS,
 }
-
 
 #[derive(Debug, Clone, PartialEq)]
 struct TokInfo {
@@ -223,7 +224,13 @@ impl State {
                 }
             }
         }
-        Some(Match { start: m.start() + self.line.pos, end: m.end() + self.line.pos, name: first_name, text: m.as_str().to_string(), sub_names: matches })
+        Some(Match {
+            start: m.start() + self.line.pos,
+            end: m.end() + self.line.pos,
+            name: first_name,
+            text: m.as_str().to_string(),
+            sub_names: matches,
+        })
     }
 
     fn current_mode(&self) -> Option<&Mode> {
@@ -250,11 +257,16 @@ impl State {
     }
 
     fn in_multi_line_string(&self) -> bool {
-        return self.end_progs.last().map(|m| m.quote.len() == 3).unwrap_or(false);
+        return self
+            .end_progs
+            .last()
+            .map(|m| m.quote.len() == 3)
+            .unwrap_or(false);
     }
 
     fn in_continued_string(&self) -> bool {
-        return self.end_progs.last().is_some() && (self.line.text.ends_with("\\\n") || self.line.text.ends_with("\\\r\n"));
+        return self.end_progs.last().is_some()
+            && (self.line.text.ends_with("\\\n") || self.line.text.ends_with("\\\r\n"));
     }
     fn collect_until(&mut self) -> Result<Vec<TokInfo>, String> {
         let mut pos = self.line.pos;
@@ -297,9 +309,13 @@ impl State {
                     results.extend(res);
                 }
             }
-        } else { // continued statement
+        } else {
+            // continued statement
             if self.line.text.is_empty() {
-                return Err(format!("EOF in multi-line statement {}:{}", self.line.num, self.line.pos));
+                return Err(format!(
+                    "EOF in multi-line statement {}:{}",
+                    self.line.num, self.line.pos
+                ));
             }
             self.continued = false;
         }
@@ -318,7 +334,6 @@ struct EndProg {
     quote: String,
     mode: Mode,
 }
-
 
 enum LoopAction {
     Break,
@@ -397,7 +412,10 @@ fn next_statement(state: &mut State) -> Result<LoopResult, String> {
             Token::NL,
             state.line.text[state.line.pos..].to_string(),
             (state.line.num, state.line.pos),
-            (state.line.num, state.line.pos + state.line.text[state.line.pos..].len()),
+            (
+                state.line.num,
+                state.line.pos + state.line.text[state.line.pos..].len(),
+            ),
             state.line.text.to_string().clone(),
         ));
         state.line.pos = state.line.max;
@@ -427,7 +445,10 @@ fn next_statement(state: &mut State) -> Result<LoopResult, String> {
                 state.line.text.to_string().clone(),
             ));
         } else {
-            return Err(format!("unindent does not match any outer indentation level {}:{}", state.line.num, state.line.pos));
+            return Err(format!(
+                "unindent does not match any outer indentation level {}:{}",
+                state.line.num, state.line.pos
+            ));
         }
     }
 
@@ -438,10 +459,10 @@ fn handle_string_start(state: &mut State, m: &Match) -> Option<Token> {
     let quote = m.sub_names["Quote"].as_str();
     let pattern = END_PATTERNS[quote];
     if m.text.to_ascii_lowercase().contains("f") {
-        let pattern = choice(&[], Some(&[
-            ("StartLBrace", START_LBRACE),
-            ("End", pattern),
-        ]));
+        let pattern = choice(
+            &[],
+            Some(&[("StartLBrace", START_LBRACE), ("End", pattern)]),
+        );
         state.add_prog(m.end, m.end, pattern.as_str(), quote, Mode::Middle);
         return Some(Token::FstringStart);
     }
@@ -457,7 +478,11 @@ fn handle_psuedo(state: &mut State, m: &Match) -> Option<Token> {
         "SearchPath" => Some(Token::SearchPath),
         "Name" => Some(Token::NAME),
         "Number" => Some(Token::NUMBER), // todo: or (token[0] == "." and token not in (".", "..."))
-        "NL" => Some(if state.parenlev > 0 { Token::NL } else { Token::NEWLINE }),
+        "NL" => Some(if state.parenlev > 0 {
+            Token::NL
+        } else {
+            Token::NEWLINE
+        }),
         "Special" => {
             if "([{".contains(m.text.chars().last().unwrap()) {
                 state.parenlev += 1;
@@ -476,7 +501,7 @@ fn handle_psuedo(state: &mut State, m: &Match) -> Option<Token> {
         "End" => {
             state.continued = true;
             None
-        },
+        }
         _ => None,
     }
 }
@@ -504,26 +529,26 @@ fn next_psuedo_matches(state: &mut State) -> Result<Option<TokInfo>, String> {
 fn next_end_tokens(state: &State) -> Vec<TokInfo> {
     let mut tokens: Vec<TokInfo> = Vec::new();
     if let Some(last_line) = state.last_line.as_ref() {
-        if !['\r', '\n'].contains(&last_line.text.chars().last().unwrap()) && !last_line.text.starts_with('#') {
+        if !['\r', '\n'].contains(&last_line.text.chars().last().unwrap())
+            && !last_line.text.starts_with('#')
+        {
             let token = TokInfo {
                 typ: Token::NEWLINE,
                 string: "".to_string(),
-                start: (state.line.num - 1, last_line.text.len()),
-                end: (state.line.num - 1, last_line.text.len() + 1),
+                start: (last_line.num - 1, last_line.text.len()),
+                end: (last_line.num - 1, last_line.text.len() + 1),
                 // line: "".to_string(),
             };
             tokens.push(token);
         }
     }
-    tokens.extend(
-        state.indents[1..].iter().map(|_| TokInfo {
-            typ: Token::DEDENT,
-            string: "".to_string(),
-            start: (state.line.num, 0),
-            end: (state.line.num, 0),
-            // line: "".to_string(),
-        })
-    );
+    tokens.extend(state.indents[1..].iter().map(|_| TokInfo {
+        typ: Token::DEDENT,
+        string: "".to_string(),
+        start: (state.line.num, 0),
+        end: (state.line.num, 0),
+        // line: "".to_string(),
+    }));
 
     tokens.push(TokInfo {
         typ: Token::ENDMARKER,
@@ -535,12 +560,12 @@ fn next_end_tokens(state: &State) -> Vec<TokInfo> {
     return tokens;
 }
 
-
 fn handle_fstring_progs(state: &mut State) -> Vec<TokInfo> {
     let mut results = Vec::new();
     let endprog = state.end_progs.last().unwrap();
     if let Some(m) = state.match_pattern(&endprog.pattern) {
-        if m.name == "End" { // quote match
+        if m.name == "End" {
+            // quote match
             let middle_end = m.end - endprog.quote.len();
             let endquote = endprog.quote.to_string();
             if middle_end > state.line.pos || !endprog.text.is_empty() {
@@ -554,9 +579,11 @@ fn handle_fstring_progs(state: &mut State) -> Vec<TokInfo> {
                 // line: state.line.text.clone(),
             });
             state.pop_prog();
-        } else { // "{" or "}"
+        } else {
+            // "{" or "}"
             let middle_end = m.end - 1;
-            if middle_end > state.line.pos || !endprog.text.is_empty() { // has buffer
+            if middle_end > state.line.pos || !endprog.text.is_empty() {
+                // has buffer
                 results.push(state.prog_token(middle_end, Token::FstringMiddle));
             }
 
@@ -570,7 +597,8 @@ fn handle_fstring_progs(state: &mut State) -> Vec<TokInfo> {
                 });
                 state.parenlev += 1;
                 state.add_prog(m.end, m.end, "", "", Mode::InBraces(state.parenlev));
-            } else { // rbrace
+            } else {
+                // rbrace
                 results.push(TokInfo {
                     typ: Token::OP,
                     string: "}".to_string(),
@@ -596,9 +624,9 @@ fn handle_end_progs<'a>(state: &mut State) -> Result<Vec<TokInfo>, String> {
     if state.line.pos == 0 && state.line.text.is_empty() {
         let endprog = state.end_progs.last().unwrap();
         let (end_line, end_pos) = endprog.start;
-        return Err(format!("EOF in multi-line string at {}:{} - {}:{}",
-                           state.line.num,
-                           state.line.pos, end_line, end_pos,
+        return Err(format!(
+            "EOF in multi-line string at {}:{} - {}:{}",
+            state.line.num, state.line.pos, end_line, end_pos,
         ));
     }
 
@@ -612,7 +640,8 @@ fn handle_end_progs<'a>(state: &mut State) -> Result<Vec<TokInfo>, String> {
             results.extend(handle_fstring_progs(state));
         }
     } else if let Some(endprog) = state.end_progs.last() {
-        if let Some(m) = state.match_pattern(endprog.pattern.as_str()) {  // all on one line
+        if let Some(m) = state.match_pattern(endprog.pattern.as_str()) {
+            // all on one line
             results.push(state.prog_token(m.end, Token::STRING));
             state.pop_prog();
             return Ok(results);
@@ -624,7 +653,9 @@ fn handle_end_progs<'a>(state: &mut State) -> Result<Vec<TokInfo>, String> {
         return Ok(results);
     }
 
-    if (state.line.pos == 0 || state.in_multi_line_string() || state.in_continued_string()) && (state.end_progs.last().is_some()) {
+    if (state.line.pos == 0 || state.in_multi_line_string() || state.in_continued_string())
+        && (state.end_progs.last().is_some())
+    {
         let endprog = state.end_progs.last_mut().unwrap();
         endprog.join_line(&state.line);
         state.line.pos = state.line.max;
@@ -632,10 +663,9 @@ fn handle_end_progs<'a>(state: &mut State) -> Result<Vec<TokInfo>, String> {
     return Ok(results);
 }
 
-struct Tokenizer<R: Read>
-{
-    stash: VecDeque<TokInfo>,  // Current line's tokens
-    stopped: bool, // an error or \n has been encountered
+struct Tokenizer<R: Read> {
+    stash: VecDeque<TokInfo>, // Current line's tokens
+    stopped: bool,            // an error or \n has been encountered
     state: State,
     // an iterator over the lines in the stream
     reader: BufReader<R>,
@@ -652,7 +682,6 @@ impl<R: Read> Tokenizer<R> {
     }
 }
 
-
 impl<R: Read> Iterator for Tokenizer<R> {
     type Item = Result<TokInfo, String>; // The type of the values produced by the iterator
 
@@ -667,9 +696,12 @@ impl<R: Read> Iterator for Tokenizer<R> {
             let mut current = String::new();
 
             if let Ok(read_bytes) = self.reader.read_line(&mut current) {
-                if read_bytes == 0 { // EOF
+                if read_bytes == 0 {
+                    // EOF
                     self.stopped = true;
-                    self.stash.extend(next_end_tokens(&self.state))
+                    self.state.set_line("".to_string());
+                    let res = next_end_tokens(&self.state);
+                    self.stash.extend(res);
                 } else {
                     let result = self.state.collect_for(current);
                     if let Ok(tokens) = result {
@@ -686,10 +718,8 @@ impl<R: Read> Iterator for Tokenizer<R> {
     }
 }
 
-
 #[allow(unused)]
-fn tokenize_file(path: &str) -> Tokenizer<File>
-{
+fn tokenize_file(path: &str) -> Tokenizer<File> {
     let file = File::open(path).unwrap();
     Tokenizer::new(file)
 }
@@ -716,8 +746,32 @@ mod tests {
     #[test]
     fn test_tokenizer() {
         let lines = "a = 1 \nif statement: 'string'";
-        for token in tokenize_string(lines) {
-            println!("{:?}", token);
+        let result = tokenize_string(lines)
+            .map(|x| x.unwrap())
+            .map(|x| format!("{:?}:{}:{}", x.typ, x.string, x.start.1))
+            .collect::<Vec<_>>();
+
+        {
+            assert_eq!(
+                result,
+                vec![
+                    "NAME:a:0",
+                    "WS: :1",
+                    "OP:=:2",
+                    "WS: :3",
+                    "NUMBER:1:4",
+                    "WS: :5",
+                    "NEWLINE:\n:6",
+                    "NAME:if:0",
+                    "WS: :2",
+                    "NAME:statement:3",
+                    "OP:::12",
+                    "WS: :13",
+                    "STRING:'string':14",
+                    "NEWLINE::22",
+                    "ENDMARKER::0"
+                ]
+            );
         }
     }
 }
