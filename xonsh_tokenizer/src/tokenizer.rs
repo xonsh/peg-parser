@@ -12,7 +12,7 @@ use crate::regex::consts::{
 use crate::regex::fns::{choice, compile};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum Token {
+pub enum Token {
     ENDMARKER,
     NAME,
     NUMBER,
@@ -40,11 +40,11 @@ enum Token {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct TokInfo {
-    typ: Token,
-    string: String,
-    start: (usize, usize),
-    end: (usize, usize),
+pub struct TokInfo {
+    pub typ: Token,
+    pub string: String,
+    pub start: (usize, usize),
+    pub end: (usize, usize),
     // line: String,
 }
 
@@ -663,7 +663,7 @@ fn handle_end_progs<'a>(state: &mut State) -> Result<Vec<TokInfo>, String> {
     return Ok(results);
 }
 
-struct Tokenizer<R: Read> {
+pub struct Tokenizer<R: Read> {
     stash: VecDeque<TokInfo>, // Current line's tokens
     stopped: bool,            // an error or \n has been encountered
     state: State,
@@ -724,7 +724,7 @@ fn tokenize_file(path: &str) -> Tokenizer<File> {
     Tokenizer::new(file)
 }
 
-fn tokenize_string(src: &str) -> Tokenizer<BufReader<Cursor<&[u8]>>> {
+pub fn tokenize_string(src: &str) -> Tokenizer<BufReader<Cursor<&[u8]>>> {
     let bytes = src.as_bytes();
     let cursor = Cursor::new(bytes);
     let reader = BufReader::new(cursor);
