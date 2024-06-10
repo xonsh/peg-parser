@@ -96,19 +96,16 @@ pub enum Mode {
     InColon,
     /// in the format specifier ({})
     InBraces(usize),
-    None,
+    // None,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::regex::fns::*;
 
     #[test]
     fn test_string_start() {
         assert_eq!(STRING_START.as_str(), "(?P<StringPrefix>(|B|BR|Br|F|FP|FR|Fp|Fr|P|PF|PR|Pf|Pr|R|RB|RF|RP|Rb|Rf|Rp|U|b|bR|br|f|fP|fR|fp|fr|p|pF|pR|pf|pr|r|rB|rF|rP|rb|rf|rp|u))(?P<Quote>((?P<TripleQt>('''|\"\"\"))|(?P<SingleQt>(\"|'))))");
         let _ = compile(PSEUDO_TOKENS.as_str()); // should not panic
     }
-
-
 }

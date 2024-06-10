@@ -1,11 +1,10 @@
 // use std::any::type_name;
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Cursor, Lines, Read};
+use std::io::{BufRead, BufReader, Cursor, Read};
 use std::iter::Iterator;
-use std::mem::Discriminant;
+use std::mem::{Discriminant, discriminant};
 
 use crate::regex::consts::{END_PATTERNS, END_RBRACE, Mode, OPERATORS, PSEUDO_TOKENS, START_LBRACE, TABSIZE};
 use crate::regex::fns::{choice, compile};
@@ -20,21 +19,21 @@ enum Token {
     INDENT,
     DEDENT,
     OP,
-    AWAIT,
-    ASYNC,
-    TypeIgnore,
-    TypeComment,
-    SoftKeyword,
+    // AWAIT,
+    // ASYNC,
+    // TypeIgnore,
+    // TypeComment,
+    // SoftKeyword,
     FstringStart,
     FstringMiddle,
     FstringEnd,
-    Errortoken,
+    ErrorToken,
     Comment,
     NL,
-    ENCODING,
+    // ENCODING,
     // xonsh specific tokens
     SearchPath,
-    MacroParam,
+    // MacroParam,
     WS,
 }
 
@@ -48,6 +47,7 @@ struct TokInfo {
     line: String,
 }
 
+#[allow(unused)]
 impl TokInfo {
     fn new(
         typ: Token,
@@ -232,21 +232,21 @@ impl State {
     }
     fn is_in_mode(&self, variant: Discriminant<Mode>) -> bool {
         if let Some(mode) = self.current_mode() {
-            return std::mem::discriminant(mode) == variant;
+            return discriminant(mode) == variant;
         }
         return false;
     }
 
     fn in_fstring(&self) -> bool {
-        return self.is_in_mode(std::mem::discriminant(&Mode::Middle));
+        return self.is_in_mode(discriminant(&Mode::Middle));
     }
 
     fn in_braces(&self) -> bool {
-        return self.is_in_mode(std::mem::discriminant(&Mode::InBraces(0)));
+        return self.is_in_mode(discriminant(&Mode::InBraces(0)));
     }
 
     fn in_colon(&self) -> bool {
-        return self.is_in_mode(std::mem::discriminant(&Mode::InColon));
+        return self.is_in_mode(discriminant(&Mode::InColon));
     }
 
     fn in_multi_line_string(&self) -> bool {
@@ -255,6 +255,57 @@ impl State {
 
     fn in_continued_string(&self) -> bool {
         return self.end_progs.last().is_some() && (self.line.text.ends_with("\\\n") || self.line.text.ends_with("\\\r\n"));
+    }
+    fn collect_until(&mut self) -> Result<Vec<TokInfo>, String> {
+        let mut pos = self.line.pos;
+        let mut results  = Vec::new();
+        while self.line.pos < self.line.max {
+            results.extend(handle_end_progs(self)?);
+
+            if let Some(t) = next_psuedo_matches(self)? {
+                results.push(t);
+            } else if pos == self.line.pos {
+                pos = self.line.pos + 1;
+                results.push(TokInfo {
+                    typ: Token::ErrorToken,
+                    string: self.line.text[self.line.pos..pos].to_string(),
+                    start: (self.line.num, self.line.pos),
+                    end: (self.line.num, pos),
+                    line: self.line.text.to_string(),
+                });
+                self.line.pos = pos;
+            } else {
+                return Err(format!("Invalid tokenizer state at {}:{}", self.line.num, self.line.pos));
+            }
+        }
+        return Ok(results);
+    }
+    fn collect_for(&mut self, line: String) -> Result<Vec<TokInfo>, String> {
+        self.set_line(line);
+        let mut results = Vec::new();
+
+        if !self.end_progs.is_empty() {
+            let res = handle_end_progs(self)?;
+            results.extend(res);
+        } else if self.parenlev == 0 && !self.continued {
+            match next_statement(self)? {
+                (LoopAction::Break, res) => {
+                    results.extend(res);
+                    return Ok(results);
+                }
+                (_, res) => {
+                    results.extend(res);
+                }
+            }
+        } else { // continued statement
+            if self.line.text.is_empty() {
+                return Err(format!("EOF in multi-line statement {}:{}", self.line.num, self.line.pos));
+            }
+            self.continued = false;
+        }
+        let res = self.collect_until()?; // store in a variable to debug
+        results.extend(res);
+        Ok(results)
     }
 }
 
@@ -269,7 +320,6 @@ struct EndProg {
 }
 
 enum LoopAction {
-    Continue,
     Break,
     None,
 }
@@ -311,7 +361,7 @@ impl EndProg {
 
 fn next_statement(state: &mut State) -> Result<LoopResult, String> {
     let mut stash: Vec<TokInfo> = Vec::new();
-    if !state.line.text.is_empty() {
+    if state.line.text.is_empty() {
         return Ok((LoopAction::Break, stash));
     }
     let mut col = 0;
@@ -349,7 +399,8 @@ fn next_statement(state: &mut State) -> Result<LoopResult, String> {
             (state.line.num, state.line.pos + state.line.text[state.line.pos..].len()),
             state.line.text.to_string().clone(),
         ));
-        return Ok((LoopAction::Continue, stash));
+        state.line.pos = state.line.max;
+        return Ok((LoopAction::None, stash));
     }
 
     if let Some(indent) = state.indents.last() {
@@ -582,11 +633,6 @@ fn handle_end_progs<'a>(state: &mut State) -> Result<Vec<TokInfo>, String> {
     return Ok(results);
 }
 
-fn collect_tokens_for_line(state: &mut State, line: String) -> Result<Vec<TokInfo>, String> {
-    state.set_line(line);
-    Ok(vec![])
-}
-
 struct Tokenizer<R: Read>
 {
     stash: VecDeque<TokInfo>,  // Current line's tokens
@@ -624,9 +670,9 @@ impl<R: Read> Iterator for Tokenizer<R> {
             if let Ok(read_bytes) = self.reader.read_line(&mut current) {
                 if read_bytes == 0 {
                     self.stopped = true;
-                    current = "".to_string();
+                    self.stash.extend(next_end_tokens(&self.state))
                 } else {
-                    let result = collect_tokens_for_line(&mut self.state, current.clone());
+                    let result = self.state.collect_for(current);
                     if let Ok(tokens) = result {
                         self.stash.extend(tokens);
                     } else {
@@ -642,9 +688,10 @@ impl<R: Read> Iterator for Tokenizer<R> {
 }
 
 
+#[allow(unused)]
 fn tokenize_file(path: &str) -> Tokenizer<File>
 {
-    let file = File::open("your_file.txt").unwrap();
+    let file = File::open(path).unwrap();
     Tokenizer::new(file)
 }
 
@@ -669,6 +716,9 @@ mod tests {
 
     #[test]
     fn test_tokenizer() {
-        let mut lines = vec!["a = 1", "b = 2", "c = 3"];
+        let lines = "a = 1 \nif statement: 'string'";
+        for token in tokenize_string(lines) {
+            println!("{:?}", token);
+        }
     }
 }
