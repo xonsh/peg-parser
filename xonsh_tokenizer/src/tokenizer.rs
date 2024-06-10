@@ -1,7 +1,14 @@
-use std::collections::{HashMap};
+// use std::any::type_name;
+use std::borrow::Borrow;
+use std::collections::HashMap;
+use std::collections::VecDeque;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Cursor, Lines, Read};
+use std::iter::Iterator;
 use std::mem::Discriminant;
+
 use crate::regex::consts::{END_PATTERNS, END_RBRACE, Mode, OPERATORS, PSEUDO_TOKENS, START_LBRACE, TABSIZE};
-use crate::regex::fns::{compile, choice};
+use crate::regex::fns::{choice, compile};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum Token {
@@ -157,11 +164,11 @@ impl State {
         }
         return false;
     }
-    fn set_line(&mut self, line: &str) {
+    fn set_line(&mut self, line: String) {
         if self.line.num != 0 {
             self.last_line = Some(self.line.clone());
         }
-        self.line = LineState::new(line, self.line.num + 1);
+        self.line = LineState::new(line.as_str(), self.line.num + 1);
     }
 
     fn add_prog(&mut self, start: usize, end: usize, pattern: &str, quote: &str, mode: Mode) {
@@ -575,6 +582,78 @@ fn handle_end_progs<'a>(state: &mut State) -> Result<Vec<TokInfo>, String> {
     return Ok(results);
 }
 
+fn collect_tokens_for_line(state: &mut State, line: String) -> Result<Vec<TokInfo>, String> {
+    state.set_line(line);
+    Ok(vec![])
+}
+
+struct Tokenizer<R: Read>
+{
+    stash: VecDeque<TokInfo>,  // Current line's tokens
+    stopped: bool, // an error or \n has been encountered
+    state: State,
+    // an iterator over the lines in the stream
+    reader: BufReader<R>,
+}
+
+impl<R: Read> Tokenizer<R> {
+    fn new(lines: R) -> Self {
+        Self {
+            stash: VecDeque::new(),
+            stopped: false,
+            state: State::default(),
+            reader: BufReader::new(lines),
+        }
+    }
+}
+
+
+impl<R: Read> Iterator for Tokenizer<R> {
+    type Item = Result<TokInfo, String>; // The type of the values produced by the iterator
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let Some(tok_info) = self.stash.pop_front() {
+                return Some(Ok(tok_info));
+            }
+            if self.stopped {
+                return None;
+            }
+            let mut current = String::new();
+
+            if let Ok(read_bytes) = self.reader.read_line(&mut current) {
+                if read_bytes == 0 {
+                    self.stopped = true;
+                    current = "".to_string();
+                } else {
+                    let result = collect_tokens_for_line(&mut self.state, current.clone());
+                    if let Ok(tokens) = result {
+                        self.stash.extend(tokens);
+                    } else {
+                        self.stopped = true;
+                        return Some(Err(result.unwrap_err()));
+                    }
+                }
+            } else {
+                return None;
+            }
+        }
+    }
+}
+
+
+fn tokenize_file(path: &str) -> Tokenizer<File>
+{
+    let file = File::open("your_file.txt").unwrap();
+    Tokenizer::new(file)
+}
+
+fn tokenize_string(src: &str) -> Tokenizer<BufReader<Cursor<&[u8]>>> {
+    let bytes = src.as_bytes();
+    let cursor = Cursor::new(bytes);
+    let reader = BufReader::new(cursor);
+    Tokenizer::new(reader)
+}
 
 #[cfg(test)]
 mod tests {
@@ -583,8 +662,13 @@ mod tests {
     #[test]
     fn test_next_psuedo_matches() {
         let mut state = State::default();
-        state.set_line("a = 1");
+        state.set_line("a = 1".to_string());
         let result = next_psuedo_matches(&mut state);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_tokenizer() {
+        let mut lines = vec!["a = 1", "b = 2", "c = 3"];
     }
 }
