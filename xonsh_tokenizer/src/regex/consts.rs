@@ -96,7 +96,7 @@ pub enum Mode {
     InColon,
     /// in the format specifier ({})
     InBraces(usize),
-    // None,
+    Nil,
 }
 
 #[cfg(test)]
