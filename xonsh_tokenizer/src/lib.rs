@@ -1,9 +1,12 @@
 mod regex;
 pub mod tokenizer;
 
+use std::collections::HashMap;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use tokenizer::{tokenize_string, TokInfo};
+use crate::regex::consts::OPERATORS;
+use crate::tokenizer::Token;
 
 #[pyclass(frozen)]
 #[derive(Clone)]
@@ -26,6 +29,32 @@ impl PyTokInfo {
             _ => return Err(PyTypeError::new_err(format!("Unknown attribute: {}", name))),
         };
         Ok(obj)
+    }
+
+    fn is_exact_type(&self, typ: &str) -> bool {
+        self.inner.typ == Token::OP && OPERATORS.contains(&typ)
+    }
+
+    fn loc_start(&self) -> HashMap<String, usize> {
+        let mut map = HashMap::new();
+        map.insert("lineno".to_string(), self.inner.start.0);
+        map.insert("col_offset".to_string(), self.inner.start.1);
+        map
+    }
+
+    fn loc_end(&self) -> HashMap<String, usize> {
+        let mut map = HashMap::new();
+        map.insert("end_lineno".to_string(), self.inner.end.0);
+        map.insert("end_col_offset".to_string(), self.inner.end.1);
+        map
+    }
+
+    fn loc(&self) -> HashMap<String, usize> {
+        // merge loc_start and loc_end outputs
+        let mut map = HashMap::new();
+        map.extend(self.loc_start());
+        map.extend(self.loc_end());
+        map
     }
 }
 

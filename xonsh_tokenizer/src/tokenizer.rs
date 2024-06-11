@@ -7,7 +7,7 @@ use std::iter::Iterator;
 use std::mem::{discriminant, Discriminant};
 
 use crate::regex::consts::{
-    Mode, END_PATTERNS, END_RBRACE, OPERATORS, PSEUDO_TOKENS, START_LBRACE, TABSIZE,
+    Mode, END_PATTERNS, END_RBRACE, PSEUDO_TOKENS, START_LBRACE, TABSIZE,
 };
 use crate::regex::fns::{choice, compile};
 
@@ -48,7 +48,6 @@ pub struct TokInfo {
     // line: String,
 }
 
-#[allow(unused)]
 impl TokInfo {
     fn new(
         typ: Token,
@@ -64,36 +63,6 @@ impl TokInfo {
             end,
             // line,
         }
-    }
-
-    fn is_exact_type(&self, typ: &str) -> bool {
-        self.typ == Token::OP && OPERATORS.contains(&typ)
-    }
-
-    fn loc_start(&self) -> HashMap<String, usize> {
-        let mut map = HashMap::new();
-        map.insert("lineno".to_string(), self.start.0);
-        map.insert("col_offset".to_string(), self.start.1);
-        map
-    }
-
-    fn loc_end(&self) -> HashMap<String, usize> {
-        let mut map = HashMap::new();
-        map.insert("end_lineno".to_string(), self.end.0);
-        map.insert("end_col_offset".to_string(), self.end.1);
-        map
-    }
-
-    fn loc(&self) -> HashMap<String, usize> {
-        // merge loc_start and loc_end outputs
-        let mut map = HashMap::new();
-        map.extend(self.loc_start());
-        map.extend(self.loc_end());
-        map
-    }
-
-    fn is_next_to(&self, prev: &TokInfo) -> bool {
-        self.end == prev.start
     }
 }
 
