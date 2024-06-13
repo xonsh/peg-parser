@@ -7,3 +7,9 @@ pyo3 = { version = "0.27.*", features = [
     "extension-module",
     "experimental-inspect",
 ] }
+
+[workspace]
+
+members = [
+    "winnow-parser",
+]
