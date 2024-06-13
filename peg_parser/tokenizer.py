@@ -2,12 +2,33 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Final, NewType
 
-from .tokenize import Token, TokenInfo
+from xonsh_tokenizer import TokenInfo
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 Mark = NewType("Mark", int)
+
+
+
+class Token:
+    ENDMARKER = "ENDMARKER"
+    NAME = "NAME"
+    NUMBER = "NUMBER"
+    STRING = "STRING"
+    NEWLINE = "NEWLINE"
+    INDENT = "INDENT"
+    DEDENT = "DEDENT"
+    OP = "OP"
+    FSTRING_START = "FSTRING_START"
+    FSTRING_MIDDLE = "FSTRING_MIDDLE"
+    FSTRING_END = "FSTRING_END"
+    ERRORTOKEN = "ERRORTOKEN"
+    COMMENT = "COMMENT"
+    NL = "NL"
+    SEARCH_PATH = "SEARCH_PATH"
+    WS = "WS"
+    TYPE_COMMENT = "TYPE_COMMENT"
 
 
 WS_TOKENS = {Token.ENDMARKER, Token.NEWLINE, Token.DEDENT, Token.INDENT}

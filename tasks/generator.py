@@ -3,7 +3,7 @@ import itertools
 from pathlib import Path
 from typing import IO, Any
 
-from peg_parser.tokenize import Token
+from peg_parser.tokenizer import Token
 from pegen import grammar
 from pegen.build import build_parser
 from pegen.grammar import (

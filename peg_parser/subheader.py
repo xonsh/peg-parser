@@ -958,16 +958,15 @@ class Parser:
         verbose: bool = False,
     ) -> ast.Module | Node | None:
         """Parse a file or string."""
-        with open(path) as f:
-            tok_stream = generate_tokens(f.readline)
-            tokenizer = Tokenizer(tok_stream, verbose=verbose, path=str(path))
-            parser = cls(
-                tokenizer,
-                verbose=verbose,
-                filename=path.name,
-                py_version=py_version,
-            )
-            return parser.parse("file")
+        tok_stream = iter(tokenize_file(str(path)))
+        tokenizer = Tokenizer(tok_stream, verbose=verbose, path=str(path))
+        parser = cls(
+            tokenizer,
+            verbose=verbose,
+            filename=path.name,
+            py_version=py_version,
+        )
+        return parser.parse("file")
 
     @classmethod
     def parse_string(
@@ -978,9 +977,7 @@ class Parser:
         verbose: bool = False,
     ) -> Any:
         """Parse a string."""
-        import io
-
-        tok_stream = generate_tokens(io.StringIO(source).readline)
+        tok_stream = iter(tokenize_str(source))
         tokenizer = Tokenizer(tok_stream, verbose=verbose)
         parser = cls(tokenizer, verbose=verbose, py_version=py_version)
         return parser.parse(mode if mode == "eval" else "file")

@@ -5,8 +5,8 @@ from collections.abc import Sequence
 
 import pytest
 
-from peg_parser.tokenize import Token as t  # noqa: N813
-from peg_parser.tokenize import TokenInfo
+from peg_parser.tokenizer import Token as t  # noqa: N813
+from xonsh_tokenizer import TokenInfo
 
 
 def ensure_tuple(seq) -> str:

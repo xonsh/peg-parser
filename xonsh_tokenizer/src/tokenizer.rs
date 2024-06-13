@@ -1,14 +1,13 @@
 // use std::any::type_name;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Cursor, Read};
 use std::iter::Iterator;
 use std::mem::{discriminant, Discriminant};
 
-use crate::regex::consts::{
-    Mode, END_PATTERNS, END_RBRACE, PSEUDO_TOKENS, START_LBRACE, TABSIZE,
-};
+use crate::regex::consts::{Mode, END_PATTERNS, END_RBRACE, PSEUDO_TOKENS, START_LBRACE, TABSIZE};
 use crate::regex::fns::{choice, compile};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -21,21 +20,14 @@ pub enum Token {
     INDENT,
     DEDENT,
     OP,
-    // AWAIT,
-    // ASYNC,
-    // TypeIgnore,
-    // TypeComment,
-    // SoftKeyword,
     FstringStart,
     FstringMiddle,
     FstringEnd,
     ErrorToken,
     Comment,
     NL,
-    // ENCODING,
     // xonsh specific tokens
     SearchPath,
-    // MacroParam,
     WS,
 }
 
@@ -45,7 +37,7 @@ pub struct TokInfo {
     pub string: String,
     pub start: (usize, usize),
     pub end: (usize, usize),
-    // line: String,
+    pub line: String,
 }
 
 impl TokInfo {
@@ -61,7 +53,7 @@ impl TokInfo {
             string,
             start,
             end,
-            // line,
+            line,
         }
     }
 }
@@ -174,13 +166,13 @@ impl State {
             string: endprog.text.clone(),
             start: endprog.start.clone(),
             end: epos,
-            // line: endprog.contline.clone(),
+            line: endprog.contline.clone(),
         };
     }
 
     fn match_pattern(&self, pattern: &str) -> Option<Match> {
         let re = compile(pattern);
-        let captures = re.captures(&self.line.text[self.line.pos..])?;
+        let captures = re.captures(&self.line.text[self.line.pos..]).ok()??;
         let m = captures.get(0)?;
         let mut matches = HashMap::new(); // name -> value
         let mut first_name = "".to_string();
@@ -253,7 +245,7 @@ impl State {
                     string: self.line.text[self.line.pos..pos].to_string(),
                     start: (self.line.num, self.line.pos),
                     end: (self.line.num, pos),
-                    // line: self.line.text.to_string(),
+                    line: self.line.text.to_string(),
                 });
                 self.line.pos = pos;
             }
@@ -506,7 +498,7 @@ fn next_end_tokens(state: &State) -> Vec<TokInfo> {
                 string: "".to_string(),
                 start: (last_line.num - 1, last_line.text.len()),
                 end: (last_line.num - 1, last_line.text.len() + 1),
-                // line: "".to_string(),
+                line: "".to_string(),
             };
             tokens.push(token);
         }
@@ -516,7 +508,7 @@ fn next_end_tokens(state: &State) -> Vec<TokInfo> {
         string: "".to_string(),
         start: (state.line.num, 0),
         end: (state.line.num, 0),
-        // line: "".to_string(),
+        line: "".to_string(),
     }));
 
     tokens.push(TokInfo {
@@ -524,7 +516,7 @@ fn next_end_tokens(state: &State) -> Vec<TokInfo> {
         string: "".to_string(),
         start: (state.line.num, 0),
         end: (state.line.num, 0),
-        // line: "".to_string(),
+        line: "".to_string(),
     });
     return tokens;
 }
@@ -545,7 +537,7 @@ fn handle_fstring_progs(state: &mut State) -> Vec<TokInfo> {
                 string: endquote, // Copy the quote string
                 start: (state.line.num, state.line.pos),
                 end: (state.line.num, m.end),
-                // line: state.line.text.clone(),
+                line: state.line.text.clone(),
             });
             state.pop_prog();
         } else {
@@ -562,7 +554,7 @@ fn handle_fstring_progs(state: &mut State) -> Vec<TokInfo> {
                     string: "{".to_string(),
                     start: (state.line.num, state.line.pos),
                     end: (state.line.num, m.end),
-                    // line: state.line.text.to_string(),
+                    line: state.line.text.to_string(),
                 });
                 state.parenlev += 1;
                 state.add_prog(m.end, m.end, "", "", Mode::InBraces(state.parenlev));
@@ -573,7 +565,7 @@ fn handle_fstring_progs(state: &mut State) -> Vec<TokInfo> {
                     string: "}".to_string(),
                     start: (state.line.num, state.line.pos),
                     end: (state.line.num, m.end),
-                    // line: state.line.text.to_string(),
+                    line: state.line.text.to_string(),
                 });
                 state.parenlev -= 1;
                 state.pop_prog(); // in-colon
@@ -688,9 +680,9 @@ impl<R: Read> Iterator for Tokenizer<R> {
 }
 
 #[allow(unused)]
-fn tokenize_file(path: &str) -> Tokenizer<File> {
-    let file = File::open(path).unwrap();
-    Tokenizer::new(file)
+pub fn tokenize_file(path: &str) -> Result<Tokenizer<File>, std::io::Error> {
+    let file = File::open(path)?;
+    Ok(Tokenizer::new(file))
 }
 
 pub fn tokenize_string(src: &str) -> Tokenizer<BufReader<Cursor<&[u8]>>> {
@@ -703,6 +695,7 @@ pub fn tokenize_string(src: &str) -> Tokenizer<BufReader<Cursor<&[u8]>>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use itertools::Itertools;
 
     #[test]
     fn test_next_psuedo_matches() {
@@ -712,17 +705,25 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    #[test]
-    fn test_tokenizer() {
-        let lines = "a = 1 \nif statement: 'string'";
+    fn handle_test_case(lines: &str, expected: &Vec<&str>) -> Result<(), String> {
         let result = tokenize_string(lines)
             .map(|x| x.unwrap())
             .map(|x| format!("{:?}:{}:{}", x.typ, x.string, x.start.1))
-            .collect::<Vec<_>>();
+            .join("\n");
+        if result != expected.join("\n") {
+            Err(format!(
+                "lines: {lines}, result: {result:?}, expected: {expected:?}"
+            ))
+        } else {
+            Ok(())
+        }
+    }
 
-        {
-            assert_eq!(
-                result,
+    #[test]
+    fn test_tokenizer() -> Result<(), String> {
+        [
+            (
+                "a = 1 \nif statement: 'string'",
                 vec![
                     "NAME:a:0",
                     "WS: :1",
@@ -738,9 +739,14 @@ mod tests {
                     "WS: :13",
                     "STRING:'string':14",
                     "NEWLINE::22",
-                    "ENDMARKER::0"
-                ]
-            );
-        }
+                    "ENDMARKER::0",
+                ],
+            ),
+            (r#"a = f"{d}" "rr""#, vec![""]),
+        ]
+        .iter()
+        .try_for_each(|(a, b)| handle_test_case(a, b))?;
+
+        Ok(())
     }
 }

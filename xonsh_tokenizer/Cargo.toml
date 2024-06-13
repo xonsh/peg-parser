@@ -15,3 +15,5 @@ regex = "1.10.4"
 strum = { version = "0.26", features = ["derive"] }
 strum_macros = "0.26"
 itertools = "0.13.0"
+heck = "0.5.0"
+fancy-regex = { version = "*" }

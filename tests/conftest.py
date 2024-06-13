@@ -47,16 +47,16 @@ def build_parser(name: str):
 
 
 def _get_tokens(inp):
-    from peg_parser import tokenize
-    from peg_parser.tokenizer import Tokenizer
+    from peg_parser.tokenizer import Token, Tokenizer
+    from xonsh_tokenizer import tokenize_str
 
-    gen = tokenize.generate_tokens(io.StringIO(inp).readline)
+    gen = iter(tokenize_str(inp))
     tokenizer = Tokenizer(gen)
     tokens = []
     while True:
         tok = tokenizer.getnext()
         tokens.append(tok)
-        if tok.type == tokenize.Token.ENDMARKER:
+        if tok.type == Token.ENDMARKER:
             break
     return tokens
 
