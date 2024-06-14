@@ -16,6 +16,23 @@ pub struct PyTokInfo {
 
 #[pymethods]
 impl PyTokInfo {
+    #[new]
+    fn __init__(
+        typ: &str,
+        string: &str,
+        start: (usize, usize),
+        end: (usize, usize),
+        line: &str,
+    ) -> PyResult<Self> {
+        let tok = match typ {
+            "WS" => Token::WS,
+            "MACRO_PARAM" => Token::MacroParam,
+            _ => panic!("Unknown token type: {}", typ),
+        };
+        let inner = tokenizer::TokInfo::new(tok, string.to_string(), start, end, line.to_string());
+        Ok(Self { inner })
+    }
+
     fn __repr__<'a>(&'a self) -> PyResult<String> {
         Ok(format!("Tok<{:?}:'{}'>", self.inner.typ, self.inner.string))
     }

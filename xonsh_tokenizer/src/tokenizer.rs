@@ -29,6 +29,7 @@ pub enum Token {
     // xonsh specific tokens
     SearchPath,
     WS,
+    MacroParam,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -41,7 +42,7 @@ pub struct TokInfo {
 }
 
 impl TokInfo {
-    fn new(
+    pub fn new(
         typ: Token,
         string: String,
         start: (usize, usize),
@@ -333,6 +334,8 @@ impl EndProg {
 
     fn reset(&mut self, end: (usize, usize)) {
         self.start = end;
+        self.text.clear();
+        self.contline.clear();
     }
 }
 
@@ -420,10 +423,7 @@ fn handle_string_start(state: &mut State, m: &Match) -> Option<Token> {
     let quote = m.sub_names["Quote"].as_str();
     let pattern = END_PATTERNS[quote];
     if m.text.to_ascii_lowercase().contains("f") {
-        let pattern = choice(
-            &[],
-            Some(&[("StartLBrace", START_LBRACE), ("End", pattern)]),
-        );
+        let pattern = choice(&[], Some(&[("LBrace", START_LBRACE), ("End", pattern)]));
         state.add_prog(m.end, m.end, pattern.as_str(), quote, Mode::Middle);
         return Some(Token::FstringStart);
     }
@@ -455,7 +455,7 @@ fn handle_psuedo(state: &mut State, m: &Match) -> Option<Token> {
                 state.parenlev -= 1;
             } else if m.text.as_str() == ":" && state.in_braces() && state.at_parenlev() {
                 let pattern = choice(&[], Some(&[("RBrace", END_RBRACE)]));
-                state.add_prog(m.start, m.end, pattern.as_str(), "", Mode::InColon);
+                state.add_prog(m.start + 1, m.end, pattern.as_str(), "", Mode::InColon);
             }
             Some(Token::OP)
         }
@@ -547,30 +547,32 @@ fn handle_fstring_progs(state: &mut State) -> Vec<TokInfo> {
                 // has buffer
                 results.push(state.prog_token(middle_end, Token::FstringMiddle));
             }
-
-            if m.name == "LBrace" {
-                results.push(TokInfo {
-                    typ: Token::OP,
-                    string: "{".to_string(),
-                    start: (state.line.num, state.line.pos),
-                    end: (state.line.num, m.end),
-                    line: state.line.text.to_string(),
-                });
-                state.parenlev += 1;
-                state.add_prog(m.end, m.end, "", "", Mode::InBraces(state.parenlev));
-            } else {
-                // rbrace
-                results.push(TokInfo {
-                    typ: Token::OP,
-                    string: "}".to_string(),
-                    start: (state.line.num, state.line.pos),
-                    end: (state.line.num, m.end),
-                    line: state.line.text.to_string(),
-                });
-                state.parenlev -= 1;
-                state.pop_prog(); // in-colon
-                let end = (state.line.num, m.end);
-                state.pop_prog().reset_prog(end); // in braces
+            match m.name.as_str() {
+                "LBrace" => {
+                    results.push(TokInfo {
+                        typ: Token::OP,
+                        string: "{".to_string(),
+                        start: (state.line.num, state.line.pos),
+                        end: (state.line.num, m.end),
+                        line: state.line.text.to_string(),
+                    });
+                    state.parenlev += 1;
+                    state.add_prog(m.end, m.end, "", "", Mode::InBraces(state.parenlev));
+                }
+                "RBrace" => {
+                    results.push(TokInfo {
+                        typ: Token::OP,
+                        string: "}".to_string(),
+                        start: (state.line.num, state.line.pos),
+                        end: (state.line.num, m.end),
+                        line: state.line.text.to_string(),
+                    });
+                    state.parenlev -= 1;
+                    state.pop_prog(); // in-colon
+                    let end = (state.line.num, m.end);
+                    state.pop_prog().reset_prog(end); // in braces
+                }
+                _ => panic!("Unmatched regex at {}:{}", state.line.num, state.line.pos),
             }
         }
         state.line.pos = m.end;
@@ -695,7 +697,6 @@ pub fn tokenize_string(src: &str) -> Tokenizer<BufReader<Cursor<&[u8]>>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use itertools::Itertools;
 
     #[test]
     fn test_next_psuedo_matches() {
@@ -708,15 +709,10 @@ mod tests {
     fn handle_test_case(lines: &str, expected: &Vec<&str>) -> Result<(), String> {
         let result = tokenize_string(lines)
             .map(|x| x.unwrap())
-            .map(|x| format!("{:?}:{}:{}", x.typ, x.string, x.start.1))
-            .join("\n");
-        if result != expected.join("\n") {
-            Err(format!(
-                "lines: {lines}, result: {result:?}, expected: {expected:?}"
-            ))
-        } else {
-            Ok(())
-        }
+            .map(|x| format!("{:?}({}){}", x.typ, x.string, x.start.1))
+            .collect::<Vec<_>>();
+        assert_eq!(&result, expected);
+        Ok(())
     }
 
     #[test]
@@ -725,24 +721,55 @@ mod tests {
             (
                 "a = 1 \nif statement: 'string'",
                 vec![
-                    "NAME:a:0",
-                    "WS: :1",
-                    "OP:=:2",
-                    "WS: :3",
-                    "NUMBER:1:4",
-                    "WS: :5",
-                    "NEWLINE:\n:6",
-                    "NAME:if:0",
-                    "WS: :2",
-                    "NAME:statement:3",
-                    "OP:::12",
-                    "WS: :13",
-                    "STRING:'string':14",
-                    "NEWLINE::22",
-                    "ENDMARKER::0",
+                    "NAME(a)0",
+                    "WS( )1",
+                    "OP(=)2",
+                    "WS( )3",
+                    "NUMBER(1)4",
+                    "WS( )5",
+                    "NEWLINE(\n)6",
+                    "NAME(if)0",
+                    "WS( )2",
+                    "NAME(statement)3",
+                    "OP(:)12",
+                    "WS( )13",
+                    "STRING('string')14",
+                    "NEWLINE()22",
+                    "ENDMARKER()0",
                 ],
             ),
-            (r#"a = f"{d}" "rr""#, vec![""]),
+            (
+                r#"a = f"{d}" "rr""#,
+                vec![
+                    "NAME(a)0",
+                    "WS( )1",
+                    "OP(=)2",
+                    "WS( )3",
+                    "FstringStart(f\")4",
+                    "OP({)6",
+                    "NAME(d)7",
+                    "OP(})8",
+                    "FstringEnd(\")9",
+                    "WS( )10",
+                    "STRING(\"rr\")11",
+                    "NEWLINE()15",
+                    "ENDMARKER()0",
+                ],
+            ),
+            (
+                "f'{expr::}'",
+                vec![
+                    "FstringStart(f')0",
+                    "OP({)2",
+                    "NAME(expr)3",
+                    "OP(:)7",
+                    "FstringMiddle(:)8",
+                    "OP(})9",
+                    "FstringEnd(')10",
+                    "NEWLINE()11",
+                    "ENDMARKER()0",
+                ],
+            ),
         ]
         .iter()
         .try_for_each(|(a, b)| handle_test_case(a, b))?;

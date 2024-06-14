@@ -147,6 +147,7 @@ follow_imports = 'skip'
 strict = true
 
 warn_unused_configs = true
+warn_unused_ignores = false
 warn_redundant_casts = true
 warn_unreachable = true
 

@@ -705,7 +705,7 @@ class Parser:
     def is_adjacent(prev: TokenInfo | Node, curr: TokenInfo | Node | Node) -> bool:
         end = prev.end if isinstance(prev, TokenInfo) else (prev.end_lineno, prev.end_col_offset)
         start = curr.start if isinstance(curr, TokenInfo) else (curr.lineno, curr.col_offset)
-        return end == start
+        return bool(end == start)
 
     def _append_node_or_token(self, tree: ast.expr | None, cmd: TokenInfo | ast.expr) -> ast.expr:
         if tree is None:
