@@ -1,5 +1,5 @@
-mod regex;
 pub mod tokenizer;
+mod regex;
 
 use crate::regex::consts::OPERATORS;
 use crate::tokenizer::Token;
