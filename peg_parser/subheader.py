@@ -97,10 +97,10 @@ def memoize(method: F) -> F:
         if key not in self._cache:
             if verbose:
                 print(f"{fill}{method_name}({argsr}) ... (looking at {self.showpeek()})")
-            self._level += 1
+                self._level += 1
             tree = method(self, mark, *args)
-            self._level -= 1
             if verbose:
+                self._level -= 1
                 print(f"{fill}... {method_name}({argsr}) -> {tree!s:.200}")
             endmark = self._mark()
             self._cache[key] = tree, endmark
@@ -134,7 +134,7 @@ def memoize_left_rec(method: Callable[[P], T | None]) -> Callable[[P], T | None]
         if key not in self._cache:
             if verbose:
                 print(f"{fill}{method_name} ... (looking at {self.showpeek()})")
-            self._level += 1
+                self._level += 1
 
             # For left-recursive rules we manipulate the cache and
             # loop until the rule shows no progress, then pick the
@@ -178,8 +178,8 @@ def memoize_left_rec(method: Callable[[P], T | None]) -> Callable[[P], T | None]
             self._reset(lastmark)
             tree = lastresult
 
-            self._level -= 1
             if verbose:
+                self._level -= 1
                 print(f"{fill}{method_name}() -> {tree!s:.200} [cached]")
             if tree:
                 endmark = self._mark()
