@@ -157,9 +157,9 @@ class XonshParserGenerator(PythonParserGenerator):
                 # Non-leader rules in a cycle are not memoized,
                 # but they must still be logged.
                 self.print("@logger")
-        else:
+        elif node.memo:
             self.print("@memoize")
-            method_args = ", mark: Mark"
+            # method_args = ", mark: Mark"
         node_type = node.type or "Any"
         self.print(f"def {node.name}(self{method_args}) -> {node_type} | None:")
         with self.indent():
@@ -172,8 +172,8 @@ class XonshParserGenerator(PythonParserGenerator):
                 self.print("self.call_invalid_rules = False")
                 self.cleanup_statements.append("self.call_invalid_rules = _prev_call_invalid")
 
-            if node.left_recursive:
-                self.print("mark = self._mark()")
+            # if node.left_recursive:
+            self.print("mark = self._mark()")
             if self.alts_uses_locations(node.rhs.alts):
                 self.print("_lnum, _col = self._tokenizer.peek().start")
             if is_loop:

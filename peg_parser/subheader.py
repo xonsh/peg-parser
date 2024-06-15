@@ -98,7 +98,7 @@ def memoize(method: F) -> F:
             if verbose:
                 print(f"{fill}{method_name}({argsr}) ... (looking at {self.showpeek()})")
                 self._level += 1
-            tree = method(self, mark, *args)
+            tree = method(self, *args)
             if verbose:
                 self._level -= 1
                 print(f"{fill}... {method_name}({argsr}) -> {tree!s:.200}")
@@ -271,22 +271,19 @@ class Parser:
         tok = self._tokenizer.peek()
         return f"{tok.start[0]}.{tok.start[1]}: {tok.type}:{tok.string!r}"
 
-    @memoize
-    def name(self, _: Mark) -> TokenInfo | None:
+    def name(self) -> TokenInfo | None:
         tok = self._tokenizer.peek()
         if tok.type == Token.NAME and tok.string not in self.KEYWORDS:
             return self._tokenizer.getnext()
         return None
 
-    @memoize
-    def keyword(self, _: Mark) -> TokenInfo | None:
+    def keyword(self) -> TokenInfo | None:
         tok = self._tokenizer.peek()
         if tok.type == Token.NAME and tok.string in self.KEYWORDS:
             return self._tokenizer.getnext()
         return None
 
-    @memoize
-    def token(self, _: Mark, typ: Token) -> TokenInfo | None:
+    def token(self, typ: Token) -> TokenInfo | None:
         tok = self._tokenizer.peek()
         if tok.type == typ:
             return self._tokenizer.getnext()
@@ -295,15 +292,13 @@ class Parser:
     def any_token(self) -> TokenInfo:
         return self._tokenizer.getnext()
 
-    @memoize
-    def soft_keyword(self, _: Mark) -> TokenInfo | None:
+    def soft_keyword(self) -> TokenInfo | None:
         tok = self._tokenizer.peek()
         if tok.type == Token.NAME and tok.string in self.SOFT_KEYWORDS:
             return self._tokenizer.getnext()
         return None
 
-    @memoize
-    def expect(self, _: Mark, typ: str) -> TokenInfo | None:
+    def expect(self, typ: str) -> TokenInfo | None:
         tok = self._tokenizer.peek()
         if tok.string == typ:
             return self._tokenizer.getnext()
