@@ -6,7 +6,7 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, NoReturn, TypeVar, cast
 
-from peg_parser.tokenize import ExactToken, Token, TokenInfo, generate_tokens
+from peg_parser.tokenize import Token, TokenInfo, generate_tokens
 from peg_parser.tokenizer import Mark, Tokenizer
 
 if TYPE_CHECKING:
@@ -595,7 +595,7 @@ class Parser:
         self,
         pos_only: list[tuple[ast.arg, None]] | None,
         pos_only_with_default: list[tuple[ast.arg, Any]],
-        param_no_default: list[tuple[ast.arg, None]] | None,
+        param_no_default: list[tuple[ast.arg]] | None,
         param_default: list[tuple[ast.arg, Any]] | None,
         after_star: tuple[ast.arg | None, list[tuple[ast.arg, Any]], ast.arg | None] | None,
     ) -> ast.arguments:
@@ -607,14 +607,13 @@ class Parser:
 
         # Because we need to combine pos only with and without default even
         # the version with no default is a tuple
-        pos_only = [p for p, _ in pos_only]  # type: ignore
         params = (param_no_default or []) + ([p for p, _ in param_default] if param_default else [])
 
         # If after_star is None, make a default tuple
         after_star = after_star or (None, [], None)
 
         return ast.arguments(
-            posonlyargs=pos_only,
+            posonlyargs=[p for p, _ in pos_only],
             args=params,
             defaults=defaults,
             vararg=after_star[0],
@@ -638,7 +637,7 @@ class Parser:
     def expand_help(self, atoms: list[tuple[ast.Name, TokenInfo]], **_: int) -> ast.Call | None:
         node: ast.Call | None = None
         for atom, tok in atoms:
-            fn = "superhelp" if tok.is_exact_type(ExactToken.DOUBLE_QUESTION) else "help"
+            fn = "superhelp" if tok.is_exact_type("??") else "help"
             if node is None:
                 node = xonsh_call(f"__xonsh__.{fn}", atom, **tok.loc())
             else:
@@ -729,11 +728,11 @@ class Parser:
 
     def subproc(self, start: TokenInfo, args: list[ast.AST], **locs: int) -> ast.Call:
         method = {
-            ExactToken.DOLLAR_LPAREN: "subproc_captured",
-            ExactToken.DOLLAR_LBRACKET: "subproc_uncaptured",
-            ExactToken.BANG_LBRACKET: "subproc_captured_hiddenobject",
-            ExactToken.BANG_LPAREN: "subproc_captured_object",
-        }[ExactToken._value2member_map_[start.string]]  # type: ignore
+            "$(": "subproc_captured",
+            "$[": "subproc_uncaptured",
+            "![": "subproc_captured_hiddenobject",
+            "!(": "subproc_captured_object",
+        }[start.string]
         return xonsh_call(f"__xonsh__.{method}", *args, **locs)
 
     def proc_inject(self, args: list[ast.AST], **locs: int) -> ast.Starred:
@@ -858,7 +857,7 @@ class Parser:
             end = node.end
         else:
             start = node.lineno, node.col_offset
-            end = node.end_lineno, node.end_col_offset  # type: ignore
+            end = node.end_lineno or 0, node.end_col_offset or 0
 
         raise self._build_syntax_error(message, start, end)
 
@@ -876,7 +875,7 @@ class Parser:
         if isinstance(end_node, TokenInfo):
             end = end_node.end
         else:
-            end = end_node.end_lineno, end_node.end_col_offset  # type: ignore
+            end = end_node.end_lineno or 0, end_node.end_col_offset or 0
 
         raise self._build_syntax_error(message, start, end)
 

@@ -40,70 +40,68 @@ from typing import TYPE_CHECKING, Any, Final, NamedTuple
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterator
 
-
-class ExactToken(Enum):
-    NOTEQUAL = "!="
-    PERCENT = "%"
-    PERCENTEQUAL = "%="
-    AMPER = "&"
-    AMPEREQUAL = "&="
-    LPAR = "("
-    RPAR = ")"
-    STAR = "*"
-    DOUBLESTAR = "**"
-    DOUBLESTAREQUAL = "**="
-    STAREQUAL = "*="
-    PLUS = "+"
-    PLUSEQUAL = "+="
-    COMMA = ","
-    MINUS = "-"
-    MINEQUAL = "-="
-    RARROW = "->"
-    DOT = "."
-    ELLIPSIS = "..."
-    SLASH = "/"
-    DOUBLESLASH = "//"
-    DOUBLESLASHEQUAL = "//="
-    SLASHEQUAL = "/="
-    COLON = ":"
-    COLONEQUAL = ":="
-    SEMI = ";"
-    LESS = "<"
-    LEFTSHIFT = "<<"
-    LEFTSHIFTEQUAL = "<<="
-    LESSEQUAL = "<="
-    EQUAL = "="
-    EQEQUAL = "=="
-    GREATER = ">"
-    GREATEREQUAL = ">="
-    RIGHTSHIFT = ">>"
-    RIGHTSHIFTEQUAL = ">>="
-    AT = "@"
-    ATEQUAL = "@="
-    LSQB = "["
-    RSQB = "]"
-    CIRCUMFLEX = "^"
-    CIRCUMFLEXEQUAL = "^="
-    LBRACE = "{"
-    VBAR = "|"
-    VBAREQUAL = "|="
-    RBRACE = "}"
-    TILDE = "~"
-    BANG = "!"
-
-    # xonsh specific tokens
-    DOLLAR = "$"
-    QUESTION = "?"
-    DOUBLE_QUESTION = "??"
-    DOUBLE_PIPE = "||"
-    DOUBLE_AMPER = "&&"
-    AT_LPAREN = "@("
-    BANG_LPAREN = "!("
-    BANG_LBRACKET = "!["
-    DOLLAR_LPAREN = "$("
-    DOLLAR_LBRACKET = "$["
-    DOLLAR_LBRACE = "${"
-    AT_DOLLAR_LPAREN = "@$("
+OPS = {
+    "!=",
+    "%",
+    "%=",
+    "&",
+    "&=",
+    "(",
+    ")",
+    "*",
+    "**",
+    "**=",
+    "*=",
+    "+",
+    "+=",
+    ",",
+    "-",
+    "-=",
+    "->",
+    ".",
+    "...",
+    "/",
+    "//",
+    "//=",
+    "/=",
+    ":",
+    ":=",
+    ";",
+    "<",
+    "<<",
+    "<<=",
+    "<=",
+    "=",
+    "==",
+    ">",
+    ">=",
+    ">>",
+    ">>=",
+    "@",
+    "@=",
+    "[",
+    "]",
+    "^",
+    "^=",
+    "{",
+    "|",
+    "|=",
+    "}",
+    "~",
+    "!",
+    "$",
+    "?",
+    "??",
+    "||",
+    "&&",
+    "@(",
+    "!(",
+    "![",
+    "$(",
+    "$[",
+    "${",
+    "@$(",
+}
 
 
 class Token(Enum):
@@ -143,8 +141,8 @@ class TokenInfo(NamedTuple):
     end: tuple[int, int]
     line: str
 
-    def is_exact_type(self, typ: ExactToken) -> bool:
-        return self.type == Token.OP and self.string == typ.value
+    def is_exact_type(self, typ: str) -> bool:
+        return self.type == Token.OP and self.string == typ
 
     def loc_start(self) -> dict[str, int]:
         """helper method to construct AST node location"""
@@ -241,7 +239,12 @@ StringStart = group(*_all_string_prefixes(), name="StringPrefix") + group(
 # Sorting in reverse order puts the long operators before their prefixes.
 # Otherwise if = came before ==, == would get recognized as two instances
 # of =.
-Special = group(*map(re.escape, sorted([t.value for t in ExactToken], reverse=True)))
+Special = group(
+    *map(
+        re.escape,
+        sorted(OPS, reverse=True),
+    )
+)
 
 SearchPath = r"([rgpf]+|@\w*)?`([^\n`\\]*(?:\\.[^\n`\\]*)*)`"
 PseudoToken = choice(

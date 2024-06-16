@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Final, NewType
 
-from .tokenize import ExactToken, Token, TokenInfo
+from .tokenize import Token, TokenInfo
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -92,12 +92,12 @@ class Tokenizer:
                     else:
                         raise SyntaxError(f"Unmatched closing paren {tok.string} at {tok.start}")
             else:
-                if tok.is_exact_type(ExactToken.RPAR):
+                if tok.is_exact_type(")"):
                     self._stack.append(tok)
                     self._call_macro = False
                     break
 
-                if tok.is_exact_type(ExactToken.COMMA):
+                if tok.is_exact_type(","):
                     break
             end = tok.end
             if start is None:
