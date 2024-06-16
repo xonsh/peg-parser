@@ -61,14 +61,17 @@ tasks:
   memray:
     cmds:
       - pytest --memray
-
+  mypy1:
+    cmds:
+      - mypy peg_parser
   mypy:
     cmds:
-      - watchexec -e py --clear -- mypy peg_parser
+      - watchexec -e py,toml,gram --clear -- task generate mypy1
 
   mypyc:
     cmds:
-      - env COMPILE_WITH_MYPYC=1 pip install -e .
+      - pip install setuptools_scm wheel
+      - env COMPILE_WITH_MYPYC=1 pip install -e . --no-build-isolation
     sources:
       - peg_parser/subheader.py
       - peg_parser/toke*.py
