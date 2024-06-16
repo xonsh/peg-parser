@@ -10,10 +10,6 @@ if TYPE_CHECKING:
 Mark = NewType("Mark", int)
 
 
-def shorttok(tok: TokenInfo) -> str:
-    return "%-25.25s" % f"{tok.start[0]}.{tok.start[1]}: {tok.type!r}:{tok.string!r}"
-
-
 class Tokenizer:
     """Caching wrapper for the tokenize module"""
 
@@ -218,4 +214,5 @@ class Tokenizer:
             print(f"{fill} (Bof)")
         else:
             tok = self._tokens[self._index - 1]
-            print(f"{fill} {shorttok(tok)}")
+            short = "%-25.25s" % f"{tok.start[0]}.{tok.start[1]}: {tok.type!r}:{tok.string!r}"
+            print(f"{fill} {short}")
