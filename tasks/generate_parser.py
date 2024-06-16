@@ -51,7 +51,7 @@ class XonshCallMakerVisitor(PythonCallMakerVisitor):
             return name, f"self.{name}()"
         if name.isupper() and (name in self.gen.tokens):
             token = self.gen.tokens_enum[name]
-            return "_" + name.lower(), f"self.token({token.__class__.__name__}.{token.name})"
+            return "_" + name.lower(), f"self.token('{token.name}')"
         return name, f"self.{name}()"
 
     def visit_Gather(self, node: Gather) -> tuple[str, str]:

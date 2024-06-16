@@ -5,7 +5,7 @@ import itertools
 import sys
 from typing import Any
 
-from peg_parser.subheader import Del, Load, Parser, Store, Target, Token, logger, memoize, memoize_left_rec
+from peg_parser.subheader import Del, Load, Parser, Store, Target, logger, memoize, memoize_left_rec
 
 
 # Keywords and soft keywords are listed at the end of the parser definition.
@@ -21,7 +21,7 @@ class XonshParser(Parser):
     def file(self) -> ast.Module | None:
         # file: statements? $
         mark = self._mark()
-        if (a := self.statements(),) and (self.token(Token.ENDMARKER)):
+        if (a := self.statements(),) and (self.token("ENDMARKER")):
             return ast.Module(body=a or [], type_ignores=[])
         self._reset(mark)
         return None
@@ -39,8 +39,8 @@ class XonshParser(Parser):
         mark = self._mark()
         if (
             (a := self.expressions())
-            and (self.repeated(self.token, Token.NEWLINE),)
-            and (self.token(Token.ENDMARKER))
+            and (self.repeated(self.token, "NEWLINE"),)
+            and (self.token("ENDMARKER"))
         ):
             return ast.Expression(body=a)
         self._reset(mark)
@@ -55,8 +55,8 @@ class XonshParser(Parser):
             and (self.expect(")"))
             and (self.expect("->"))
             and (b := self.expression())
-            and (self.repeated(self.token, Token.NEWLINE),)
-            and (self.token(Token.ENDMARKER))
+            and (self.repeated(self.token, "NEWLINE"),)
+            and (self.token("ENDMARKER"))
         ):
             return ast.FunctionType(argtypes=a, returns=b)
         self._reset(mark)
@@ -67,9 +67,9 @@ class XonshParser(Parser):
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (
-            (a := self.token(Token.FSTRING_START))
+            (a := self.token("FSTRING_START"))
             and (b := self.repeated(self.fstring_mid),)
-            and (self.token(Token.FSTRING_END))
+            and (self.token("FSTRING_END"))
         ):
             return self.handle_fstring(a, b, **self.span(_lnum, _col))
         self._reset(mark)
@@ -98,16 +98,16 @@ class XonshParser(Parser):
         # statement_newline: compound_stmt NEWLINE | simple_stmts | NEWLINE | $
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
-        if (a := self.compound_stmt()) and (self.token(Token.NEWLINE)):
+        if (a := self.compound_stmt()) and (self.token("NEWLINE")):
             return [a]
         self._reset(mark)
         if simple_stmts := self.simple_stmts():
             return simple_stmts
         self._reset(mark)
-        if self.token(Token.NEWLINE):
+        if self.token("NEWLINE"):
             return [ast.Pass(**self.span(_lnum, _col))]
         self._reset(mark)
-        if self.token(Token.ENDMARKER):
+        if self.token("ENDMARKER"):
             return None
         self._reset(mark)
         return None
@@ -118,14 +118,14 @@ class XonshParser(Parser):
         if (
             (a := self.simple_stmt())
             and (self.negative_lookahead(self.expect, ";"))
-            and (self.token(Token.NEWLINE))
+            and (self.token("NEWLINE"))
         ):
             return [a]
         self._reset(mark)
         if (
             (a := self.gathered(self.simple_stmt, self.expect, ";"))
             and (self.expect(";"),)
-            and (self.token(Token.NEWLINE))
+            and (self.token("NEWLINE"))
         ):
             return a
         self._reset(mark)
@@ -239,7 +239,7 @@ class XonshParser(Parser):
             (a := self.repeated(self._tmp_9))
             and (b := self.annotated_rhs())
             and (self.negative_lookahead(self.expect, "="))
-            and (tc := self.token(Token.TYPE_COMMENT),)
+            and (tc := self.token("TYPE_COMMENT"),)
         ):
             return ast.Assign(targets=a, value=b, type_comment=tc, **self.span(_lnum, _col))
         self._reset(mark)
@@ -507,10 +507,10 @@ class XonshParser(Parser):
         # block: NEWLINE INDENT statements DEDENT | simple_stmts | invalid_block
         mark = self._mark()
         if (
-            (self.token(Token.NEWLINE))
-            and (self.token(Token.INDENT))
+            (self.token("NEWLINE"))
+            and (self.token("INDENT"))
             and (a := self.statements())
-            and (self.token(Token.DEDENT))
+            and (self.token("DEDENT"))
         ):
             return a
         self._reset(mark)
@@ -838,12 +838,12 @@ class XonshParser(Parser):
     def param_no_default(self) -> ast.arg | None:
         # param_no_default: param ',' TYPE_COMMENT? | param TYPE_COMMENT? &')'
         mark = self._mark()
-        if (a := self.param()) and (self.expect(",")) and (self.token(Token.TYPE_COMMENT),):
+        if (a := self.param()) and (self.expect(",")) and (self.token("TYPE_COMMENT"),):
             return a
         self._reset(mark)
         if (
             (a := self.param())
-            and (self.token(Token.TYPE_COMMENT),)
+            and (self.token("TYPE_COMMENT"),)
             and (self.positive_lookahead(self.expect, ")"))
         ):
             return a
@@ -853,12 +853,12 @@ class XonshParser(Parser):
     def param_no_default_star_annotation(self) -> ast.arg | None:
         # param_no_default_star_annotation: param_star_annotation ',' TYPE_COMMENT? | param_star_annotation TYPE_COMMENT? &')'
         mark = self._mark()
-        if (a := self.param_star_annotation()) and (self.expect(",")) and (self.token(Token.TYPE_COMMENT),):
+        if (a := self.param_star_annotation()) and (self.expect(",")) and (self.token("TYPE_COMMENT"),):
             return a
         self._reset(mark)
         if (
             (a := self.param_star_annotation())
-            and (self.token(Token.TYPE_COMMENT),)
+            and (self.token("TYPE_COMMENT"),)
             and (self.positive_lookahead(self.expect, ")"))
         ):
             return a
@@ -872,14 +872,14 @@ class XonshParser(Parser):
             (a := self.param())
             and (c := self.default())
             and (self.expect(","))
-            and (self.token(Token.TYPE_COMMENT),)
+            and (self.token("TYPE_COMMENT"),)
         ):
             return (a, c)
         self._reset(mark)
         if (
             (a := self.param())
             and (c := self.default())
-            and (self.token(Token.TYPE_COMMENT),)
+            and (self.token("TYPE_COMMENT"),)
             and (self.positive_lookahead(self.expect, ")"))
         ):
             return (a, c)
@@ -893,14 +893,14 @@ class XonshParser(Parser):
             (a := self.param())
             and (c := self.default(),)
             and (self.expect(","))
-            and (self.token(Token.TYPE_COMMENT),)
+            and (self.token("TYPE_COMMENT"),)
         ):
             return (a, c)
         self._reset(mark)
         if (
             (a := self.param())
             and (c := self.default(),)
-            and (self.token(Token.TYPE_COMMENT),)
+            and (self.token("TYPE_COMMENT"),)
             and (self.positive_lookahead(self.expect, ")"))
         ):
             return (a, c)
@@ -1050,7 +1050,7 @@ class XonshParser(Parser):
             and (cut := True)
             and (ex := self.star_expressions())
             and (self.expect_forced(self.expect(":"), "':'"))
-            and (tc := self.token(Token.TYPE_COMMENT),)
+            and (tc := self.token("TYPE_COMMENT"),)
             and (b := self.block())
             and (el := self.else_block(),)
         ):
@@ -1069,7 +1069,7 @@ class XonshParser(Parser):
             and (cut := True)
             and (ex := self.star_expressions())
             and (self.expect(":"))
-            and (tc := self.token(Token.TYPE_COMMENT),)
+            and (tc := self.token("TYPE_COMMENT"),)
             and (b := self.block())
             and (el := self.else_block(),)
         ):
@@ -1106,7 +1106,7 @@ class XonshParser(Parser):
             (self.expect("with"))
             and (a := self.gathered(self.with_item, self.expect, ","))
             and (self.expect(":"))
-            and (tc := self.token(Token.TYPE_COMMENT),)
+            and (tc := self.token("TYPE_COMMENT"),)
             and (b := self.block())
         ):
             return ast.With(items=a, body=b, type_comment=tc, **self.span(_lnum, _col))
@@ -1128,7 +1128,7 @@ class XonshParser(Parser):
             and (self.expect("with"))
             and (a := self.gathered(self.with_item, self.expect, ","))
             and (self.expect(":"))
-            and (tc := self.token(Token.TYPE_COMMENT),)
+            and (tc := self.token("TYPE_COMMENT"),)
             and (b := self.block())
         ):
             return ast.AsyncWith(items=a, body=b, type_comment=tc, **self.span(_lnum, _col))
@@ -1161,7 +1161,7 @@ class XonshParser(Parser):
         # with_macro_stmt: with_macro_start MACRO_PARAM
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
-        if (a := self.with_macro_start()) and (b := self.token(Token.MACRO_PARAM)):
+        if (a := self.with_macro_start()) and (b := self.token("MACRO_PARAM")):
             return self.handle_with_macro_stmt(a, b, **self.span(_lnum, _col))
         self._reset(mark)
         return None
@@ -1291,10 +1291,10 @@ class XonshParser(Parser):
             (self.expect("match"))
             and (subject := self.subject_expr())
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.token(Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.token("INDENT"))
             and (cases := self.repeated(self.case_block))
-            and (self.token(Token.DEDENT))
+            and (self.token("DEDENT"))
         ):
             return ast.Match(subject=subject, cases=cases, **self.span(_lnum, _col))
         self._reset(mark)
@@ -1487,10 +1487,10 @@ class XonshParser(Parser):
         # signed_number: NUMBER | '-' NUMBER
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
-        if a := self.token(Token.NUMBER):
+        if a := self.token("NUMBER"):
             return ast.Constant(value=ast.literal_eval(a.string), **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.expect("-")) and (a := self.token(Token.NUMBER)):
+        if (self.expect("-")) and (a := self.token("NUMBER")):
             return ast.UnaryOp(
                 op=ast.USub(),
                 operand=ast.Constant(
@@ -1521,7 +1521,7 @@ class XonshParser(Parser):
         # real_number: NUMBER
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
-        if real := self.token(Token.NUMBER):
+        if real := self.token("NUMBER"):
             return ast.Constant(value=self.ensure_real(real), **self.span(_lnum, _col))
         self._reset(mark)
         return None
@@ -1530,7 +1530,7 @@ class XonshParser(Parser):
         # imaginary_number: NUMBER
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
-        if imag := self.token(Token.NUMBER):
+        if imag := self.token("NUMBER"):
             return ast.Constant(value=self.ensure_imaginary(imag), **self.span(_lnum, _col))
         self._reset(mark)
         return None
@@ -2377,7 +2377,7 @@ class XonshParser(Parser):
         if (
             (a := self.func_macro_start())
             and (cut := True)
-            and (b := self.repeated(self.token, Token.MACRO_PARAM),)
+            and (b := self.repeated(self.token, "MACRO_PARAM"),)
             and (self.expect(")"))
         ):
             return self.macro_call(a, b, **self.span(_lnum, _col))
@@ -2526,17 +2526,17 @@ class XonshParser(Parser):
         if name := self.name():
             return name
         self._reset(mark)
-        if _number := self.token(Token.NUMBER):
+        if _number := self.token("NUMBER"):
             return _number
         self._reset(mark)
-        if _string := self.token(Token.STRING):
+        if _string := self.token("STRING"):
             return _string
         self._reset(mark)
         if (
             (self.negative_lookahead(self.expect, "]"))
             and (self.negative_lookahead(self.expect, ")"))
             and (self.negative_lookahead(self.expect, "}"))
-            and (_op := self.token(Token.OP))
+            and (_op := self.token("OP"))
         ):
             return _op
         self._reset(mark)
@@ -2548,7 +2548,7 @@ class XonshParser(Parser):
         if cmd_name := self.cmd_name():
             return cmd_name
         self._reset(mark)
-        if _ws := self.token(Token.WS):
+        if _ws := self.token("WS"):
             return _ws
         self._reset(mark)
         if keyword := self.keyword():
@@ -2618,7 +2618,7 @@ class XonshParser(Parser):
         if (self.positive_lookahead(self._tmp_41)) and (strings := self.strings()):
             return strings
         self._reset(mark)
-        if a := self.token(Token.NUMBER):
+        if a := self.token("NUMBER"):
             return ast.Constant(value=ast.literal_eval(a.string), **self.span(_lnum, _col))
         self._reset(mark)
         if (self.positive_lookahead(self.expect, "(")) and (_tmp_42 := self._tmp_42()):
@@ -2639,7 +2639,7 @@ class XonshParser(Parser):
         # search_path: SEARCH_PATH
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
-        if a := self.token(Token.SEARCH_PATH):
+        if a := self.token("SEARCH_PATH"):
             return self.expand_search_path(a, **self.span(_lnum, _col))
         self._reset(mark)
         return None
@@ -2848,7 +2848,7 @@ class XonshParser(Parser):
         if fstring_replacement_field := self.fstring_replacement_field():
             return fstring_replacement_field
         self._reset(mark)
-        if t := self.token(Token.FSTRING_MIDDLE):
+        if t := self.token("FSTRING_MIDDLE"):
             return ast.Constant(value=t.string, **self.span(_lnum, _col))
         self._reset(mark)
         return None
@@ -2900,7 +2900,7 @@ class XonshParser(Parser):
         # fstring_format_spec: FSTRING_MIDDLE | fstring_replacement_field
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
-        if t := self.token(Token.FSTRING_MIDDLE):
+        if t := self.token("FSTRING_MIDDLE"):
             return ast.Constant(value=t.string, **self.span(_lnum, _col))
         self._reset(mark)
         if fstring_replacement_field := self.fstring_replacement_field():
@@ -3494,8 +3494,8 @@ class XonshParser(Parser):
         # func_type_comment: NEWLINE TYPE_COMMENT &(NEWLINE INDENT) | invalid_double_type_comments | TYPE_COMMENT
         mark = self._mark()
         if (
-            (self.token(Token.NEWLINE))
-            and (t := self.token(Token.TYPE_COMMENT))
+            (self.token("NEWLINE"))
+            and (t := self.token("TYPE_COMMENT"))
             and (self.positive_lookahead(self._tmp_57))
         ):
             return t.string
@@ -3503,7 +3503,7 @@ class XonshParser(Parser):
         if self.call_invalid_rules and (self.invalid_double_type_comments()):
             return None
         self._reset(mark)
-        if _type_comment := self.token(Token.TYPE_COMMENT):
+        if _type_comment := self.token("TYPE_COMMENT"):
             return _type_comment
         self._reset(mark)
         return None
@@ -3779,7 +3779,7 @@ class XonshParser(Parser):
     def invalid_block(self) -> None:
         # invalid_block: NEWLINE !INDENT
         mark = self._mark()
-        if (self.token(Token.NEWLINE)) and (self.negative_lookahead(self.token, Token.INDENT)):
+        if (self.token("NEWLINE")) and (self.negative_lookahead(self.token, "INDENT")):
             return self.raise_indentation_error("expected an indented block")
         self._reset(mark)
         return None
@@ -3889,7 +3889,7 @@ class XonshParser(Parser):
         if (a := self.expect("*")) and (self._tmp_78()):
             return self.raise_syntax_error_known_location("named arguments must follow bare *", a)
         self._reset(mark)
-        if (self.expect("*")) and (self.expect(",")) and (self.token(Token.TYPE_COMMENT)):
+        if (self.expect("*")) and (self.expect(",")) and (self.token("TYPE_COMMENT")):
             return self.raise_syntax_error("bare * has associated type comment")
         self._reset(mark)
         if (self.expect("*")) and (self.param()) and (a := self.expect("=")):
@@ -4039,11 +4039,11 @@ class XonshParser(Parser):
         # invalid_double_type_comments: TYPE_COMMENT NEWLINE TYPE_COMMENT NEWLINE INDENT
         mark = self._mark()
         if (
-            (self.token(Token.TYPE_COMMENT))
-            and (self.token(Token.NEWLINE))
-            and (self.token(Token.TYPE_COMMENT))
-            and (self.token(Token.NEWLINE))
-            and (self.token(Token.INDENT))
+            (self.token("TYPE_COMMENT"))
+            and (self.token("NEWLINE"))
+            and (self.token("TYPE_COMMENT"))
+            and (self.token("NEWLINE"))
+            and (self.token("INDENT"))
         ):
             return self.raise_syntax_error("Cannot have two type comments on def")
         self._reset(mark)
@@ -4099,7 +4099,7 @@ class XonshParser(Parser):
     def invalid_import_from_targets(self) -> None:
         # invalid_import_from_targets: import_from_as_names ',' NEWLINE
         mark = self._mark()
-        if (self.import_from_as_names()) and (self.expect(",")) and (self.token(Token.NEWLINE)):
+        if (self.import_from_as_names()) and (self.expect(",")) and (self.token("NEWLINE")):
             return self.raise_syntax_error("trailing comma not allowed without surrounding parentheses")
         self._reset(mark)
         return None
@@ -4136,8 +4136,8 @@ class XonshParser(Parser):
             and (a := self.expect("with"))
             and (self.gathered(self._tmp_92, self.expect, ","))
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.negative_lookahead(self.token, Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.negative_lookahead(self.token, "INDENT"))
         ):
             return self.raise_indentation_error(
                 f"expected an indented block after 'with' statement on line {a.start[0]}"
@@ -4151,8 +4151,8 @@ class XonshParser(Parser):
             and (self.expect(","),)
             and (self.expect(")"))
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.negative_lookahead(self.token, Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.negative_lookahead(self.token, "INDENT"))
         ):
             return self.raise_indentation_error(
                 f"expected an indented block after 'with' statement on line {a.start[0]}"
@@ -4166,8 +4166,8 @@ class XonshParser(Parser):
         if (
             (a := self.expect("try"))
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.negative_lookahead(self.token, Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.negative_lookahead(self.token, "INDENT"))
         ):
             return self.raise_indentation_error(
                 f"expected an indented block after 'try' statement on line {a.start[0]}"
@@ -4230,11 +4230,11 @@ class XonshParser(Parser):
             and (self.expect("*"),)
             and (self.expression())
             and (self._tmp_98(),)
-            and (self.token(Token.NEWLINE))
+            and (self.token("NEWLINE"))
         ):
             return self.raise_syntax_error("expected ':'")
         self._reset(mark)
-        if (self.expect("except")) and (self.expect("*"),) and (self.token(Token.NEWLINE)):
+        if (self.expect("except")) and (self.expect("*"),) and (self.token("NEWLINE")):
             return self.raise_syntax_error("expected ':'")
         self._reset(mark)
         if (self.expect("except")) and (self.expect("*")) and (self._tmp_99()):
@@ -4248,8 +4248,8 @@ class XonshParser(Parser):
         if (
             (a := self.expect("finally"))
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.negative_lookahead(self.token, Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.negative_lookahead(self.token, "INDENT"))
         ):
             return self.raise_indentation_error(
                 f"expected an indented block after 'finally' statement on line {a.start[0]}"
@@ -4265,8 +4265,8 @@ class XonshParser(Parser):
             and (self.expression())
             and (self._tmp_100(),)
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.negative_lookahead(self.token, Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.negative_lookahead(self.token, "INDENT"))
         ):
             return self.raise_indentation_error(
                 f"expected an indented block after 'except' statement on line {a.start[0]}"
@@ -4275,8 +4275,8 @@ class XonshParser(Parser):
         if (
             (a := self.expect("except"))
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.negative_lookahead(self.token, Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.negative_lookahead(self.token, "INDENT"))
         ):
             return self.raise_indentation_error(
                 f"expected an indented block after 'except' statement on line {a.start[0]}"
@@ -4293,8 +4293,8 @@ class XonshParser(Parser):
             and (self.expression())
             and (self._tmp_101(),)
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.negative_lookahead(self.token, Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.negative_lookahead(self.token, "INDENT"))
         ):
             return self.raise_indentation_error(
                 f"expected an indented block after 'except*' statement on line {a.start[0]}"
@@ -4312,8 +4312,8 @@ class XonshParser(Parser):
             (a := self.expect("match"))
             and (self.subject_expr())
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.negative_lookahead(self.token, Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.negative_lookahead(self.token, "INDENT"))
         ):
             return self.raise_indentation_error(
                 f"expected an indented block after 'match' statement on line {a.start[0]}"
@@ -4337,8 +4337,8 @@ class XonshParser(Parser):
             and (self.patterns())
             and (self.guard(),)
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.negative_lookahead(self.token, Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.negative_lookahead(self.token, "INDENT"))
         ):
             return self.raise_indentation_error(
                 f"expected an indented block after 'case' statement on line {a.start[0]}"
@@ -4393,15 +4393,15 @@ class XonshParser(Parser):
     def invalid_if_stmt(self) -> None:
         # invalid_if_stmt: 'if' named_expression NEWLINE | 'if' named_expression ':' NEWLINE !INDENT
         mark = self._mark()
-        if (self.expect("if")) and (self.named_expression()) and (self.token(Token.NEWLINE)):
+        if (self.expect("if")) and (self.named_expression()) and (self.token("NEWLINE")):
             return self.raise_syntax_error("expected ':'")
         self._reset(mark)
         if (
             (a := self.expect("if"))
             and (a_1 := self.named_expression())
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.negative_lookahead(self.token, Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.negative_lookahead(self.token, "INDENT"))
         ):
             return self.raise_indentation_error(
                 f"expected an indented block after 'if' statement on line {a.start[0]}"
@@ -4412,15 +4412,15 @@ class XonshParser(Parser):
     def invalid_elif_stmt(self) -> None:
         # invalid_elif_stmt: 'elif' named_expression NEWLINE | 'elif' named_expression ':' NEWLINE !INDENT
         mark = self._mark()
-        if (self.expect("elif")) and (self.named_expression()) and (self.token(Token.NEWLINE)):
+        if (self.expect("elif")) and (self.named_expression()) and (self.token("NEWLINE")):
             return self.raise_syntax_error("expected ':'")
         self._reset(mark)
         if (
             (a := self.expect("elif"))
             and (self.named_expression())
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.negative_lookahead(self.token, Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.negative_lookahead(self.token, "INDENT"))
         ):
             return self.raise_indentation_error(
                 f"expected an indented block after 'elif' statement on line {a.start[0]}"
@@ -4434,8 +4434,8 @@ class XonshParser(Parser):
         if (
             (a := self.expect("else"))
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.negative_lookahead(self.token, Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.negative_lookahead(self.token, "INDENT"))
         ):
             return self.raise_indentation_error(
                 f"expected an indented block after 'else' statement on line {a.start[0]}"
@@ -4446,15 +4446,15 @@ class XonshParser(Parser):
     def invalid_while_stmt(self) -> None:
         # invalid_while_stmt: 'while' named_expression NEWLINE | 'while' named_expression ':' NEWLINE !INDENT
         mark = self._mark()
-        if (self.expect("while")) and (self.named_expression()) and (self.token(Token.NEWLINE)):
+        if (self.expect("while")) and (self.named_expression()) and (self.token("NEWLINE")):
             return self.raise_syntax_error("expected ':'")
         self._reset(mark)
         if (
             (a := self.expect("while"))
             and (self.named_expression())
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.negative_lookahead(self.token, Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.negative_lookahead(self.token, "INDENT"))
         ):
             return self.raise_indentation_error(
                 f"expected an indented block after 'while' statement on line {a.start[0]}"
@@ -4466,12 +4466,12 @@ class XonshParser(Parser):
         # invalid_for_stmt: ASYNC? 'for' star_targets 'in' star_expressions NEWLINE | 'async'? 'for' star_targets 'in' star_expressions ':' NEWLINE !INDENT
         mark = self._mark()
         if (
-            (self.token(Token.ASYNC),)
+            (self.token("ASYNC"),)
             and (self.expect("for"))
             and (self.star_targets())
             and (self.expect("in"))
             and (self.star_expressions())
-            and (self.token(Token.NEWLINE))
+            and (self.token("NEWLINE"))
         ):
             return self.raise_syntax_error("expected ':'")
         self._reset(mark)
@@ -4482,8 +4482,8 @@ class XonshParser(Parser):
             and (self.expect("in"))
             and (self.star_expressions())
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.negative_lookahead(self.token, Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.negative_lookahead(self.token, "INDENT"))
         ):
             return self.raise_indentation_error(
                 f"expected an indented block after 'for' statement on line {a.start[0]}"
@@ -4504,8 +4504,8 @@ class XonshParser(Parser):
             and (self.expect(")"))
             and (self._tmp_103(),)
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.negative_lookahead(self.token, Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.negative_lookahead(self.token, "INDENT"))
         ):
             return self.raise_indentation_error(
                 f"expected an indented block after function definition on line {a.start[0]}"
@@ -4521,7 +4521,7 @@ class XonshParser(Parser):
             and (self.name())
             and (self.type_params(),)
             and (self._tmp_104(),)
-            and (self.token(Token.NEWLINE))
+            and (self.token("NEWLINE"))
         ):
             return self.raise_syntax_error("expected ':'")
         self._reset(mark)
@@ -4531,8 +4531,8 @@ class XonshParser(Parser):
             and (self.type_params(),)
             and (self._tmp_105(),)
             and (self.expect(":"))
-            and (self.token(Token.NEWLINE))
-            and (self.negative_lookahead(self.token, Token.INDENT))
+            and (self.token("NEWLINE"))
+            and (self.negative_lookahead(self.token, "INDENT"))
         ):
             return self.raise_indentation_error(
                 f"expected an indented block after class definition on line {a.start[0]}"
@@ -4790,7 +4790,7 @@ class XonshParser(Parser):
         if literal := self.expect(";"):
             return literal
         self._reset(mark)
-        if _newline := self.token(Token.NEWLINE):
+        if _newline := self.token("NEWLINE"):
             return _newline
         self._reset(mark)
         return None
@@ -4844,7 +4844,7 @@ class XonshParser(Parser):
     def _tmp_17(self) -> Any | None:
         # _tmp_17: '@' dec_maybe_call NEWLINE
         mark = self._mark()
-        if (self.expect("@")) and (f := self.dec_maybe_call()) and (self.token(Token.NEWLINE)):
+        if (self.expect("@")) and (f := self.dec_maybe_call()) and (self.token("NEWLINE")):
             return f
         self._reset(mark)
         return None
@@ -4852,7 +4852,7 @@ class XonshParser(Parser):
     def _tmp_18(self) -> Any | None:
         # _tmp_18: '@' named_expression NEWLINE
         mark = self._mark()
-        if (self.expect("@")) and (f := self.named_expression()) and (self.token(Token.NEWLINE)):
+        if (self.expect("@")) and (f := self.named_expression()) and (self.token("NEWLINE")):
             return f
         self._reset(mark)
         return None
@@ -5087,10 +5087,10 @@ class XonshParser(Parser):
     def _tmp_41(self) -> Any | None:
         # _tmp_41: STRING | FSTRING_START
         mark = self._mark()
-        if _string := self.token(Token.STRING):
+        if _string := self.token("STRING"):
             return _string
         self._reset(mark)
-        if _fstring_start := self.token(Token.FSTRING_START):
+        if _fstring_start := self.token("FSTRING_START"):
             return _fstring_start
         self._reset(mark)
         return None
@@ -5154,7 +5154,7 @@ class XonshParser(Parser):
         if fstring := self.fstring():
             return fstring
         self._reset(mark)
-        if _string := self.token(Token.STRING):
+        if _string := self.token("STRING"):
             return _string
         self._reset(mark)
         return None
@@ -5255,7 +5255,7 @@ class XonshParser(Parser):
     def _tmp_57(self) -> Any | None:
         # _tmp_57: NEWLINE INDENT
         mark = self._mark()
-        if (_newline := self.token(Token.NEWLINE)) and (_indent := self.token(Token.INDENT)):
+        if (_newline := self.token("NEWLINE")) and (_indent := self.token("INDENT")):
             return [_newline, _indent]
         self._reset(mark)
         return None
@@ -5315,7 +5315,7 @@ class XonshParser(Parser):
     def _tmp_63(self) -> Any | None:
         # _tmp_63: NAME STRING | SOFT_KEYWORD
         mark = self._mark()
-        if (name := self.name()) and (_string := self.token(Token.STRING)):
+        if (name := self.name()) and (_string := self.token("STRING")):
             return [name, _string]
         self._reset(mark)
         if soft_keyword := self.soft_keyword():
@@ -5337,7 +5337,7 @@ class XonshParser(Parser):
     def _tmp_65(self) -> Any | None:
         # _tmp_65: FSTRING_MIDDLE | fstring_replacement_field
         mark = self._mark()
-        if _fstring_middle := self.token(Token.FSTRING_MIDDLE):
+        if _fstring_middle := self.token("FSTRING_MIDDLE"):
             return _fstring_middle
         self._reset(mark)
         if fstring_replacement_field := self.fstring_replacement_field():
@@ -5705,7 +5705,7 @@ class XonshParser(Parser):
     def _tmp_99(self) -> Any | None:
         # _tmp_99: NEWLINE | ':'
         mark = self._mark()
-        if _newline := self.token(Token.NEWLINE):
+        if _newline := self.token("NEWLINE"):
             return _newline
         self._reset(mark)
         if literal := self.expect(":"):

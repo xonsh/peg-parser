@@ -10,8 +10,7 @@ import itertools
 import sys
 from typing import Any, Optional, Union, List, Tuple, NoReturn
 
-from peg_parser.subheader import memoize, memoize_left_rec, logger, Parser, Load, Store, Del, Target, Token
-from peg_parser.tokenizer import Mark
+from peg_parser.subheader import Del, Load, Parser, Store, Target, logger, memoize, memoize_left_rec
 '''
 
 @trailer''

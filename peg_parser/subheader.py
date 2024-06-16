@@ -283,9 +283,9 @@ class Parser:
             return self._tokenizer.getnext()
         return None
 
-    def token(self, typ: Token) -> TokenInfo | None:
+    def token(self, typ: str) -> TokenInfo | None:
         tok = self._tokenizer.peek()
-        if tok.type == typ:
+        if tok.type == Token[typ]:
             return self._tokenizer.getnext()
         return None
 
