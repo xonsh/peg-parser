@@ -153,7 +153,7 @@ assert_stmt[ast.Assert]: 'assert' a=expression b=[',' z=expression { z }] {
     ast.Assert(test=a, msg=b, LOCATIONS)
 }
 
-import_stmt[ast.Import]:
+import_stmt[ast.Import | ast.ImportFrom]:
     | invalid_import
     | import_name
     | import_from
@@ -450,7 +450,7 @@ with_macro_start: # same line
 # Try statement
 # -------------
 
-try_stmt[ast.Try]:
+try_stmt[ast.Try | ast.TryStar]:
     | invalid_try_stmt
     | 'try' &&':' b=block f=finally_block {
         ast.Try(body=b, handlers=[], orelse=[], finalbody=f, LOCATIONS)
@@ -701,7 +701,7 @@ class_pattern["ast.MatchClass"]:
      }
     | invalid_class_pattern
 
-positional_patterns:
+positional_patterns[list[ast.MatchAs | ast.MatchOr]]:
     | args=','.pattern+ { args }
 
 keyword_patterns:
@@ -1042,8 +1042,8 @@ atom:
     | a=NUMBER {
         ast.Constant(value=ast.literal_eval(a.string), LOCATIONS)
      }
-    | &'(' (tuple | group | genexp)
-    | &'[' (list | listcomp)
+    | &'(' (ptuple | group | genexp)
+    | &'[' (plist | listcomp)
     | &'{' (dict | set | dictcomp | setcomp)
     | '...' {
         ast.Constant(value=Ellipsis, LOCATIONS)
@@ -1124,16 +1124,16 @@ lambda_param[ast.arg]: a=NAME {
 # LITERALS
 # ========
 
-fstring_mid:
+fstring_mid[ast.FormattedValue | ast.Constant]:
     | fstring_replacement_field
     | t=FSTRING_MIDDLE { ast.Constant(value=t.string, LOCATIONS) }
-fstring_replacement_field:
-    | '{' a=annotated_rhs debug_expr='='? conversion=[fstring_conversion] format=[fstring_full_format_spec] rbrace='}' {
+fstring_replacement_field[ast.FormattedValue]:
+    | '{' a=annotated_rhs debug_expr='='? conver=[fstring_conversion] format=[fstring_full_format_spec] rbrace='}' {
         ast.FormattedValue(
             value=a,
             conversion=(
-                conversion.decode()[0]
-                if conversion else
+                conver.decode()[0]
+                if conver else
                 (b'r'[0] if debug_expr else -1)
             ),
             format_spec=format,
@@ -1141,7 +1141,7 @@ fstring_replacement_field:
         )
      }
     | invalid_replacement_field
-fstring_conversion[int]:
+fstring_conversion:
     | conv_token='!' conv=NAME { self.check_fstring_conversion(conv_token, conv) }
 fstring_full_format_spec:
     | ':' spec=fstring_format_spec* {
@@ -1153,7 +1153,7 @@ fstring_full_format_spec:
 fstring_format_spec:
     | t=FSTRING_MIDDLE { ast.Constant(value=t.string, LOCATIONS) }
     | fstring_replacement_field
-fstring:
+fstring[ast.JoinedStr]:
     | a=FSTRING_START b=fstring_mid* c=FSTRING_END {
         self.handle_fstring(a, b, LOCATIONS)
      }
@@ -1162,10 +1162,10 @@ strings (memo): a=(fstring|STRING)+ {
     self.concatenate_strings(a)
 }
 
-list[ast.List]:
+plist[ast.List]:
     | '[' a=[star_named_expressions] ']' { ast.List(elts=a or [], ctx=Load, LOCATIONS) }
 
-tuple[ast.Tuple]:
+ptuple[ast.Tuple]:
     | '(' a=[y=star_named_expression ',' z=[star_named_expressions] { [y] + (z or []) } ] ')' {
         ast.Tuple(elts=a or [], ctx=Load, LOCATIONS)
      }
@@ -1345,7 +1345,7 @@ del_t_atom:
 # ---------------
 
 # type_expressions allow */** but ignore them
-type_expressions[list]:
+type_expressions[list[Any]]:
     | a=','.expression+ ',' '*' b=expression ',' '**' c=expression { a + [b, c] }
     | a=','.expression+ ',' '*' b=expression { a + [b] }
     | a=','.expression+ ',' '**' b=expression { a + [b] }
@@ -1478,7 +1478,7 @@ invalid_named_expression[NoReturn]:
             )
         )
      }
-    | !(list|tuple|genexp|'True'|'None'|'False') a=bitwise_or b='=' bitwise_or !('='|':=') {
+    | !(plist|ptuple|genexp|'True'|'None'|'False') a=bitwise_or b='=' bitwise_or !('='|':=') {
         (
             None
             if self.in_recursive_rule else
@@ -1510,8 +1510,8 @@ invalid_assignment[NoReturn]:
         )
      }
 invalid_ann_assign_target[ast.AST]:
-    | a=list { a }
-    | a=tuple { a }
+    | a=plist { a }
+    | a=ptuple { a }
     | '(' a=invalid_ann_assign_target ')' { a }
 invalid_del_stmt[NoReturn]:
     | 'del' a=star_expressions {
@@ -1611,7 +1611,7 @@ invalid_lambda_parameters[NoReturn]:
     | lambda_param_maybe_default+ '/' a='*' {
         self.raise_syntax_error_known_location("expected comma between / and *", a)
      }
-invalid_lambda_parameters_helper[NoReturn]:
+invalid_lambda_parameters_helper:
     | a=lambda_slash_with_default { [a] }
     | a=lambda_param_with_default+
 invalid_lambda_star_etc[NoReturn]:
@@ -1726,7 +1726,7 @@ invalid_except_stmt_indent[NoReturn]:
             f"expected an indented block after 'except' statement on line {a.start[0]}"
         )
      }
-invalid_except_star_stmt_indent:
+invalid_except_star_stmt_indent[NoReturn]:
     | a='except' '*' expression ['as' NAME ] ':' NEWLINE !INDENT {
         self.raise_indentation_error(
             f"expected an indented block after 'except*' statement on line {a.start[0]}"
@@ -1761,7 +1761,7 @@ invalid_class_pattern[NoReturn]:
             "positional patterns follow keyword patterns", a[0], a[-1]
         )
      }
-invalid_class_argument_pattern[list]:
+invalid_class_argument_pattern:
     | [positional_patterns ','] keyword_patterns ',' a=positional_patterns { a }
 invalid_if_stmt[NoReturn]:
     | 'if' named_expression NEWLINE { self.raise_syntax_error("expected ':'") }

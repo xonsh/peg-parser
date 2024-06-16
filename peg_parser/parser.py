@@ -62,7 +62,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def fstring(self) -> Any | None:
+    def fstring(self) -> ast.JoinedStr | None:
         # fstring: FSTRING_START fstring_mid* FSTRING_END
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -383,7 +383,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def import_stmt(self) -> ast.Import | None:
+    def import_stmt(self) -> ast.Import | ast.ImportFrom | None:
         # import_stmt: invalid_import | import_name | import_from
         mark = self._mark()
         if self.call_invalid_rules and (self.invalid_import()):
@@ -1183,7 +1183,7 @@ class XonshParser(Parser):
             return None
         return None
 
-    def try_stmt(self) -> ast.Try | None:
+    def try_stmt(self) -> ast.Try | ast.TryStar | None:
         # try_stmt: invalid_try_stmt | 'try' &&':' block finally_block | 'try' &&':' block except_block+ else_block? finally_block? | 'try' &&':' block except_star_block+ else_block? finally_block?
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -1786,7 +1786,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def positional_patterns(self) -> Any | None:
+    def positional_patterns(self) -> list[ast.MatchAs | ast.MatchOr] | None:
         # positional_patterns: ','.pattern+
         mark = self._mark()
         if args := self.gathered(self.pattern, self.expect, ","):
@@ -2597,7 +2597,7 @@ class XonshParser(Parser):
         return None
 
     def atom(self) -> Any | None:
-        # atom: search_path | NAME | 'True' | 'False' | 'None' | &(STRING | FSTRING_START) strings | NUMBER | &'(' (tuple | group | genexp) | &'[' (list | listcomp) | &'{' (dict | set | dictcomp | setcomp) | '...'
+        # atom: search_path | NAME | 'True' | 'False' | 'None' | &(STRING | FSTRING_START) strings | NUMBER | &'(' (ptuple | group | genexp) | &'[' (plist | listcomp) | &'{' (dict | set | dictcomp | setcomp) | '...'
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if search_path := self.search_path():
@@ -2841,7 +2841,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def fstring_mid(self) -> Any | None:
+    def fstring_mid(self) -> ast.FormattedValue | ast.Constant | None:
         # fstring_mid: fstring_replacement_field | FSTRING_MIDDLE
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -2853,7 +2853,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def fstring_replacement_field(self) -> Any | None:
+    def fstring_replacement_field(self) -> ast.FormattedValue | None:
         # fstring_replacement_field: '{' annotated_rhs '='? fstring_conversion? fstring_full_format_spec? '}' | invalid_replacement_field
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -2861,13 +2861,13 @@ class XonshParser(Parser):
             (self.expect("{"))
             and (a := self.annotated_rhs())
             and (debug_expr := self.expect("="),)
-            and (conversion := self.fstring_conversion(),)
+            and (conver := self.fstring_conversion(),)
             and (format := self.fstring_full_format_spec(),)
             and (self.expect("}"))
         ):
             return ast.FormattedValue(
                 value=a,
-                conversion=conversion.decode()[0] if conversion else b"r"[0] if debug_expr else -1,
+                conversion=conver.decode()[0] if conver else b"r"[0] if debug_expr else -1,
                 format_spec=format,
                 **self.span(_lnum, _col),
             )
@@ -2877,7 +2877,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def fstring_conversion(self) -> int | None:
+    def fstring_conversion(self) -> Any | None:
         # fstring_conversion: '!' NAME
         mark = self._mark()
         if (conv_token := self.expect("!")) and (conv := self.name()):
@@ -2917,8 +2917,8 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def list(self) -> ast.List | None:
-        # list: '[' star_named_expressions? ']'
+    def plist(self) -> ast.List | None:
+        # plist: '[' star_named_expressions? ']'
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("[")) and (a := self.star_named_expressions(),) and (self.expect("]")):
@@ -2926,8 +2926,8 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def tuple(self) -> ast.Tuple | None:
-        # tuple: '(' [star_named_expression ',' star_named_expressions?] ')'
+    def ptuple(self) -> ast.Tuple | None:
+        # ptuple: '(' [star_named_expression ',' star_named_expressions?] ')'
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("(")) and (a := self._tmp_47(),) and (self.expect(")")):
@@ -3440,7 +3440,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def type_expressions(self) -> list | None:
+    def type_expressions(self) -> list[Any] | None:
         # type_expressions: ','.expression+ ',' '*' expression ',' '**' expression | ','.expression+ ',' '*' expression | ','.expression+ ',' '**' expression | '*' expression ',' '**' expression | '*' expression | '**' expression | ','.expression+
         mark = self._mark()
         if (
@@ -3671,7 +3671,7 @@ class XonshParser(Parser):
         return None
 
     def invalid_named_expression(self) -> None:
-        # invalid_named_expression: expression ':=' expression | NAME '=' bitwise_or !('=' | ':=') | !(list | tuple | genexp | 'True' | 'None' | 'False') bitwise_or '=' bitwise_or !('=' | ':=')
+        # invalid_named_expression: expression ':=' expression | NAME '=' bitwise_or !('=' | ':=') | !(plist | ptuple | genexp | 'True' | 'None' | 'False') bitwise_or '=' bitwise_or !('=' | ':=')
         mark = self._mark()
         if (a := self.expression()) and (self.expect(":=")) and (self.expression()):
             return self.raise_syntax_error_known_location(
@@ -3750,12 +3750,12 @@ class XonshParser(Parser):
         return None
 
     def invalid_ann_assign_target(self) -> ast.AST | None:
-        # invalid_ann_assign_target: list | tuple | '(' invalid_ann_assign_target ')'
+        # invalid_ann_assign_target: plist | ptuple | '(' invalid_ann_assign_target ')'
         mark = self._mark()
-        if a := self.list():
+        if a := self.plist():
             return a
         self._reset(mark)
-        if a := self.tuple():
+        if a := self.ptuple():
             return a
         self._reset(mark)
         if (
@@ -3983,7 +3983,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def invalid_lambda_parameters_helper(self) -> None:
+    def invalid_lambda_parameters_helper(self) -> Any | None:
         # invalid_lambda_parameters_helper: lambda_slash_with_default | lambda_param_with_default+
         mark = self._mark()
         if a := self.lambda_slash_with_default():
@@ -4284,7 +4284,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def invalid_except_star_stmt_indent(self) -> Any | None:
+    def invalid_except_star_stmt_indent(self) -> None:
         # invalid_except_star_stmt_indent: 'except' '*' expression ['as' NAME] ':' NEWLINE !INDENT
         mark = self._mark()
         if (
@@ -4377,7 +4377,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def invalid_class_argument_pattern(self) -> list | None:
+    def invalid_class_argument_pattern(self) -> Any | None:
         # invalid_class_argument_pattern: [positional_patterns ','] keyword_patterns ',' positional_patterns
         mark = self._mark()
         if (
@@ -5096,10 +5096,10 @@ class XonshParser(Parser):
         return None
 
     def _tmp_42(self) -> Any | None:
-        # _tmp_42: tuple | group | genexp
+        # _tmp_42: ptuple | group | genexp
         mark = self._mark()
-        if tuple := self.tuple():
-            return tuple
+        if ptuple := self.ptuple():
+            return ptuple
         self._reset(mark)
         if group := self.group():
             return group
@@ -5110,10 +5110,10 @@ class XonshParser(Parser):
         return None
 
     def _tmp_43(self) -> Any | None:
-        # _tmp_43: list | listcomp
+        # _tmp_43: plist | listcomp
         mark = self._mark()
-        if list := self.list():
-            return list
+        if plist := self.plist():
+            return plist
         self._reset(mark)
         if listcomp := self.listcomp():
             return listcomp
@@ -5357,13 +5357,13 @@ class XonshParser(Parser):
         return None
 
     def _tmp_67(self) -> Any | None:
-        # _tmp_67: list | tuple | genexp | 'True' | 'None' | 'False'
+        # _tmp_67: plist | ptuple | genexp | 'True' | 'None' | 'False'
         mark = self._mark()
-        if list := self.list():
-            return list
+        if plist := self.plist():
+            return plist
         self._reset(mark)
-        if tuple := self.tuple():
-            return tuple
+        if ptuple := self.ptuple():
+            return ptuple
         self._reset(mark)
         if genexp := self.genexp():
             return genexp

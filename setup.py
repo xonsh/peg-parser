@@ -43,6 +43,7 @@ if os.environ.get("COMPILE_WITH_MYPYC"):
             "peg_parser/tokenize.py",
             "peg_parser/tokenizer.py",
             "peg_parser/subheader.py",
+            "peg_parser/parser.py",
         ]
     )
 

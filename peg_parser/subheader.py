@@ -13,13 +13,14 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
+    FC = TypeVar("FC", bound=ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)
+
 # Singleton ast nodes, created once for efficiency
 Load = ast.Load()
 Store = ast.Store()
 Del = ast.Del()
 
 Node = TypeVar("Node", bound=ast.AST)
-FC = TypeVar("FC", ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 
 EXPR_NAME_MAPPING = {
     ast.Attribute: "attribute",
@@ -304,7 +305,7 @@ class Parser:
             return self._tokenizer.getnext()
         return None
 
-    def repeated(self, func: Callable[..., T], *args: Any) -> list[T]:
+    def repeated(self, func: Callable[..., T | None], *args: Any) -> list[T]:
         mark = self._mark()
         children = []
         while result := func(*args):
@@ -371,7 +372,7 @@ class Parser:
 
         return res
 
-    def check_version(self, min_version: tuple[int, ...], error_msg: str, node: Node) -> Node:
+    def check_version(self, min_version: tuple[int, ...], error_msg: str, node: T) -> T:
         """Check that the python version is high enough for a rule to apply."""
         if self.py_version >= min_version:
             return node
@@ -522,7 +523,7 @@ class Parser:
         consolidated: list[Any] = []  # ast.Constant | ast.FormattedValue
         for p in values:
             if consolidated and isinstance(consolidated[-1], ast.Constant) and isinstance(p, ast.Constant):
-                consolidated[-1].value += p.value  # type: ignore
+                consolidated[-1].value += p.value  # type: ignore[unreachable]
                 consolidated[-1].end_lineno = p.end_lineno
                 consolidated[-1].end_col_offset = p.end_col_offset
             else:
@@ -544,7 +545,9 @@ class Parser:
             self._path_token = None
         return node
 
-    def handle_fstring(self, a: TokenInfo, b: list[ast.expr], **locs: int) -> ast.JoinedStr:
+    def handle_fstring(
+        self, a: TokenInfo, b: list[ast.FormattedValue | ast.Constant], **locs: int
+    ) -> ast.JoinedStr:
         path_tok = self._strip_path_prefix(a)
         if path_tok:
             self._path_token = path_tok

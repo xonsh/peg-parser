@@ -46,7 +46,7 @@ extend-safe-fixes = ["FA", "TCH", "PT"]
 "tests/test_subproc_macros.py" = [
     "PT014"
 ]
-"tasks/generate_parser.py" = ["N802", "PLR0913", "PLR2004"]
+"tasks/generate_parser.py" = ["N802", "PLR0913", "PLR2004", "C901"]
 "*/subheader.py" = [
     "C901",
     "PLR0915", # too many statements
@@ -138,7 +138,6 @@ Source = "https://github.com/jnoortheen/xonsh-parser"
 packages = "peg_parser"
 exclude = [
     'tests',
-    'peg_parser/parser.py',
     'pegen\/build.py',
     'pegen\/grammar_parser.py',
 ]
@@ -157,3 +156,20 @@ show_column_numbers = true
 show_error_context = true
 error_summary = true
 pretty = true
+
+[[tool.mypy.overrides]]
+module = "peg_parser.parser"
+allow_redefinition = true
+local_partial_types = true
+warn_unreachable = false
+disable_error_code = [
+    "assignment",
+    "no-any-return",
+    "func-returns-value",
+    "var-annotated",
+    "type-arg",
+    "arg-type",
+    "attr-defined",
+    "return-value",
+]
+#strict = false
