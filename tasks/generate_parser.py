@@ -214,6 +214,10 @@ class XonshParserGenerator(PythonParserGenerator):
         else:
             self.add_return(f"{action}")
 
+    def print(self, *args: object) -> None:
+        super().print(*args)
+        self.file.flush()
+
 
 def main(output_file=None, grammar_file=None):
     output_file = output_file or Path(__file__).parent.parent / "peg_parser" / "parser.py"
