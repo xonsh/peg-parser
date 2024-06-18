@@ -37,14 +37,8 @@ def nodes_equal(x, y):
 
 
 def build_parser(name: str):
-    # path = Path(__file__).parent.parent.joinpath("peg_parser/parser.py")
-    # if not path.exists():
-    #     from tasks import generate_parser
-    #
-    #     generate_parser.main()
     from peg_parser import parser
 
-    # assert parser.__file__ == str(path.absolute()), "Parser was not built"
     return getattr(parser, name)
 
 

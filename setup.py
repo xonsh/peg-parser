@@ -19,10 +19,10 @@ class CustomCommand(Command):
         if self.bdist_dir:
             root_dir = os.path.abspath(os.path.dirname(__file__))
             sys.path.insert(0, root_dir)
-            from tasks import generate_parser
+            from tasks import generator
 
             self.bdist_dir.mkdir(parents=True, exist_ok=True)
-            generate_parser.main()
+            generator.main()
 
 
 class CustomBuild(build):

@@ -11,7 +11,7 @@ tasks:
       - ruff format pegen/grammar_parser.py
   generate:
     cmds:
-      - python3 tasks/generate_parser.py
+      - python3 tasks/generator.py
       - ruff check --fix peg_parser/parser.py
       - ruff format peg_parser/parser.py
       - scc peg_parser/parser.py --uloc

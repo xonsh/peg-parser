@@ -46,7 +46,7 @@ extend-safe-fixes = ["FA", "TCH", "PT"]
 "tests/test_subproc_macros.py" = [
     "PT014"
 ]
-"tasks/generate_parser.py" = ["N802", "PLR0913", "PLR2004", "C901"]
+"tasks/generator.py" = ["N802", "PLR0913", "PLR2004", "C901"]
 "*/subheader.py" = [
     "C901",
     "PLR0915", # too many statements
