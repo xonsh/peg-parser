@@ -181,7 +181,7 @@ class XonshParser(Parser):
         return None
 
     def compound_stmt(self) -> Any | None:
-        # compound_stmt: &('def' | '@' | 'async') function_def | &'if' if_stmt | &('class' | '@') class_def | &('with' | 'async') with_stmt | &'with' with_macro_stmt | &('for' | 'async') for_stmt | &'try' try_stmt | &'while' while_stmt | match_stmt
+        # compound_stmt: &('def' | '@' | 'async') function_def | &'if' if_stmt | &('class' | '@') class_def | &('with' | 'async') with_stmt | &('for' | 'async') for_stmt | &'try' try_stmt | &'while' while_stmt | match_stmt
         mark = self._mark()
         if (self.positive_lookahead(self._tmp_2)) and (function_def := self.function_def()):
             return function_def
@@ -194,9 +194,6 @@ class XonshParser(Parser):
         self._reset(mark)
         if (self.positive_lookahead(self._tmp_4)) and (with_stmt := self.with_stmt()):
             return with_stmt
-        self._reset(mark)
-        if (self.positive_lookahead(self.expect, "with")) and (with_macro_stmt := self.with_macro_stmt()):
-            return with_macro_stmt
         self._reset(mark)
         if (self.positive_lookahead(self._tmp_5)) and (for_stmt := self.for_stmt()):
             return for_stmt
@@ -1071,12 +1068,22 @@ class XonshParser(Parser):
         return None
 
     def with_stmt(self) -> ast.With | ast.AsyncWith | None:
-        # with_stmt: invalid_with_stmt_indent | 'with' '(' ','.with_item+ ','? ')' ':' block | 'with' ','.with_item+ ':' TYPE_COMMENT? block | 'async' 'with' '(' ','.with_item+ ','? ')' ':' block | 'async' 'with' ','.with_item+ ':' TYPE_COMMENT? block | invalid_with_stmt
+        # with_stmt: invalid_with_stmt_indent | &with_macro_start ~ with_macro_stmt | 'with' '(' ','.with_item+ ','? ')' ':' block | 'with' ','.with_item+ ':' TYPE_COMMENT? block | 'async' 'with' '(' ','.with_item+ ','? ')' ':' block | 'async' 'with' ','.with_item+ ':' TYPE_COMMENT? block | invalid_with_stmt
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_with_stmt_indent()):
             return None
         self._reset(mark)
+        cut = False
+        if (
+            (self.positive_lookahead(self.with_macro_start))
+            and (cut := True)
+            and (with_macro_stmt := self.with_macro_stmt())
+        ):
+            return with_macro_stmt
+        self._reset(mark)
+        if cut:
+            return None
         if (
             (self.expect("with"))
             and (self.expect("("))
@@ -2306,7 +2313,7 @@ class XonshParser(Parser):
 
     @memoize_left_rec
     def primary(self) -> Any | None:
-        # primary: primary '.' NAME | primary genexp | func_macro_start ~ MACRO_PARAM*? ')' | primary '(' arguments? ')' | primary '[' slices ']' | sub_procs | env_atom | (".".help_atom+) | atom
+        # primary: primary '.' NAME | primary genexp | func_macro_start ~ MACRO_PARAM*? &&')' | primary '(' arguments? ')' | primary '[' slices ']' | sub_procs | env_atom | (".".help_atom+) | atom
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.primary()) and (self.expect(".")) and (b := self.name()):
@@ -2320,7 +2327,7 @@ class XonshParser(Parser):
             (a := self.func_macro_start())
             and (cut := True)
             and (b := self.repeated(self.token, "MACRO_PARAM"),)
-            and (self.expect(")"))
+            and (self.expect_forced(self.expect(")"), "')'"))
         ):
             return self.macro_call(a, b, **self.span(_lnum, _col))
         self._reset(mark)

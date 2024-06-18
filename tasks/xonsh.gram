@@ -66,7 +66,6 @@ compound_stmt:
     | &'if' if_stmt
     | &('class' | '@') class_def
     | &('with' | 'async') with_stmt
-    | &'with' with_macro_stmt
     | &('for' | 'async') for_stmt
     | &'try' try_stmt
     | &'while' while_stmt
@@ -416,6 +415,7 @@ for_stmt[Union[ast.For, ast.AsyncFor]]:
 
 with_stmt[Union[ast.With, ast.AsyncWith]]:
     | invalid_with_stmt_indent
+    | &with_macro_start ~ with_macro_stmt
     | 'with' '(' a=','.with_item+ ','? ')' ':' b=block {
         ast.With(items=a, body=b, LOCATIONS)
      }
@@ -950,7 +950,7 @@ await_primary (memo):
 primary:
     | a=primary '.' b=NAME { ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS) }
     | a=primary b=genexp { ast.Call(func=a, args=[b], keywords=[], LOCATIONS) }
-    | a=func_macro_start ~ b=[MACRO_PARAM*] ')' { self.macro_call(a, b, LOCATIONS) }
+    | a=func_macro_start ~ b=[MACRO_PARAM*] &&')' { self.macro_call(a, b, LOCATIONS) }
     | a=primary '(' b=[arguments] ')' {
         ast.Call(
             func=a,
