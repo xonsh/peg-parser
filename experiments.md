@@ -168,6 +168,7 @@ Took:  1.39s
 | optimize gathered               | 261K | 2104/8665/8973  |
 | after ruff formatting           | 229K | 2257/6006/6316  |
 | after mark passing from memoize | 223K | 2261/5638/5949  |
+| reuse rhs if rule is same       | 213K | 2165/5307/5617  |
 
 - optimized `get_last_non_whitespace_token` brought `benchmarks.PeakMemSuite.peakmem_parser_large_file` runtime to 5s from 10s
 

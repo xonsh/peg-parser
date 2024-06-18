@@ -105,12 +105,23 @@ class XonshParserGenerator(PythonParserGenerator):
         tokens = {t.name for t in Token}
         tokens.update(["SOFT_KEYWORD", "KEYWORD", "ANY_TOKEN"])
         ParserGenerator.__init__(self, grammar, tokens, file)
+        self._rhs_func_cache: dict[str, tuple[str, Rhs]] = {}
         self.callmakervisitor = XonshCallMakerVisitor(self)
         self.invalidvisitor = InvalidNodeVisitor()
         self.usednamesvisitor = UsedNamesVisitor()
         self.unreachable_formatting = unreachable_formatting or "None  # pragma: no cover"
         self.location_formatting = "**self.span(_lnum, _col)"
         self.cleanup_statements: list[str] = []
+
+    def artifical_rule_from_rhs(self, rhs: Rhs) -> str:
+        self.counter += 1
+        name = f"_tmp_{self.counter}"  # TODO: Pick a nicer name.
+        if dup := self._rhs_func_cache.get(repr(rhs)):
+            return dup[0]
+        else:
+            self._rhs_func_cache[repr(rhs)] = (name, rhs)
+        self.todo[name] = Rule(name, None, rhs)
+        return name
 
     def generate(self, filename: str) -> None:
         header = self.grammar.metas.get("header", MODULE_PREFIX)
