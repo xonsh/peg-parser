@@ -2,16 +2,17 @@ pub mod tokenizer;
 mod regex;
 
 use crate::regex::consts::OPERATORS;
-use crate::tokenizer::Token;
 use heck::ToShoutySnakeCase;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use std::collections::HashMap;
+use crate::tokenizer::tok::{TokInfo, Token};
+use crate::tokenizer::main::{tokenize_string, tokenize_file as tok_file};
 
 #[pyclass(frozen, module = "xonsh_tokenizer", name = "TokenInfo")]
 #[derive(Clone)]
 pub struct PyTokInfo {
-    pub inner: tokenizer::TokInfo,
+    pub inner: TokInfo,
 }
 
 #[pymethods]
@@ -29,7 +30,7 @@ impl PyTokInfo {
             "MACRO_PARAM" => Token::MacroParam,
             _ => panic!("Unknown token type: {}", typ),
         };
-        let inner = tokenizer::TokInfo::new(tok, string.to_string(), start, end, line.to_string());
+        let inner = TokInfo::new(tok, string.to_string(), start, end, line.to_string());
         Ok(Self { inner })
     }
 
@@ -81,7 +82,7 @@ impl PyTokInfo {
 #[pyfunction]
 fn tokenize_str(src: &str) -> PyResult<Vec<PyTokInfo>> {
     let mut tokens = Vec::new();
-    for token in tokenizer::tokenize_string(src) {
+    for token in tokenize_string(src) {
         if let Ok(inner) = token {
             tokens.push(PyTokInfo { inner });
         } else {
@@ -94,7 +95,7 @@ fn tokenize_str(src: &str) -> PyResult<Vec<PyTokInfo>> {
 #[pyfunction]
 fn tokenize_file(file_path: &str) -> PyResult<Vec<PyTokInfo>> {
     let mut tokens = Vec::new();
-    for token in tokenizer::tokenize_file(file_path)? {
+    for token in tok_file(file_path)? {
         if let Ok(inner) = token {
             tokens.push(PyTokInfo { inner });
         } else {
