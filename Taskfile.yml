@@ -11,6 +11,7 @@ tasks:
       - ruff check --fix peg_parser/parser.py
       - ruff format peg_parser/parser.py
       - scc peg_parser/parser.py --uloc
+      - ls -lh peg_parser/parser.py
     generates:
       - peg_parser/parser.py
     sources:
@@ -18,6 +19,11 @@ tasks:
       - tasks/*.gram
       - peg_parser/*.py
       - pegen/*.py
+
+  check-duplicates:
+    cmds:
+      - pylint --enable=R0801 --disable=W,C,R0916,R0911,R0912,R0904  --min-similarity-lines=1 peg_parser/parser.py
+      - jscpd peg_parser/parser.py
 
   profile:
     cmds:

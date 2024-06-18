@@ -1,4 +1,5 @@
 import ast
+import itertools
 from pathlib import Path
 from typing import IO, Any
 
@@ -183,7 +184,23 @@ class XonshParserGenerator(PythonParserGenerator):
                 self.print("self.call_invalid_rules = False")
                 self.cleanup_statements.append("self.call_invalid_rules = _prev_call_invalid")
 
-            # if node.left_recursive:
+            # special case to reduce generated code size
+            if (
+                len(node.rhs.alts) > 1
+                and (not any(a.action for a in node.rhs.alts))
+                and (not any(len(a.items) > 1 for a in node.rhs.alts))
+            ):
+                self.print("return self.seq_alts(")
+                alt_funcs = itertools.chain.from_iterable(a.items for a in node.rhs.alts)
+                for fn in alt_funcs:
+                    head, tail = self.callmakervisitor.lookahead_call_helper(fn, nested=False)
+                    if tail:
+                        self.print(f"({head}, {tail}), ")
+                    else:
+                        self.print(f"{head}, ")
+                self.print(")")
+                return
+
             self.print("mark = self._mark()")
             if self.alts_uses_locations(node.rhs.alts):
                 self.print("_lnum, _col = self._tokenizer.peek().start")

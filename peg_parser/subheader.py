@@ -349,6 +349,20 @@ class Parser:
         end = self._tokenizer.get_last_non_whitespace_token().end
         return {"lineno": lnum, "col_offset": col, "end_lineno": end[0], "end_col_offset": end[1]}
 
+    def seq_alts(self, *alt: Callable[..., T] | tuple[Callable[..., T], ...]) -> T | None:
+        """Hanle sequence of alts that don't have action associated with them."""
+        mark = self._mark()
+        for arg in alt:
+            if isinstance(arg, tuple):
+                method, *args = arg
+                res = method(*args)
+            else:
+                res = arg()
+            if res:
+                return res
+            self._reset(mark)
+        return None
+
     def parse(self, rule: str, call_invalid_rules: bool = False) -> ast.AST | Any | None:
         self.call_invalid_rules = call_invalid_rules
         res = getattr(self, rule)()
