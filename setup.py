@@ -47,5 +47,19 @@ if os.environ.get("COMPILE_WITH_MYPYC"):
         ]
     )
 
+if os.environ.get("COMPILE_WITH_CYTHON"):
+    from Cython.Build import cythonize
+
+    options["ext_modules"] = cythonize(
+        [
+            "peg_parser/tokenize.py",
+            "peg_parser/tokenizer.py",
+            # "peg_parser/subheader.py",
+            # "peg_parser/parser.py",
+        ],
+        show_all_warnings=True,
+        annotate=True,
+        compiler_directives={"language_level": "3"},
+    )
 
 setup(**options)

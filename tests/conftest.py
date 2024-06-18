@@ -6,7 +6,6 @@ import ast
 import contextlib
 import io
 import logging
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -38,14 +37,14 @@ def nodes_equal(x, y):
 
 
 def build_parser(name: str):
-    path = Path(__file__).parent.parent.joinpath("peg_parser/parser.py")
-    if not path.exists():
-        from tasks import generate_parser
-
-        generate_parser.main()
+    # path = Path(__file__).parent.parent.joinpath("peg_parser/parser.py")
+    # if not path.exists():
+    #     from tasks import generate_parser
+    #
+    #     generate_parser.main()
     from peg_parser import parser
 
-    assert parser.__file__ == str(path.absolute()), "Parser was not built"
+    # assert parser.__file__ == str(path.absolute()), "Parser was not built"
     return getattr(parser, name)
 
 

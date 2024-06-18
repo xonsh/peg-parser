@@ -2,7 +2,8 @@ version: '3'
 tasks:
   pull_grammar:
     cmds:
-      - curl -L https://github.com/python/cpython/raw/main/Grammar/python.gram > tasks/python.gram
+#      - curl -L https://github.com/python/cpython/raw/main/Grammar/python.gram > tasks/python.gram
+      - curl -L https://github.com/we-like-parsers/pegen/raw/main/data/python.gram > tasks/python.gram
   generate-meta:
     cmds:
       - git checkout pegen/grammar_parser.py
@@ -77,10 +78,24 @@ tasks:
     cmds:
       - watchexec -e py,toml,gram --clear -- task generate mypy1
 
-  mypyc:
+  build_dep:
     cmds:
       - pip install setuptools_scm wheel
+
+  mypycify:
+    deps:
+      - build_dep
+    cmds:
       - env COMPILE_WITH_MYPYC=1 pip install -e . --no-build-isolation
+    sources:
+      - peg_parser/subheader.py
+      - peg_parser/toke*.py
+
+  cythonize:
+    deps:
+      - build_dep
+    cmds:
+      - env COMPILE_WITH_CYTHON=1 pip install -e . --no-build-isolation
     sources:
       - peg_parser/subheader.py
       - peg_parser/toke*.py
