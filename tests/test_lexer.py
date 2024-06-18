@@ -372,7 +372,7 @@ def test_ioredir1(case):
     assert check_tokens_subproc(case, [("NAME", case[:-1], 2), (t.OP, case[-1], len(case) + 1)])
 
 
-@pytest.mark.parametrize("case", ["2>1", "err>out", "e>o", pytest.param("2>&1", marks=pytest.mark.xfail)])
+@pytest.mark.parametrize("case", ["2>1", "err>out", "e>o"])
 def test_ioredir2(case):
     idx = case.find(">")
     assert check_tokens_subproc(
@@ -410,6 +410,7 @@ def test_ioredir2(case):
                 ("NUMBER", "3", 6),
             ],
         ),
+        ("2>&1", [("NUMBER", "2", 0), ("OP", ">&", 1), ("NUMBER", "1", 3)]),
     ],
 )
 def test_pymode_not_ioredirect(s, exp):

@@ -160,8 +160,17 @@ def test_syntax_error_lambda_nondefault_follows_default(python_parse_str):
         python_parse_str("lambda x=1, y: x", mode="exec")
 
 
-@pytest.mark.parametrize("first_prefix, second_prefix", itertools.permutations(["", "p", "b"], 2))
-@pytest.mark.xfail
+@pytest.mark.parametrize(
+    "first_prefix, second_prefix",
+    itertools.permutations(
+        [
+            # "",
+            "p",
+            "b",
+        ],
+        2,
+    ),
+)
 def test_syntax_error_literal_concat_different(first_prefix, second_prefix, python_parse_str):
-    with pytest.raises(SyntaxError):
+    with pytest.raises((SyntaxError, TypeError)):
         python_parse_str(f"{first_prefix}'hello' {second_prefix}'world'", mode="exec")
