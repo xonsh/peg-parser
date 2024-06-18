@@ -42,7 +42,6 @@ impl<R: Read> Iterator for Tokenizer<R> {
                 if read_bytes == 0 {
                     // EOF
                     self.stopped = true;
-                    self.state.set_line("".to_string());
                     let res = self.state.next_end_tokens();
                     self.stash.extend(res);
                 } else {

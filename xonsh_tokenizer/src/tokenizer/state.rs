@@ -26,7 +26,6 @@ pub(crate) struct State {
     pub(crate) parenlev: usize,
     pub(crate) continued: bool,
     pub(crate) indents: Vec<usize>,
-    pub(crate) last_line: Option<LineState>,
     pub(crate) line: LineState,
     pub(crate) end_progs: Vec<EndProg>,
 }
@@ -37,7 +36,6 @@ impl Default for State {
             parenlev: 0,
             continued: false,
             indents: vec![0],
-            last_line: None,
             line: LineState::default(),
             end_progs: vec![],
         }
@@ -53,10 +51,7 @@ impl State {
         }
         return false;
     }
-    pub(crate) fn set_line(&mut self, line: String) {
-        if self.line.num != 0 {
-            self.last_line = Some(self.line.clone());
-        }
+    fn set_line(&mut self, line: String) {
         self.line = LineState::new(line.as_str(), self.line.num + 1);
     }
 
@@ -280,33 +275,31 @@ impl State {
 
     pub(crate) fn next_end_tokens(&self) -> Vec<TokInfo> {
         let mut tokens: Vec<TokInfo> = Vec::new();
-        if let Some(last_line) = self.last_line.as_ref() {
-            if !['\r', '\n'].contains(&last_line.text.chars().last().unwrap())
-                && !last_line.text.starts_with('#')
-            {
-                let token = TokInfo {
-                    typ: Token::NEWLINE,
-                    string: "".to_string(),
-                    start: (last_line.num - 1, last_line.text.len()),
-                    end: (last_line.num - 1, last_line.text.len() + 1),
-                    line: "".to_string(),
-                };
-                tokens.push(token);
-            }
+        if !['\r', '\n'].contains(&self.line.text.chars().last().unwrap())
+            && !self.line.text.starts_with('#')
+        {
+            let token = TokInfo {
+                typ: Token::NEWLINE,
+                string: "".to_string(),
+                start: (self.line.num, self.line.text.len()),
+                end: (self.line.num, self.line.text.len() + 1),
+                line: "".to_string(),
+            };
+            tokens.push(token);
         }
         tokens.extend(self.indents[1..].iter().map(|_| TokInfo {
             typ: Token::DEDENT,
             string: "".to_string(),
-            start: (self.line.num, 0),
-            end: (self.line.num, 0),
+            start: (self.line.num + 1, 0),
+            end: (self.line.num + 1, 0),
             line: "".to_string(),
         }));
 
         tokens.push(TokInfo {
             typ: Token::ENDMARKER,
             string: "".to_string(),
-            start: (self.line.num, 0),
-            end: (self.line.num, 0),
+            start: (self.line.num + 1, 0),
+            end: (self.line.num + 1, 0),
             line: "".to_string(),
         });
         return tokens;
