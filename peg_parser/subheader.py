@@ -740,13 +740,7 @@ class Parser:
     def proc_args(self, args: list[TokenInfo | ast.expr]) -> list[ast.AST]:
         return list(self._proc_args(args))
 
-    def subproc(self, start: TokenInfo, args: list[ast.AST], **locs: int) -> ast.Call:
-        method = {
-            "$(": "subproc_captured",
-            "$[": "subproc_uncaptured",
-            "![": "subproc_captured_hiddenobject",
-            "!(": "subproc_captured_object",
-        }[start.string]
+    def handle_proc(self, method: str, args: list[ast.AST], **locs: int) -> ast.Call:
         return xonsh_call(f"__xonsh__.{method}", *args, **locs)
 
     def proc_inject(self, args: list[ast.AST], **locs: int) -> ast.Starred:

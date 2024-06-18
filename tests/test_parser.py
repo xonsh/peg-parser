@@ -266,7 +266,6 @@ def test_comment_only(check_xonsh_ast):
         "![(if True:\n   ls\nelse:\n   echo not true)]",
     ],
 )
-@pytest.mark.xfail
 def test_use_subshell(case, check_xonsh_ast):
     check_xonsh_ast(case)
 

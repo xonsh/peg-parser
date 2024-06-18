@@ -960,7 +960,7 @@ primary:
         )
      }
     | a=primary '[' b=slices ']' { ast.Subscript(value=a, slice=b, ctx=Load, LOCATIONS) }
-    | sub_procs
+    | &('$(' | '$[' | '![' | '!(') ~ sub_procs
     | env_atom
     | a=(".".help_atom+) { self.expand_help(a, LOCATIONS) }
     | atom
@@ -971,10 +971,10 @@ func_macro_start:
     }
 
 sub_procs:
-    | a='$(' ~ args=proc_cmds ')' { self.subproc(a, args, LOCATIONS) }
-    | a='$[' ~ args=proc_cmds ']' { self.subproc(a, args, LOCATIONS) }
-    | a='![' ~ args=proc_cmds ']' { self.subproc(a, args, LOCATIONS) }
-    | a='!(' ~ args=proc_cmds ')' { self.subproc(a, args, LOCATIONS) }
+    | '$(' ~ args=proc_cmds ')' { self.handle_proc("subproc_captured", args, LOCATIONS) }
+    | '$[' ~ args=proc_cmds ']' { self.handle_proc("subproc_uncaptured", args, LOCATIONS) }
+    | '![' ~ args=proc_cmds ']' { self.handle_proc("subproc_captured_hiddenobject", args, LOCATIONS) }
+    | '!(' ~ args=proc_cmds ')' { self.handle_proc("subproc_captured_object", args, LOCATIONS) }
 
 help_atom:
     | a=atom b=('??' | '?') { (a, b) }
@@ -986,6 +986,7 @@ env_atom:
 proc_cmds:
     | a=proc_cmd+ { self.proc_args(a) }
 
+
 proc_cmd:
     | sub_procs
     | '@(' ~ a=(bare_genexp | expressions) ')' { self.proc_pyexpr(a, LOCATIONS) }
@@ -994,6 +995,7 @@ proc_cmd:
     | help_atom
     | search_path
     | proc_macro_start ~ a=(cmd_group | any_cmd )* { self.proc_macro_arg(a, LOCATIONS) }
+    | a=cmd_group { self.proc_macro_arg(a, LOCATIONS) }
     | cmd_name
 
 proc_macro_start:

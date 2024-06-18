@@ -16,7 +16,6 @@ def test_redirect(check_xonsh_ast):
         "![< /path/to/input.txt > /path/to/output.txt]",
     ],
 )
-@pytest.mark.xfail
 def test_redirect_abspath(case, check_xonsh_ast):
     assert check_xonsh_ast(case)
 

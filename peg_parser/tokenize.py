@@ -142,6 +142,9 @@ class TokenInfo(NamedTuple):
     end: tuple[int, int]
     line: str
 
+    def __repr__(self) -> str:
+        return f"<{self.type.name}>({self.string!r}) at {self.start[0]}"
+
     def is_exact_type(self, typ: str) -> bool:
         return self.type == Token.OP and self.string == typ
 
