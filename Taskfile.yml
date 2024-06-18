@@ -1,5 +1,8 @@
 version: '3'
 tasks:
+  pull_grammar:
+    cmds:
+      - curl -L https://github.com/python/cpython/raw/main/Grammar/python.gram > tasks/python.gram
   generate-meta:
     cmds:
       - git checkout pegen/grammar_parser.py
@@ -51,8 +54,8 @@ tasks:
       - generate
     cmds:
       - python -m pytest {{.CLI_ARGS}}
-    sources:
-      - '**/*.py'
+#    sources:
+#      - '**/*.py'
 
   wtest:
     cmds:
