@@ -38,22 +38,6 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def func_type(self) -> ast.FunctionType | None:
-        # func_type: '(' type_expressions? ')' '->' expression NEWLINE* $
-        mark = self._mark()
-        if (
-            (self.expect("("))
-            and (a := self.type_expressions(),)
-            and (self.expect(")"))
-            and (self.expect("->"))
-            and (b := self.expression())
-            and (self.repeated(self.token, "NEWLINE"),)
-            and (self.token("ENDMARKER"))
-        ):
-            return ast.FunctionType(argtypes=a, returns=b)
-        self._reset(mark)
-        return None
-
     def fstring(self) -> ast.JoinedStr | None:
         # fstring: FSTRING_START fstring_mid* FSTRING_END
         mark = self._mark()
@@ -3368,56 +3352,6 @@ class XonshParser(Parser):
         self._reset(mark)
         if (self.expect("[")) and (a := self.del_targets(),) and (self.expect("]")):
             return ast.List(elts=a, ctx=Del, **self.span(_lnum, _col))
-        self._reset(mark)
-        return None
-
-    def type_expressions(self) -> list[Any] | None:
-        # type_expressions: ','.expression+ ',' '*' expression ',' '**' expression | ','.expression+ ',' '*' expression | ','.expression+ ',' '**' expression | '*' expression ',' '**' expression | '*' expression | '**' expression | ','.expression+
-        mark = self._mark()
-        if (
-            (a := self.gathered(self.expression, self.expect, ","))
-            and (self.expect(","))
-            and (self.expect("*"))
-            and (b := self.expression())
-            and (self.expect(","))
-            and (self.expect("**"))
-            and (c := self.expression())
-        ):
-            return a + [b, c]
-        self._reset(mark)
-        if (
-            (a := self.gathered(self.expression, self.expect, ","))
-            and (self.expect(","))
-            and (self.expect("*"))
-            and (b := self.expression())
-        ):
-            return a + [b]
-        self._reset(mark)
-        if (
-            (a := self.gathered(self.expression, self.expect, ","))
-            and (self.expect(","))
-            and (self.expect("**"))
-            and (b := self.expression())
-        ):
-            return a + [b]
-        self._reset(mark)
-        if (
-            (self.expect("*"))
-            and (a := self.expression())
-            and (self.expect(","))
-            and (self.expect("**"))
-            and (b := self.expression())
-        ):
-            return [a, b]
-        self._reset(mark)
-        if (self.expect("*")) and (a := self.expression()):
-            return [a]
-        self._reset(mark)
-        if (self.expect("**")) and (a := self.expression()):
-            return [a]
-        self._reset(mark)
-        if a := self.gathered(self.expression, self.expect, ","):
-            return a
         self._reset(mark)
         return None
 
