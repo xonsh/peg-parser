@@ -10,14 +10,6 @@ from peg_parser.subheader import Del, Load, Parser, Store, Target, logger, memoi
 
 # Keywords and soft keywords are listed at the end of the parser definition.
 class XonshParser(Parser):
-    def start(self) -> Any | None:
-        # start: file
-        mark = self._mark()
-        if file := self.file():
-            return file
-        self._reset(mark)
-        return None
-
     def file(self) -> ast.Module | None:
         # file: statements? $
         mark = self._mark()
@@ -2812,7 +2804,7 @@ class XonshParser(Parser):
         ):
             return ast.FormattedValue(
                 value=a,
-                conversion=conver.decode()[0] if conver else b"r"[0] if debug_expr else -1,
+                conversion=conver if conver else b"r"[0] if debug_expr else -1,
                 format_spec=format,
                 **self.span(_lnum, _col),
             )
@@ -2822,11 +2814,11 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def fstring_conversion(self) -> Any | None:
+    def fstring_conversion(self) -> int | None:
         # fstring_conversion: '!' NAME
         mark = self._mark()
-        if (conv_token := self.expect("!")) and (conv := self.name()):
-            return self.check_fstring_conversion(conv_token, conv)
+        if (self.expect("!")) and (conv := self.name()):
+            return self.check_fstring_conversion(conv)
         self._reset(mark)
         return None
 

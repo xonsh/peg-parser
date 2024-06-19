@@ -471,12 +471,7 @@ class Parser:
             self.raise_syntax_error_known_location("imaginary number required in complex literal", number)
         return value
 
-    def check_fstring_conversion(self, mark: TokenInfo, name: TokenInfo) -> TokenInfo:
-        if mark.lineno != name.lineno or mark.col_offset != name.col_offset:  # type: ignore
-            self.raise_syntax_error_known_range(
-                "f-string: conversion type must come right after the exclamanation mark", mark, name
-            )
-
+    def check_fstring_conversion(self, name: TokenInfo) -> int:
         s = name.string
         if len(s) > 1 or s not in ("s", "r", "a"):
             self.raise_syntax_error_known_location(
@@ -484,7 +479,7 @@ class Parser:
                 name,
             )
 
-        return name
+        return s.encode()[0]
 
     def _concat_strings_in_constant(self, parts: list[TokenInfo]) -> ast.Constant:
         s = ast.literal_eval(parts[0].string)

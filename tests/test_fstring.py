@@ -11,6 +11,7 @@ import pytest
         "f\"{'$HOME'}\"",
         "f\"{${'HOME'}}\"",
         "f'{${$FOO+$BAR}}'",
+        'f"{st!r}"',
     ],
 )
 def test_f_env_var(inp, parse_str):
