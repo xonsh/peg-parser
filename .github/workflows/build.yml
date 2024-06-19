@@ -14,7 +14,7 @@ permissions:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 5
+    timeout-minutes: 3
     strategy:
       fail-fast: false
       matrix:
@@ -37,8 +37,9 @@ jobs:
         cache-dependency-path: pyproject.toml
     - name: Install dependencies
       run: |
-        pip install -U pip
-        pip install -e ".[test]"
+        pip3 --version
+        pip3 install -U pip
+        pip3 install -e ".[test]"
     - name: Test
       run: pytest --cov=peg_parser tests/ --cov-report=term-missing --cov-report=xml
 #    - uses: codecov/codecov-action@v4.0.1
