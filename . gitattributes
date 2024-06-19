@@ -1,1 +1,1 @@
-**/*.gram linguist-language=EBNF
+*.gram linguist-language=EBNF
