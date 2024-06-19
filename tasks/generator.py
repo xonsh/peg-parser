@@ -44,6 +44,11 @@ class XonshCallMakerVisitor(PythonCallMakerVisitor):
         tail = tail[:-1]
         return head, tail
 
+    def _call_helper(self, node: Item, nested=True):
+        for arg in self.lookahead_call_helper(node, nested=nested):
+            if arg:
+                yield arg
+
     def visit_NameLeaf(self, node: NameLeaf) -> tuple[str | None, str]:
         name = node.value
         special = {"SOFT_KEYWORD", "KEYWORD", "NAME", "ANY_TOKEN"}
@@ -55,30 +60,62 @@ class XonshCallMakerVisitor(PythonCallMakerVisitor):
             return "_" + name.lower(), f"self.token('{token.name}')"
         return name, f"self.{name}()"
 
+    def rhs_helper(self, node: Rhs) -> tuple[str, str] | None:
+        # special case to reduce generated code size
+        if (
+            len(node.alts) <= 1
+            or (any(a.action for a in node.alts))
+            or (any(len(a.items) > 1 for a in node.alts))
+        ):
+            return None
+        alt_funcs = itertools.chain.from_iterable(a.items for a in node.alts)
+        args = []
+        for fn in alt_funcs:
+            head, tail = self.lookahead_call_helper(fn, nested=False)
+            if tail:
+                args.append(f"({head}, {tail})")  # tuple
+            else:
+                args.append(head)  # func
+        return "seq_alts", f"self.seq_alts({', '.join(args)},)"
+
+    # def visit_Rhs(self, node: Rhs) -> tuple[str | None, str]:
+    #     if node in self.cache:
+    #         return self.cache[node]
+    #     if len(node.alts) == 1 and len(node.alts[0].items) == 1:
+    #         self.cache[node] = self.visit(node.alts[0].items[0])
+    #     elif simple := self.rhs_helper(node):
+    #         name, call = simple
+    #         self.cache[node] = name, call
+    #     else:
+    #         name = self.gen.artifical_rule_from_rhs(node)
+    #         self.cache[node] = name, f"self.{name}()"
+    #     return self.cache[node]
+
     def visit_Gather(self, node: Gather) -> tuple[str, str]:
         if node in self.cache:
             return self.cache[node]
         func, fn_args = self.lookahead_call_helper(node)
-        assert not fn_args
-        sep = ", ".join([a for a in self.lookahead_call_helper(node.separator, nested=False) if a])
+        if fn_args:
+            func = f"({func}, {fn_args})"
+        sep = ", ".join(self._call_helper(node.separator, nested=False))
         self.cache[node] = "gathered", f"self.gathered({func}, {sep})"  # No trailing comma here either!
         return self.cache[node]
 
-    def call_helper(self, node: Item) -> str:
-        return ", ".join(a for a in self.lookahead_call_helper(node) if a)
-
     def visit_PositiveLookahead(self, node: PositiveLookahead) -> tuple[None, str]:
-        return None, f"self.positive_lookahead({self.call_helper(node)})"
+        args = ", ".join(self._call_helper(node))
+        return None, f"self.positive_lookahead({args})"
 
     def visit_NegativeLookahead(self, node: NegativeLookahead) -> tuple[None, str]:
-        return None, f"self.negative_lookahead({self.call_helper(node)})"
+        args = ", ".join(self._call_helper(node))
+        return None, f"self.negative_lookahead({args})"
 
     def get_repeated(self, node):
         if isinstance(node.node, NameLeaf):
-            args = ", ".join([a for a in self.lookahead_call_helper(node) if a])
-            return f"self.repeated({args})"
-        name, _ = self.visit(Rhs([Alt([NamedItem(None, node.node)])]))
-        return f"self.repeated(self.{name})"
+            args = ", ".join(self._call_helper(node))
+        else:
+            rhs = Rhs([Alt([NamedItem(None, node.node)])])
+            args = ", ".join(self._call_helper(rhs, nested=False))
+        return f"self.repeated({args})"
 
     def visit_Repeat0(self, node: Repeat0) -> tuple[str, str]:
         if node in self.cache:
@@ -185,20 +222,9 @@ class XonshParserGenerator(PythonParserGenerator):
                 self.cleanup_statements.append("self.call_invalid_rules = _prev_call_invalid")
 
             # special case to reduce generated code size
-            if (
-                len(node.rhs.alts) > 1
-                and (not any(a.action for a in node.rhs.alts))
-                and (not any(len(a.items) > 1 for a in node.rhs.alts))
-            ):
-                self.print("return self.seq_alts(")
-                alt_funcs = itertools.chain.from_iterable(a.items for a in node.rhs.alts)
-                for fn in alt_funcs:
-                    head, tail = self.callmakervisitor.lookahead_call_helper(fn, nested=False)
-                    if tail:
-                        self.print(f"({head}, {tail}), ")
-                    else:
-                        self.print(f"{head}, ")
-                self.print(")")
+            if simple := self.callmakervisitor.rhs_helper(node.rhs):
+                _, call = simple
+                self.print(f"return {call}")
                 return
 
             self.print("mark = self._mark()")

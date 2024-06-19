@@ -314,21 +314,28 @@ class Parser:
         self._reset(mark)
         return children
 
-    def sep_repeated(self, func: Callable[[], T], sep_func: Callable[..., T], *args: Any) -> list[T]:
-        mark = self._mark()
-        children = []
-        while (sep_func(*args)) and (elem := func()):
-            children.append(elem)
-            mark = self._mark()
-        self._reset(mark)
-        return children
+    def sep_repeated(
+        self,
+        func: Callable[..., T | None] | tuple[Callable[..., T | None], ...],
+        sep_func: Callable[..., Any],
+        *sep_args: Any,
+    ) -> Any:
+        if (sep_func(*sep_args)) and (elem := self.seq_alts(func)):
+            return elem
+        return None
 
     def gathered(
-        self, func: Callable[[], T | None], sep: Callable[..., Any], *sep_args: Any
+        self,
+        func: Callable[..., T | None] | tuple[Callable[..., T | None], ...],
+        sep: Callable[..., Any],
+        *sep_args: Any,
     ) -> list[T] | None:
         # gather: ','.e+
+        seq: list[T]
         mark = self._mark()
-        if (elem := func()) is not None and (seq := self.sep_repeated(func, sep, *sep_args)) is not None:
+        if (elem := self.seq_alts(func)) is not None and (
+            seq := self.repeated(self.sep_repeated, func, sep, *sep_args)
+        ) is not None:
             return [elem, *seq]
         self._reset(mark)
         return None
