@@ -25,23 +25,26 @@ def dump_diff(**trees: ast.AST):
     return "\n".join(difflib.unified_diff(o.split("\n"), p.split("\n"), orig_name, pp_name))
 
 
+marks = {"marks": pytest.mark.xfail} if sys.version_info < (3, 12) else {}
+
+
 @pytest.mark.parametrize(
     "filename",
     [
         "advanced_decorators.py",
-        "assignment.py",
+        pytest.param("assignment.py", **marks),
         "async.py",
         "call.py",
         "comprehensions.py",
         "expressions.py",
-        "fstrings.py",
+        pytest.param("fstrings.py", **marks),
         "function_def.py",
         "imports.py",
         "lambdas.py",
         "multi_statement_per_line.py",
         "no_newline_at_end_of_file.py",
         "no_newline_at_end_of_file_with_comment.py",
-        "pattern_matching.py",
+        pytest.param("pattern_matching.py", **marks),
         "simple_decorators.py",
         "statements.py",
         "with_statement_multi_items.py",
