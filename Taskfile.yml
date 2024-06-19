@@ -58,6 +58,9 @@ tasks:
 #    sources:
 #      - '**/*.py'
 
+  test-cov:
+    cmd: task test -- --cov=peg_parser --cov-report=html
+
   wtest:
     cmds:
       - watchexec -e py,gram --clear -- task test -- --ff -x -vv --testmon
