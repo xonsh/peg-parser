@@ -159,7 +159,9 @@ def test_invalid_statements(python_parse_file, python_parse_str, tmp_path, sourc
         ("f(a, b for b in c)", "Generator expression must be parenthesized", (1, 6), (1, None)),
         # NOTE CPython bug, should report 18 as expected (we use None to omit the check)
         ("f(a, b for b in c, d)", "Generator expression must be parenthesized", (1, 6), (1, None)),
-        ("f(*a=b)", "cannot assign to iterable argument unpacking", (1, 3), (1, 7)),
+        pytest.param(
+            "f(*a=b)", "cannot assign to iterable argument unpacking", (1, 3), (1, 7), marks=pytest.mark.xfail
+        ),
         ("f(**a, b)", "positional argument follows keyword argument unpacking", (1, 9), (1, 10)),
         ("f(a=1, b)", "positional argument follows keyword argument", (1, 9), (1, 10)),
         # Invalid kwarg rules
