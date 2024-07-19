@@ -470,13 +470,13 @@ class Parser:
         value = ast.literal_eval(number.string)
         if not isinstance(value, float | int):
             self.raise_syntax_error_known_location("real number required in complex literal", number)
-        return value
+        return cast(float | int, value)
 
     def ensure_imaginary(self, number: TokenInfo) -> complex:
         value = ast.literal_eval(number.string)
         if not isinstance(value, complex):
             self.raise_syntax_error_known_location("imaginary number required in complex literal", number)
-        return value
+        return cast(complex, value)
 
     def check_fstring_conversion(self, name: TokenInfo) -> int:
         s = name.string
@@ -851,7 +851,7 @@ class Parser:
             self.raise_raw_syntax_error(f"expected {expectation}", last_token.start, end)
         return res
 
-    def raise_syntax_error(self, message: str) -> NoReturn:
+    def raise_syntax_error(self, message: str) -> None:
         """Raise a syntax error."""
         tok = self._tokenizer.diagnose()
         raise self._build_syntax_error(
@@ -860,7 +860,7 @@ class Parser:
             tok.end if sys.version_info >= (3, 12) or tok.type != Token.NEWLINE else tok.start,
         )
 
-    def raise_syntax_error_known_location(self, message: str, node: ast.AST | TokenInfo) -> NoReturn:
+    def raise_syntax_error_known_location(self, message: str, node: ast.AST | TokenInfo) -> None:
         """Raise a syntax error that occured at a given AST node."""
         if isinstance(node, TokenInfo):
             start = node.start
@@ -876,7 +876,7 @@ class Parser:
         message: str,
         start_node: ast.AST | TokenInfo,
         end_node: ast.AST | TokenInfo,
-    ) -> NoReturn:
+    ) -> None:
         if isinstance(start_node, TokenInfo):
             start = start_node.start
         else:
