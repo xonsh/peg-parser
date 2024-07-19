@@ -3969,7 +3969,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def invalid_with_stmt(self) -> None | None:
+    def invalid_with_stmt(self) -> None:
         # invalid_with_stmt: 'async'? 'with' ','.(expression ['as' star_target])+ &&':' | 'async'? 'with' '(' ','.(expressions ['as' star_target])+ ','? ')' &&':'
         mark = self._mark()
         if (
@@ -4076,7 +4076,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def invalid_except_stmt(self) -> None | None:
+    def invalid_except_stmt(self) -> None:
         # invalid_except_stmt: 'except' '*'? expression ',' expressions ['as' NAME] ':' | 'except' '*'? expression ['as' NAME] NEWLINE | 'except' '*'? NEWLINE | 'except' '*' (NEWLINE | ':')
         mark = self._mark()
         if (
@@ -4405,7 +4405,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def invalid_double_starred_kvpairs(self) -> None | None:
+    def invalid_double_starred_kvpairs(self) -> None:
         # invalid_double_starred_kvpairs: ','.double_starred_kvpair+ ',' invalid_kvpair | expression ':' '*' bitwise_or | expression ':' &('}' | ',')
         mark = self._mark()
         if (
@@ -4428,7 +4428,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def invalid_kvpair(self) -> None | None:
+    def invalid_kvpair(self) -> None:
         # invalid_kvpair: expression !(':') | expression ':' '*' bitwise_or | expression ':' &('}' | ',') | expression ':'
         mark = self._mark()
         if (a := self.expression()) and (self.negative_lookahead(self.expect, ":")):
@@ -4468,7 +4468,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def invalid_replacement_field(self) -> Any | None:
+    def invalid_replacement_field(self) -> None:
         # invalid_replacement_field: '{' '=' | '{' '!' | '{' ':' | '{' '}' | '{' !annotated_rhs | '{' annotated_rhs !('=' | '!' | ':' | '}') | '{' annotated_rhs '=' !('!' | ':' | '}') | '{' annotated_rhs '='? invalid_conversion_character | '{' annotated_rhs '='? ['!' NAME] !(':' | '}') | '{' annotated_rhs '='? ['!' NAME] ':' fstring_format_spec* !'}' | '{' annotated_rhs '='? ['!' NAME] !'}'
         mark = self._mark()
         if (self.expect("{")) and (a := self.expect("=")):
@@ -4537,7 +4537,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def invalid_conversion_character(self) -> Any | None:
+    def invalid_conversion_character(self) -> None:
         # invalid_conversion_character: '!' &(':' | '}') | '!' !NAME
         mark = self._mark()
         if (self.expect("!")) and (self.positive_lookahead(self._tmp_112)):

@@ -4,7 +4,7 @@ import ast
 import enum
 import sys
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, NoReturn, ParamSpec, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, ParamSpec, TypeVar, cast
 
 from peg_parser.tokenize import Token, TokenInfo, generate_tokens
 from peg_parser.tokenizer import Mark, Tokenizer
@@ -893,7 +893,7 @@ class Parser:
 
         raise self._build_syntax_error(message, start, end)
 
-    def raise_syntax_error_starting_from(self, message: str, start_node: ast.AST | TokenInfo) -> NoReturn:
+    def raise_syntax_error_starting_from(self, message: str, start_node: ast.AST | TokenInfo) -> None:
         if isinstance(start_node, TokenInfo):
             start = start_node.start
         else:
@@ -916,7 +916,7 @@ class Parser:
 
         self.raise_syntax_error_known_location(msg, invalid_target)
 
-    def raise_syntax_error_on_next_token(self, message: str) -> NoReturn:
+    def raise_syntax_error_on_next_token(self, message: str) -> None:
         next_token = self._tokenizer.peek()
         raise self._build_syntax_error(message, next_token.start, next_token.end)
 

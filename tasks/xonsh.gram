@@ -1657,7 +1657,7 @@ invalid_import_from_targets[NoReturn]:
         self.raise_syntax_error("trailing comma not allowed without surrounding parentheses")
      }
 
-invalid_with_stmt[None]:
+invalid_with_stmt[NoReturn]:
     | ['async'] 'with' ','.(expression ['as' star_target])+ &&':' { UNREACHABLE }
     | ['async'] 'with' '(' ','.(expressions ['as' star_target])+ ','? ')' &&':' { UNREACHABLE }
 invalid_with_stmt_indent[NoReturn]:
@@ -1691,7 +1691,7 @@ invalid_try_stmt[NoReturn]:
             "cannot have both 'except' and 'except*' on the same 'try'", a
         )
      }
-invalid_except_stmt[None]:
+invalid_except_stmt[NoReturn]:
     | 'except' '*'? a=expression ',' expressions ['as' NAME ] ':' {
         self.raise_syntax_error_starting_from("multiple exception types must be parenthesized", a)
      }
@@ -1802,7 +1802,7 @@ invalid_class_def_raw[NoReturn]:
         )
      }
 
-invalid_double_starred_kvpairs[None]:
+invalid_double_starred_kvpairs[NoReturn]:
     | ','.double_starred_kvpair+ ',' invalid_kvpair
     | expression ':' a='*' bitwise_or {
         self.raise_syntax_error_starting_from("cannot use a starred expression in a dictionary value", a)
@@ -1810,7 +1810,7 @@ invalid_double_starred_kvpairs[None]:
     | expression a=':' &('}'|',') {
         self.raise_syntax_error_known_location("expression expected after dictionary key and ':'", a)
      }
-invalid_kvpair[None]:
+invalid_kvpair[NoReturn]:
     | a=expression !(':') {
         self.raise_raw_syntax_error(
             "':' expected after dictionary key",
@@ -1835,7 +1835,7 @@ invalid_starred_expression:
             "cannot assign to iterable argument unpacking", a, b
         )
      }
-invalid_replacement_field:
+invalid_replacement_field[NoReturn]:
     | '{' a='=' { self.raise_syntax_error_known_location("f-string: valid expression required before '='", a) }
     | '{' a='!' { self.raise_syntax_error_known_location("f-string: valid expression required before '!'", a) }
     | '{' a=':' { self.raise_syntax_error_known_location("f-string: valid expression required before ':'", a) }
@@ -1861,6 +1861,6 @@ invalid_replacement_field:
         self.raise_syntax_error_on_next_token("f-string: expecting '}'")
      }
 
-invalid_conversion_character:
+invalid_conversion_character[NoReturn]:
     | '!' &(':' | '}') { self.raise_syntax_error_on_next_token("f-string: missing conversion character") }
     | '!' !NAME { self.raise_syntax_error_on_next_token("f-string: invalid conversion character") }
