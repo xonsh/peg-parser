@@ -884,7 +884,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def annotation(self) -> Any | None:
+    def annotation(self) -> ast.Expr | None:
         # annotation: ':' expression
         mark = self._mark()
         if (self.expect(":")) and (a := self.expression()):
@@ -900,7 +900,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def default(self) -> Any | None:
+    def default(self) -> ast.Expr | None:
         # default: '=' expression | invalid_default
         mark = self._mark()
         if (self.expect("=")) and (a := self.expression()):

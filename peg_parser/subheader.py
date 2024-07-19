@@ -4,7 +4,7 @@ import ast
 import enum
 import sys
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, NoReturn, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, NoReturn, ParamSpec, TypeVar, cast
 
 from peg_parser.tokenize import Token, TokenInfo, generate_tokens
 from peg_parser.tokenizer import Mark, Tokenizer
@@ -51,7 +51,11 @@ EXPR_NAME_MAPPING = {
 }
 
 T = TypeVar("T")
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
+T3 = TypeVar("T3")
 P = TypeVar("P", bound="Parser")
+P1 = ParamSpec("P1")
 F = TypeVar("F", bound=Callable[..., Any])
 
 
@@ -305,7 +309,7 @@ class Parser:
             return self._tokenizer.getnext()
         return None
 
-    def repeated(self, func: Callable[..., T | None], *args: Any) -> list[T]:
+    def repeated(self, func: Callable[..., T1 | None], *args: Any) -> list[T1]:
         mark = self._mark()
         children = []
         while result := func(*args):
@@ -316,22 +320,22 @@ class Parser:
 
     def sep_repeated(
         self,
-        func: Callable[..., T | None] | tuple[Callable[..., T | None], ...],
+        func: Callable[..., T2] | tuple[Callable[..., T2], Any],
         sep_func: Callable[..., Any],
         *sep_args: Any,
-    ) -> Any:
+    ) -> T2 | None:
         if (sep_func(*sep_args)) and (elem := self.seq_alts(func)):
             return elem
         return None
 
     def gathered(
         self,
-        func: Callable[..., T | None] | tuple[Callable[..., T | None], ...],
+        func: Callable[..., T3 | None] | tuple[Callable[..., T3 | None], Any],
         sep: Callable[..., Any],
         *sep_args: Any,
-    ) -> list[T] | None:
+    ) -> list[T3] | None:
         # gather: ','.e+
-        seq: list[T]
+        seq: list[T3]
         mark = self._mark()
         if (elem := self.seq_alts(func)) is not None and (
             seq := self.repeated(self.sep_repeated, func, sep, *sep_args)
@@ -356,8 +360,8 @@ class Parser:
         end = self._tokenizer.get_last_non_whitespace_token().end
         return {"lineno": lnum, "col_offset": col, "end_lineno": end[0], "end_col_offset": end[1]}
 
-    def seq_alts(self, *alt: Callable[..., T] | tuple[Callable[..., T], ...]) -> T | None:
-        """Hanle sequence of alts that don't have action associated with them."""
+    def seq_alts(self, *alt: Callable[..., T] | tuple[Callable[..., T], Any]) -> T | None:
+        """Handle sequence of alts that don't have action associated with them."""
         mark = self._mark()
         for arg in alt:
             if isinstance(arg, tuple):
@@ -797,7 +801,7 @@ class Parser:
         self._tokenizer._proc_macro = True
         return a
 
-    def proc_macro_arg(self, a: list[TokenInfo | str], **locs: int) -> ast.Constant:
+    def proc_macro_arg(self, a: list[TokenInfo | str] | Any, **locs: int) -> ast.Constant:
         locs["col_offset"] += 1  # offset `!`
         st = "".join((tok.string if isinstance(tok, TokenInfo) else tok) for tok in a).strip()
         self._tokenizer._proc_macro = False

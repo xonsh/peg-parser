@@ -170,6 +170,5 @@ disable_error_code = [
     "type-arg",
     "arg-type",
     "attr-defined",
-#    "return-value",
 ]
 strict = true

@@ -370,9 +370,9 @@ param: a=NAME b=annotation? { ast.arg(arg=a.string, annotation=b, LOCATIONS) }
 param_star_annotation: a=NAME b=star_annotation {
     ast.arg(arg=a.string, annotations=b, LOCATIONS)
  }
-annotation: ':' a=expression { a }
+annotation[ast.Expr]: ':' a=expression { a }
 star_annotation: ':' a=star_expression { a }
-default: '=' a=expression { a } | invalid_default
+default[ast.Expr]: '=' a=expression { a } | invalid_default
 
 # If statement
 # ------------
