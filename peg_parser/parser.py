@@ -99,11 +99,11 @@ class XonshParser(Parser):
             return [a]
         self._reset(mark)
         if (
-            (a := self.gathered(self.simple_stmt, self.expect, ";"))
+            (a1 := self.gathered(self.simple_stmt, self.expect, ";"))
             and (self.expect(";"),)
             and (self.token("NEWLINE"))
         ):
-            return a
+            return a1
         self._reset(mark)
         return None
 
@@ -871,7 +871,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def param(self) -> Any | None:
+    def param(self) -> ast.arg | None:
         # param: NAME annotation?
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -880,7 +880,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def param_star_annotation(self) -> Any | None:
+    def param_star_annotation(self) -> ast.arg | None:
         # param_star_annotation: NAME star_annotation
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -1131,7 +1131,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def with_macro_stmt(self) -> Any | None:
+    def with_macro_stmt(self) -> ast.With | None:
         # with_macro_stmt: with_macro_start MACRO_PARAM
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -1801,7 +1801,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def type_param_seq(self) -> Any | None:
+    def type_param_seq(self) -> list[Any] | None:
         # type_param_seq: ','.type_param+ ','?
         mark = self._mark()
         if (a := self.gathered(self.type_param, self.expect, ",")) and (self.expect(","),):
@@ -1877,7 +1877,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def expression(self) -> Any | None:
+    def expression(self) -> ast.Expr | Any | None:
         # expression: invalid_expression | invalid_legacy_expression | disjunction 'if' disjunction 'else' expression | disjunction | lambdef
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -2585,7 +2585,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def lambdef(self) -> Any | None:
+    def lambdef(self) -> ast.Lambda | None:
         # lambdef: 'lambda' lambda_params? ':' expression
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -3120,8 +3120,8 @@ class XonshParser(Parser):
         if (a := self.name()) and (self.expect("=")) and (b := self.expression()):
             return ast.keyword(arg=a.string, value=b, **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.expect("**")) and (a := self.expression()):
-            return ast.keyword(arg=None, value=a, **self.span(_lnum, _col))
+        if (self.expect("**")) and (a1 := self.expression()):
+            return ast.keyword(arg=None, value=a1, **self.span(_lnum, _col))
         self._reset(mark)
         return None
 
@@ -3453,27 +3453,32 @@ class XonshParser(Parser):
         if (a := self._tmp_62()) and (b := self.expect("=")):
             return self.raise_syntax_error_known_range(f"cannot assign to {a.string}", a, b)
         self._reset(mark)
-        if (a := self.name()) and (b := self.expect("=")) and (self.expression()) and (self.for_if_clauses()):
+        if (
+            (a1 := self.name())
+            and (b1 := self.expect("="))
+            and (self.expression())
+            and (self.for_if_clauses())
+        ):
             return self.raise_syntax_error_known_range(
-                "invalid syntax. Maybe you meant '==' or ':=' instead of '='?", a, b
+                "invalid syntax. Maybe you meant '==' or ':=' instead of '='?", a1, b1
             )
         self._reset(mark)
-        if (self.negative_lookahead(self._tmp_63)) and (a := self.expression()) and (b := self.expect("=")):
+        if (self.negative_lookahead(self._tmp_63)) and (a2 := self.expression()) and (b2 := self.expect("=")):
             return self.raise_syntax_error_known_range(
-                'expression cannot contain assignment, perhaps you meant "=="?', a, b
+                'expression cannot contain assignment, perhaps you meant "=="?', a2, b2
             )
         self._reset(mark)
         if (
-            (a := self.expect("**"))
+            (a3 := self.expect("**"))
             and (self.expression())
             and (self.expect("="))
-            and (b := self.expression())
+            and (b3 := self.expression())
         ):
-            return self.raise_syntax_error_known_range("cannot assign to keyword argument unpacking", a, b)
+            return self.raise_syntax_error_known_range("cannot assign to keyword argument unpacking", a3, b3)
         self._reset(mark)
         return None
 
-    def expression_without_invalid(self) -> ast.AST | None:
+    def expression_without_invalid(self) -> ast.AST | Any | None:
         # expression_without_invalid: disjunction 'if' disjunction 'else' expression | disjunction | lambdef
         _prev_call_invalid = self.call_invalid_rules
         self.call_invalid_rules = False
@@ -3561,22 +3566,22 @@ class XonshParser(Parser):
             )
         self._reset(mark)
         if (
-            (a := self.name())
+            (a1 := self.name())
             and (self.expect("="))
-            and (b := self.bitwise_or())
+            and (b1 := self.bitwise_or())
             and (self.negative_lookahead(self._tmp_67))
         ):
             return (
                 None
                 if self.in_recursive_rule
                 else self.raise_syntax_error_known_range(
-                    "invalid syntax. Maybe you meant '==' or ':=' instead of '='?", a, b
+                    "invalid syntax. Maybe you meant '==' or ':=' instead of '='?", a1, b1
                 )
             )
         self._reset(mark)
         if (
             (self.negative_lookahead(self._tmp_68))
-            and (a := self.bitwise_or())
+            and (a2 := self.bitwise_or())
             and (self.expect("="))
             and (self.bitwise_or())
             and (self.negative_lookahead(self._tmp_67))
@@ -3585,7 +3590,7 @@ class XonshParser(Parser):
                 None
                 if self.in_recursive_rule
                 else self.raise_syntax_error_known_location(
-                    f"cannot assign to {self.get_expr_name(a)} here. Maybe you meant '==' instead of '='?", a
+                    f"cannot assign to {self.get_expr_name(a)} here. Maybe you meant '==' instead of '='?", a2
                 )
             )
         self._reset(mark)
@@ -3796,8 +3801,8 @@ class XonshParser(Parser):
         if (self.expect("**")) and (self.param()) and (a := self.expect("=")):
             return self.raise_syntax_error_known_location("var-keyword argument cannot have default value", a)
         self._reset(mark)
-        if (self.expect("**")) and (self.param()) and (self.expect(",")) and (a := self.param()):
-            return self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a)
+        if (self.expect("**")) and (self.param()) and (self.expect(",")) and (a1 := self.param()):
+            return self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a1)
         self._reset(mark)
         if (self.expect("**")) and (self.param()) and (self.expect(",")) and (a := self._tmp_82()):
             return self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a)
@@ -4242,9 +4247,9 @@ class XonshParser(Parser):
             (self.or_pattern())
             and (self.expect("as"))
             and (self.negative_lookahead(self.name))
-            and (a := self.expression())
+            and (a1 := self.expression())
         ):
-            return self.raise_syntax_error_known_location("invalid pattern target", a)
+            return self.raise_syntax_error_known_location("invalid pattern target", a1)
         self._reset(mark)
         return None
 
@@ -4459,19 +4464,19 @@ class XonshParser(Parser):
                 (a.end_lineno, a.end_col_offset),
             )
         self._reset(mark)
-        if (self.expression()) and (self.expect(":")) and (a := self.expect("*")) and (self.bitwise_or()):
+        if (self.expression()) and (self.expect(":")) and (a1 := self.expect("*")) and (self.bitwise_or()):
             return self.raise_syntax_error_starting_from(
-                "cannot use a starred expression in a dictionary value", a
+                "cannot use a starred expression in a dictionary value", a1
             )
         self._reset(mark)
-        if (self.expression()) and (a := self.expect(":")) and (self.positive_lookahead(self._tmp_107)):
+        if (self.expression()) and (a2 := self.expect(":")) and (self.positive_lookahead(self._tmp_107)):
             return self.raise_syntax_error_known_location(
-                "expression expected after dictionary key and ':'", a
+                "expression expected after dictionary key and ':'", a2
             )
         self._reset(mark)
-        if (self.expression()) and (a := self.expect(":")):
+        if (self.expression()) and (a3 := self.expect(":")):
             return self.raise_syntax_error_known_location(
-                "expression expected after dictionary key and ':'", a
+                "expression expected after dictionary key and ':'", a3
             )
         self._reset(mark)
         return None

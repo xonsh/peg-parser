@@ -40,7 +40,7 @@ statement_newline[list[Any]]:
 
 simple_stmts[list[Any]]:
     | a=simple_stmt !';' NEWLINE { [a] } # Not needed, there for speedup
-    | a=';'.simple_stmt+ [';'] NEWLINE { a }
+    | a1=';'.simple_stmt+ [';'] NEWLINE { a1 }
 
 # NOTE: assignment MUST precede expression, else parsing a simple assignment
 # will throw a SyntaxError.
@@ -366,8 +366,8 @@ param_with_default[Tuple[ast.arg, Any]]:
 param_maybe_default[Tuple[ast.arg, Any]]:
     | a=param c=default? ',' tc=TYPE_COMMENT? { (a, c) }
     | a=param c=default? tc=TYPE_COMMENT? &')' { (a, c) }
-param: a=NAME b=annotation? { ast.arg(arg=a.string, annotation=b, LOCATIONS) }
-param_star_annotation: a=NAME b=star_annotation {
+param[ast.arg]: a=NAME b=annotation? { ast.arg(arg=a.string, annotation=b, LOCATIONS) }
+param_star_annotation[ast.arg]: a=NAME b=star_annotation {
     ast.arg(arg=a.string, annotations=b, LOCATIONS)
  }
 annotation[ast.Expr]: ':' a=expression { a }
@@ -435,7 +435,7 @@ with_item[ast.withitem]:
     | invalid_with_item
     | e=expression { ast.withitem(context_expr=e, optional_vars=None) }
 
-with_macro_stmt:
+with_macro_stmt[ast.With]:
     | a=with_macro_start b=MACRO_PARAM {
         self.handle_with_macro_stmt(a, b, LOCATIONS)
      }
@@ -748,7 +748,7 @@ type_params[list[Any]]: '[' t=type_param_seq  ']' {
     )
  }
 
-type_param_seq: a=','.type_param+ [','] { a }
+type_param_seq[list[Any]]: a=','.type_param+ [','] { a }
 
 type_param (memo):
     | a=NAME b=[type_param_bound] {
@@ -794,7 +794,7 @@ expressions:
     | a=expression ',' { ast.Tuple(elts=[a], ctx=Load, LOCATIONS) }
     | expression
 
-expression (memo):
+expression[ast.Expr | Any](memo):
     | invalid_expression
     | invalid_legacy_expression
     | a=disjunction 'if' b=disjunction 'else' c=expression {
@@ -1060,7 +1060,7 @@ group:
 # Lambda functions
 # ----------------
 
-lambdef:
+lambdef[ast.Lambda]:
     | 'lambda' a=[lambda_params] ':' b=expression {
         ast.Lambda(args=a or self.make_arguments(None, [], None, [], (None, [], None)), body=b, LOCATIONS)
      }
@@ -1259,7 +1259,7 @@ kwarg_or_starred:
 kwarg_or_double_starred:
     | invalid_kwarg
     | a=NAME '=' b=expression { ast.keyword(arg=a.string, value=b, LOCATIONS) }   # XXX Unreachable
-    | '**' a=expression { ast.keyword(arg=None, value=a, LOCATIONS) }
+    | '**' a1=expression { ast.keyword(arg=None, value=a1, LOCATIONS) }
 
 # ASSIGNMENT TARGETS
 # ==================
@@ -1404,25 +1404,25 @@ invalid_kwarg[NoReturn]:
     | a=('True'|'False'|'None') b='=' {
         self.raise_syntax_error_known_range(f"cannot assign to {a.string}", a, b)
      }
-    | a=NAME b='=' expression for_if_clauses {
+    | a1=NAME b1='=' expression for_if_clauses {
         self.raise_syntax_error_known_range(
-            "invalid syntax. Maybe you meant '==' or ':=' instead of '='?", a, b
+            "invalid syntax. Maybe you meant '==' or ':=' instead of '='?", a1, b1
         )
      }
-    | !(NAME '=') a=expression b='=' {
+    | !(NAME '=') a2=expression b2='=' {
         self.raise_syntax_error_known_range(
-            "expression cannot contain assignment, perhaps you meant \"==\"?", a, b,
+            "expression cannot contain assignment, perhaps you meant \"==\"?", a2, b2,
         )
      }
-    | a='**' expression '=' b=expression {
+    | a3='**' expression '=' b3=expression {
         self.raise_syntax_error_known_range(
-            "cannot assign to keyword argument unpacking", a, b
+            "cannot assign to keyword argument unpacking", a3, b3
         )
      }
 
 # IMPORTANT: Note that the "_without_invalid" suffix causes the rule to
 # not call invalid rules under it
-expression_without_invalid[ast.AST]:
+expression_without_invalid[ast.AST | Any]:
     | a=disjunction 'if' b=disjunction 'else' c=expression {
         ast.IfExp(body=b, test=a, orelse=c, LOCATIONS)
      }
@@ -1460,21 +1460,21 @@ invalid_named_expression[NoReturn]:
         )
      }
     # Use in_raw_rule
-    | a=NAME '=' b=bitwise_or !('='|':=') {
+    | a1=NAME '=' b1=bitwise_or !('='|':=') {
         (
             None
             if self.in_recursive_rule else
             self.raise_syntax_error_known_range(
-                "invalid syntax. Maybe you meant '==' or ':=' instead of '='?", a, b
+                "invalid syntax. Maybe you meant '==' or ':=' instead of '='?", a1, b1
             )
         )
      }
-    | !(plist|ptuple|genexp|'True'|'None'|'False') a=bitwise_or b='=' bitwise_or !('='|':=') {
+    | !(plist|ptuple|genexp|'True'|'None'|'False') a2=bitwise_or '=' bitwise_or !('='|':=') {
         (
             None
             if self.in_recursive_rule else
             self.raise_syntax_error_known_location(
-                f"cannot assign to {self.get_expr_name(a)} here. Maybe you meant '==' instead of '='?", a
+                f"cannot assign to {self.get_expr_name(a)} here. Maybe you meant '==' instead of '='?", a2
             )
         )
      }
@@ -1570,8 +1570,8 @@ invalid_kwds:
     | '**' param a='=' {
         self.raise_syntax_error_known_location("var-keyword argument cannot have default value", a)
      }
-    | '**' param ',' a=param {
-        self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a)
+    | '**' param ',' a1=param {
+        self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a1)
      }
     | '**' param ',' a=('*'|'**'|'/') {
         self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a)
@@ -1743,8 +1743,8 @@ invalid_as_pattern[NoReturn]:
     | or_pattern 'as' a="_" {
         self.raise_syntax_error_known_location("cannot use '_' as a target", a)
      }
-    | or_pattern 'as' !NAME a=expression {
-        self.raise_syntax_error_known_location("invalid pattern target", a)
+    | or_pattern 'as' !NAME a1=expression {
+        self.raise_syntax_error_known_location("invalid pattern target", a1)
      }
 invalid_class_pattern[NoReturn]:
     | name_or_attr '(' a=invalid_class_argument_pattern  {
@@ -1818,16 +1818,16 @@ invalid_kvpair[NoReturn]:
             (a.end_lineno, a.end_col_offset)
         )
      }
-    | expression ':' a='*' bitwise_or {
-        self.raise_syntax_error_starting_from("cannot use a starred expression in a dictionary value", a)
+    | expression ':' a1='*' bitwise_or {
+        self.raise_syntax_error_starting_from("cannot use a starred expression in a dictionary value", a1)
      }
-    | expression a=':' &('}'|',') {
+    | expression a2=':' &('}'|',') {
         self.raise_syntax_error_known_location(
-            "expression expected after dictionary key and ':'", a
+            "expression expected after dictionary key and ':'", a2
         )
      }
-    | expression a=':' {
-        self.raise_syntax_error_known_location("expression expected after dictionary key and ':'", a)
+    | expression a3=':' {
+        self.raise_syntax_error_known_location("expression expected after dictionary key and ':'", a3)
      }
 invalid_starred_expression:
     | a='*' expression '=' b=expression {
