@@ -28,17 +28,17 @@ fstring[ast.Expr]: star_expressions
 # GENERAL STATEMENTS
 # ==================
 
-statements[list]: a=statement+ { list(itertools.chain.from_iterable(a)) }
+statements[list[Any]]: a=statement+ { list(itertools.chain.from_iterable(a)) }
 
-statement[list]: a=compound_stmt { [a] } | a=simple_stmts { a }
+statement[list[Any]]: a=compound_stmt { [a] } | a=simple_stmts { a }
 
-statement_newline[list]:
+statement_newline[list[Any]]:
     | a=compound_stmt NEWLINE { [a] }
     | simple_stmts
     | NEWLINE { [ast.Pass(LOCATIONS)] }
     | ENDMARKER { None }
 
-simple_stmts[list]:
+simple_stmts[list[Any]]:
     | a=simple_stmt !';' NEWLINE { [a] } # Not needed, there for speedup
     | a=';'.simple_stmt+ [';'] NEWLINE { a }
 
@@ -192,7 +192,7 @@ dotted_name[str]:
 # Common elements
 # ---------------
 
-block[list] (memo):
+block[list[Any]] (memo):
     | NEWLINE INDENT a=statements DEDENT { a }
     | simple_stmts
     | invalid_block
@@ -385,7 +385,7 @@ elif_stmt[List[ast.If]]:
     | invalid_elif_stmt
     | 'elif' a=named_expression ':' b=block c=elif_stmt { [ast.If(test=a, body=b, orelse=c, LOCATIONS)] }
     | 'elif' a=named_expression ':' b=block c=[else_block] { [ast.If(test=a, body=b, orelse=c or [], LOCATIONS)] }
-else_block[list]:
+else_block[list[Any]]:
     | invalid_else_stmt
     | 'else' &&':' b=block { b }
 
@@ -484,7 +484,7 @@ except_star_block[ast.ExceptHandler]:
         ast.ExceptHandler(type=e, name=t, body=b, LOCATIONS)
      }
     | invalid_except_stmt
-finally_block[list]:
+finally_block[list[Any]]:
     | invalid_finally_stmt
     | 'finally' &&':' a=block { a }
 
@@ -740,7 +740,7 @@ type_alias["ast.TypeAlias"]:
 # Type parameter declaration
 # --------------------------
 
-type_params[list]: '[' t=type_param_seq  ']' {
+type_params[list[Any]]: '[' t=type_param_seq  ']' {
     self.check_version(
         (3, 12),
         "Type parameter lists are",
@@ -880,7 +880,7 @@ compare_op_bitwise_or_pair:
 
 eq_bitwise_or: '==' a=bitwise_or { (ast.Eq(), a) }
 # Do not support the Barry as BDFL <> for not eq
-noteq_bitwise_or[tuple]:
+noteq_bitwise_or[tuple[ast.NotEq, Any]]:
     | '!=' a=bitwise_or { (ast.NotEq(), a) }
 lte_bitwise_or: '<=' a=bitwise_or { (ast.LtE(), a) }
 lt_bitwise_or: '<' a=bitwise_or { (ast.Lt(), a) }
@@ -1182,13 +1182,13 @@ dict[ast.Dict]:
      }
     | '{' invalid_double_starred_kvpairs '}'
 
-double_starred_kvpairs[list]: a=','.double_starred_kvpair+ [','] { a }
+double_starred_kvpairs[list[Any]]: a=','.double_starred_kvpair+ [','] { a }
 
 double_starred_kvpair:
     | '**' a=bitwise_or { (None, a) }
     | kvpair
 
-kvpair[tuple]: a=expression ':' b=expression { (a, b) }
+kvpair[tuple[ast.Expr, ast.Expr]]: a=expression ':' b=expression { (a, b) }
 
 # Comprehensions & Generators
 # ---------------------------
@@ -1227,11 +1227,11 @@ dictcomp[ast.DictComp]:
 # FUNCTION CALL ARGUMENTS
 # =======================
 
-arguments[Tuple[list, list]] (memo):
+arguments[tuple[list[Any], list[Any]]] (memo):
     | a=args [','] &')' { a }
     | invalid_arguments
 
-args[Tuple[list, list]]:
+args[tuple[list[Any], list[Any]]]:
     | a=','.(starred_expression | ( assignment_expression | expression !':=') !'=')+ b=[',' k=kwargs {k}] {
         (a + ([e for e in b if isinstance(e, ast.Starred)] if b else []),
          ([e for e in b if not isinstance(e, ast.Starred)] if b else [])
@@ -1242,7 +1242,7 @@ args[Tuple[list, list]]:
          [e for e in a if not isinstance(e, ast.Starred)])
     }
 
-kwargs[list]:
+kwargs[list[Any]]:
     | a=','.kwarg_or_starred+ ',' b=','.kwarg_or_double_starred+ { a + b }
     | ','.kwarg_or_starred+
     | ','.kwarg_or_double_starred+
@@ -1274,9 +1274,9 @@ star_targets:
         ast.Tuple(elts=[a] + b, ctx=Store, LOCATIONS)
      }
 
-star_targets_list_seq[list]: a=','.star_target+ [','] { a }
+star_targets_list_seq[list[Any]]: a=','.star_target+ [','] { a }
 
-star_targets_tuple_seq[list]:
+star_targets_tuple_seq[list[Any]]:
     | a=star_target b=(',' c=star_target { c })+ [','] { [a] + b }
     | a=star_target ',' { [a] }
 

@@ -51,7 +51,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def statements(self) -> list | None:
+    def statements(self) -> list[Any] | None:
         # statements: statement+
         mark = self._mark()
         if a := self.repeated(self.statement):
@@ -59,7 +59,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def statement(self) -> list | None:
+    def statement(self) -> list[Any] | None:
         # statement: compound_stmt | simple_stmts
         mark = self._mark()
         if a := self.compound_stmt():
@@ -70,7 +70,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def statement_newline(self) -> list | None:
+    def statement_newline(self) -> list[Any] | None:
         # statement_newline: compound_stmt NEWLINE | simple_stmts | NEWLINE | $
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -88,7 +88,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def simple_stmts(self) -> list | None:
+    def simple_stmts(self) -> list[Any] | None:
         # simple_stmts: simple_stmt !';' NEWLINE | ';'.simple_stmt+ ';'? NEWLINE
         mark = self._mark()
         if (
@@ -471,7 +471,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def block(self) -> list | None:
+    def block(self) -> list[Any] | None:
         # block: NEWLINE INDENT statements DEDENT | simple_stmts | invalid_block
         mark = self._mark()
         if (
@@ -970,7 +970,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def else_block(self) -> list | None:
+    def else_block(self) -> list[Any] | None:
         # else_block: invalid_else_stmt | 'else' &&':' block
         mark = self._mark()
         if self.call_invalid_rules and (self.invalid_else_stmt()):
@@ -1246,7 +1246,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def finally_block(self) -> list | None:
+    def finally_block(self) -> list[Any] | None:
         # finally_block: invalid_finally_stmt | 'finally' &&':' block
         mark = self._mark()
         if self.call_invalid_rules and (self.invalid_finally_stmt()):
@@ -1793,7 +1793,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def type_params(self) -> list | None:
+    def type_params(self) -> list[Any] | None:
         # type_params: '[' type_param_seq ']'
         mark = self._mark()
         if (self.expect("[")) and (t := self.type_param_seq()) and (self.expect("]")):
@@ -2080,7 +2080,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def noteq_bitwise_or(self) -> tuple | None:
+    def noteq_bitwise_or(self) -> tuple[ast.NotEq, Any] | None:
         # noteq_bitwise_or: '!=' bitwise_or
         mark = self._mark()
         if (self.expect("!=")) and (a := self.bitwise_or()):
@@ -2889,7 +2889,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def double_starred_kvpairs(self) -> list | None:
+    def double_starred_kvpairs(self) -> list[Any] | None:
         # double_starred_kvpairs: ','.double_starred_kvpair+ ','?
         mark = self._mark()
         if (a := self.gathered(self.double_starred_kvpair, self.expect, ",")) and (self.expect(","),):
@@ -2908,7 +2908,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def kvpair(self) -> tuple | None:
+    def kvpair(self) -> tuple[ast.Expr, ast.Expr] | None:
         # kvpair: expression ':' expression
         mark = self._mark()
         if (a := self.expression()) and (self.expect(":")) and (b := self.expression()):
@@ -3037,7 +3037,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def arguments(self) -> tuple[list, list] | None:
+    def arguments(self) -> tuple[list[Any], list[Any]] | None:
         # arguments: args ','? &')' | invalid_arguments
         mark = self._mark()
         if (a := self.args()) and (self.expect(","),) and (self.positive_lookahead(self.expect, ")")):
@@ -3048,7 +3048,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def args(self) -> tuple[list, list] | None:
+    def args(self) -> tuple[list[Any], list[Any]] | None:
         # args: ','.(starred_expression | (assignment_expression | expression !':=') !'=')+ [',' kwargs] | kwargs
         mark = self._mark()
         if (a := self.gathered(self._tmp_53, self.expect, ",")) and (b := self._tmp_54(),):
@@ -3065,7 +3065,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def kwargs(self) -> list | None:
+    def kwargs(self) -> list[Any] | None:
         # kwargs: ','.kwarg_or_starred+ ',' ','.kwarg_or_double_starred+ | ','.kwarg_or_starred+ | ','.kwarg_or_double_starred+
         mark = self._mark()
         if (
@@ -3137,7 +3137,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def star_targets_list_seq(self) -> list | None:
+    def star_targets_list_seq(self) -> list[Any] | None:
         # star_targets_list_seq: ','.star_target+ ','?
         mark = self._mark()
         if (a := self.gathered(self.star_target, self.expect, ",")) and (self.expect(","),):
@@ -3145,7 +3145,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def star_targets_tuple_seq(self) -> list | None:
+    def star_targets_tuple_seq(self) -> list[Any] | None:
         # star_targets_tuple_seq: star_target ((',' star_target))+ ','? | star_target ','
         mark = self._mark()
         if (a := self.star_target()) and (b := self.repeated(self._tmp_55)) and (self.expect(","),):
