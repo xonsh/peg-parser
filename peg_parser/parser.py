@@ -205,25 +205,30 @@ class XonshParser(Parser):
                 **self.span(_lnum, _col),
             )
         self._reset(mark)
-        if (a := self._tmp_7()) and (self.expect(":")) and (b := self.expression()) and (c := self._tmp_6(),):
-            return ast.AnnAssign(target=a, annotation=b, value=c, simple=0, **self.span(_lnum, _col))
+        if (
+            (a1 := self._tmp_7())
+            and (self.expect(":"))
+            and (b1 := self.expression())
+            and (c1 := self._tmp_8(),)
+        ):
+            return ast.AnnAssign(target=a1, annotation=b1, value=c1, simple=0, **self.span(_lnum, _col))
         self._reset(mark)
         if (
-            (a := self.repeated(self._tmp_9))
-            and (b := self.annotated_rhs())
+            (a2 := self.repeated(self._tmp_9))
+            and (b2 := self.annotated_rhs())
             and (self.negative_lookahead(self.expect, "="))
             and (tc := self.token("TYPE_COMMENT"),)
         ):
-            return ast.Assign(targets=a, value=b, type_comment=tc, **self.span(_lnum, _col))
+            return ast.Assign(targets=a2, value=b2, type_comment=tc, **self.span(_lnum, _col))
         self._reset(mark)
         cut = False
         if (
-            (a := self.single_target())
-            and (b := self.augassign())
+            (a3 := self.single_target())
+            and (b3 := self.augassign())
             and (cut := True)
-            and (c := self.annotated_rhs())
+            and (c3 := self.annotated_rhs())
         ):
-            return ast.AugAssign(target=a, op=b, value=c, **self.span(_lnum, _col))
+            return ast.AugAssign(target=a3, op=b3, value=c3, **self.span(_lnum, _col))
         self._reset(mark)
         if cut:
             return None
@@ -386,11 +391,11 @@ class XonshParser(Parser):
         self._reset(mark)
         if (
             (self.expect("from"))
-            and (a := self.repeated(self._tmp_13))
+            and (a1 := self.repeated(self._tmp_13))
             and (self.expect("import"))
-            and (b := self.import_from_targets())
+            and (b1 := self.import_from_targets())
         ):
-            return ast.ImportFrom(names=b, level=self.extract_import_level(a), **self.span(_lnum, _col))
+            return ast.ImportFrom(names=b1, level=self.extract_import_level(a1), **self.span(_lnum, _col))
         self._reset(mark)
         return None
 
@@ -460,8 +465,8 @@ class XonshParser(Parser):
         if (a := self.dotted_name()) and (self.expect(".")) and (b := self.name()):
             return a + "." + b.string
         self._reset(mark)
-        if a := self.name():
-            return a.string
+        if a1 := self.name():
+            return a1.string
         self._reset(mark)
         return None
 
@@ -691,24 +696,24 @@ class XonshParser(Parser):
             return self.make_arguments(a, [], b, c, d)
         self._reset(mark)
         if (
-            (a := self.slash_with_default())
-            and (b := self.repeated(self.param_with_default),)
-            and (c := self.star_etc(),)
+            (a1 := self.slash_with_default())
+            and (b1 := self.repeated(self.param_with_default),)
+            and (c1 := self.star_etc(),)
         ):
-            return self.make_arguments(None, a, None, b, c)
+            return self.make_arguments(None, a1, None, b1, c1)
         self._reset(mark)
         if (
-            (a := self.repeated(self.param_no_default))
-            and (b := self.repeated(self.param_with_default),)
-            and (c := self.star_etc(),)
+            (a2 := self.repeated(self.param_no_default))
+            and (b2 := self.repeated(self.param_with_default),)
+            and (c2 := self.star_etc(),)
         ):
-            return self.make_arguments(None, [], a, b, c)
+            return self.make_arguments(None, [], a2, b2, c2)
         self._reset(mark)
-        if (a := self.repeated(self.param_with_default)) and (b := self.star_etc(),):
-            return self.make_arguments(None, [], None, a, b)
+        if (a3 := self.repeated(self.param_with_default)) and (b3 := self.star_etc(),):
+            return self.make_arguments(None, [], None, a3, b3)
         self._reset(mark)
-        if a := self.star_etc():
-            return self.make_arguments(None, [], None, None, a)
+        if a4 := self.star_etc():
+            return self.make_arguments(None, [], None, None, a4)
         self._reset(mark)
         return None
 
@@ -2295,27 +2300,27 @@ class XonshParser(Parser):
         if (a := self.primary()) and (self.expect(".")) and (b := self.name()):
             return ast.Attribute(value=a, attr=b.string, ctx=Load, **self.span(_lnum, _col))
         self._reset(mark)
-        if (a := self.primary()) and (b := self.genexp()):
-            return ast.Call(func=a, args=[b], keywords=[], **self.span(_lnum, _col))
+        if (a1 := self.primary()) and (b1 := self.genexp()):
+            return ast.Call(func=a1, args=[b1], keywords=[], **self.span(_lnum, _col))
         self._reset(mark)
         cut = False
         if (
-            (a := self.func_macro_start())
+            (a2 := self.func_macro_start())
             and (cut := True)
-            and (b := self.repeated(self.token, "MACRO_PARAM"),)
+            and (b2 := self.repeated(self.token, "MACRO_PARAM"),)
             and (self.expect_forced(self.expect(")"), "')'"))
         ):
-            return self.macro_call(a, b, **self.span(_lnum, _col))
+            return self.macro_call(a2, b2, **self.span(_lnum, _col))
         self._reset(mark)
         if cut:
             return None
-        if (a := self.primary()) and (self.expect("(")) and (b := self.arguments(),) and (self.expect(")")):
+        if (a3 := self.primary()) and (self.expect("(")) and (b3 := self.arguments(),) and (self.expect(")")):
             return ast.Call(
-                func=a, args=b[0] if b else [], keywords=b[1] if b else [], **self.span(_lnum, _col)
+                func=a3, args=b3[0] if b3 else [], keywords=b3[1] if b3 else [], **self.span(_lnum, _col)
             )
         self._reset(mark)
-        if (a := self.primary()) and (self.expect("[")) and (b := self.slices()) and (self.expect("]")):
-            return ast.Subscript(value=a, slice=b, ctx=Load, **self.span(_lnum, _col))
+        if (a4 := self.primary()) and (self.expect("[")) and (b4 := self.slices()) and (self.expect("]")):
+            return ast.Subscript(value=a4, slice=b4, ctx=Load, **self.span(_lnum, _col))
         self._reset(mark)
         cut = False
         if (self.positive_lookahead(self._tmp_34)) and (cut := True) and (sub_procs := self.sub_procs()):
@@ -2326,8 +2331,8 @@ class XonshParser(Parser):
         if env_atom := self.env_atom():
             return env_atom
         self._reset(mark)
-        if a := self.gathered(self.help_atom, self.expect, "."):
-            return self.expand_help(a, **self.span(_lnum, _col))
+        if a5 := self.gathered(self.help_atom, self.expect, "."):
+            return self.expand_help(a5, **self.span(_lnum, _col))
         self._reset(mark)
         if atom := self.atom():
             return atom
@@ -2617,24 +2622,24 @@ class XonshParser(Parser):
             return self.make_arguments(a, [], b, c, d)
         self._reset(mark)
         if (
-            (a := self.lambda_slash_with_default())
-            and (b := self.repeated(self.lambda_param_with_default),)
-            and (c := self.lambda_star_etc(),)
+            (a1 := self.lambda_slash_with_default())
+            and (b1 := self.repeated(self.lambda_param_with_default),)
+            and (c1 := self.lambda_star_etc(),)
         ):
-            return self.make_arguments(None, a, None, b, c)
+            return self.make_arguments(None, a1, None, b1, c1)
         self._reset(mark)
         if (
-            (a := self.repeated(self.lambda_param_no_default))
-            and (b := self.repeated(self.lambda_param_with_default),)
-            and (c := self.lambda_star_etc(),)
+            (a2 := self.repeated(self.lambda_param_no_default))
+            and (b2 := self.repeated(self.lambda_param_with_default),)
+            and (c2 := self.lambda_star_etc(),)
         ):
-            return self.make_arguments(None, [], a, b, c)
+            return self.make_arguments(None, [], a2, b2, c2)
         self._reset(mark)
-        if (a := self.repeated(self.lambda_param_with_default)) and (b := self.lambda_star_etc(),):
-            return self.make_arguments(None, [], None, a, b)
+        if (a3 := self.repeated(self.lambda_param_with_default)) and (b3 := self.lambda_star_etc(),):
+            return self.make_arguments(None, [], None, a3, b3)
         self._reset(mark)
-        if a := self.lambda_star_etc():
-            return self.make_arguments(None, [], None, [], a)
+        if a4 := self.lambda_star_etc():
+            return self.make_arguments(None, [], None, [], a4)
         self._reset(mark)
         return None
 
@@ -3204,14 +3209,14 @@ class XonshParser(Parser):
         if a := self.name():
             return ast.Name(id=a.string, ctx=Store, **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.expect("(")) and (a := self.target_with_star_atom()) and (self.expect(")")):
-            return self.set_expr_context(a, Store)
+        if (self.expect("(")) and (a1 := self.target_with_star_atom()) and (self.expect(")")):
+            return self.set_expr_context(a1, Store)
         self._reset(mark)
-        if (self.expect("(")) and (a := self.star_targets_tuple_seq(),) and (self.expect(")")):
-            return ast.Tuple(elts=a, ctx=Store, **self.span(_lnum, _col))
+        if (self.expect("(")) and (a2 := self.star_targets_tuple_seq(),) and (self.expect(")")):
+            return ast.Tuple(elts=a2, ctx=Store, **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.expect("[")) and (a := self.star_targets_list_seq(),) and (self.expect("]")):
-            return ast.List(elts=a, ctx=Store, **self.span(_lnum, _col))
+        if (self.expect("[")) and (a3 := self.star_targets_list_seq(),) and (self.expect("]")):
+            return ast.List(elts=a3, ctx=Store, **self.span(_lnum, _col))
         self._reset(mark)
         return None
 
@@ -3383,48 +3388,60 @@ class XonshParser(Parser):
             )
         self._reset(mark)
         if (
-            (a := self.expression())
+            (a1 := self.expression())
             and (b := self.for_if_clauses())
             and (self.expect(","))
             and (self._tmp_59(),)
         ):
             return self.raise_syntax_error_known_range(
-                "Generator expression must be parenthesized", a, b[-1].ifs[-1] if b[-1].ifs else b[-1].iter
+                "Generator expression must be parenthesized", a1, b[-1].ifs[-1] if b[-1].ifs else b[-1].iter
             )
         self._reset(mark)
-        if (a := self.name()) and (b := self.expect("=")) and (self.expression()) and (self.for_if_clauses()):
+        if (
+            (a2 := self.name())
+            and (b2 := self.expect("="))
+            and (self.expression())
+            and (self.for_if_clauses())
+        ):
             return self.raise_syntax_error_known_range(
-                "invalid syntax. Maybe you meant '==' or ':=' instead of '='?", a, b
+                "invalid syntax. Maybe you meant '==' or ':=' instead of '='?", a2, b2
             )
         self._reset(mark)
         if (
             (self._tmp_60(),)
-            and (a := self.name())
-            and (b := self.expect("="))
+            and (a3 := self.name())
+            and (b3 := self.expect("="))
             and (self.positive_lookahead(self._tmp_61))
         ):
-            return self.raise_syntax_error_known_range("expected argument value expression", a, b)
+            return self.raise_syntax_error_known_range("expected argument value expression", a3, b3)
         self._reset(mark)
-        if (a := self.args()) and (b := self.for_if_clauses()):
+        if (a4 := self.args()) and (b4 := self.for_if_clauses()):
             return (
                 self.raise_syntax_error_known_range(
                     "Generator expression must be parenthesized",
-                    a[0][-1],
-                    b[-1].ifs[-1] if b[-1].ifs else b[-1].iter,
+                    a4[0][-1],
+                    b4[-1].ifs[-1] if b4[-1].ifs else b4[-1].iter,
                 )
-                if len(a[0]) > 1
+                if len(a4[0]) > 1
                 else None
             )
         self._reset(mark)
-        if (self.args()) and (self.expect(",")) and (a := self.expression()) and (b := self.for_if_clauses()):
+        if (
+            (self.args())
+            and (self.expect(","))
+            and (a5 := self.expression())
+            and (b5 := self.for_if_clauses())
+        ):
             return self.raise_syntax_error_known_range(
-                "Generator expression must be parenthesized", a, b[-1].ifs[-1] if b[-1].ifs else b[-1].iter
+                "Generator expression must be parenthesized",
+                a5,
+                b5[-1].ifs[-1] if b5[-1].ifs else b5[-1].iter,
             )
         self._reset(mark)
-        if (a := self.args()) and (self.expect(",")) and (self.args()):
+        if (a6 := self.args()) and (self.expect(",")) and (self.args()):
             return self.raise_syntax_error(
                 "positional argument follows keyword argument unpacking"
-                if a[1][-1].arg is None
+                if a6[1][-1].arg is None
                 else "positional argument follows keyword argument"
             )
         self._reset(mark)
@@ -3516,21 +3533,21 @@ class XonshParser(Parser):
             )
         self._reset(mark)
         if (
-            (a := self.disjunction())
+            (a1 := self.disjunction())
             and (self.expect("if"))
-            and (b := self.disjunction())
+            and (b1 := self.disjunction())
             and (self.negative_lookahead(self._tmp_65))
         ):
-            return self.raise_syntax_error_known_range("expected 'else' after 'if' expression", a, b)
+            return self.raise_syntax_error_known_range("expected 'else' after 'if' expression", a1, b1)
         self._reset(mark)
         if (
-            (a := self.expect("lambda"))
+            (a2 := self.expect("lambda"))
             and (self.lambda_params(),)
-            and (b := self.expect(":"))
+            and (b2 := self.expect(":"))
             and (self.positive_lookahead(self._tmp_66))
         ):
             return self.raise_syntax_error_known_range(
-                "f-string: lambda expressions are not allowed without parentheses", a, b
+                "f-string: lambda expressions are not allowed without parentheses", a2, b2
             )
         self._reset(mark)
         return None
@@ -3620,16 +3637,16 @@ class XonshParser(Parser):
         if a := self.plist():
             return a
         self._reset(mark)
-        if a := self.ptuple():
-            return a
+        if a1 := self.ptuple():
+            return a1
         self._reset(mark)
         if (
             self.call_invalid_rules
             and (self.expect("("))
-            and (a := self.invalid_ann_assign_target())
+            and (a2 := self.invalid_ann_assign_target())
             and (self.expect(")"))
         ):
-            return a
+            return a2
         self._reset(mark)
         return None
 
@@ -3702,28 +3719,28 @@ class XonshParser(Parser):
         if (a := self.expect("/")) and (self.expect(",")):
             return self.raise_syntax_error_known_location("at least one argument must precede /", a)
         self._reset(mark)
-        if (self._tmp_75()) and (self.repeated(self.param_maybe_default),) and (a := self.expect("/")):
-            return self.raise_syntax_error_known_location("/ may appear only once", a)
+        if (self._tmp_75()) and (self.repeated(self.param_maybe_default),) and (a1 := self.expect("/")):
+            return self.raise_syntax_error_known_location("/ may appear only once", a1)
         self._reset(mark)
         if (
             self.call_invalid_rules
             and (self.slash_no_default(),)
             and (self.repeated(self.param_no_default),)
             and (self.invalid_parameters_helper())
-            and (a := self.param_no_default())
+            and (a2 := self.param_no_default())
         ):
             return self.raise_syntax_error_known_location(
-                "parameter without a default follows parameter with a default", a
+                "parameter without a default follows parameter with a default", a2
             )
         self._reset(mark)
         if (
             (self.repeated(self.param_no_default),)
-            and (a := self.expect("("))
+            and (a3 := self.expect("("))
             and (self.repeated(self.param_no_default))
             and (self.expect(","),)
             and (b := self.expect(")"))
         ):
-            return self.raise_syntax_error_known_range("Function parameters cannot be parenthesized", a, b)
+            return self.raise_syntax_error_known_range("Function parameters cannot be parenthesized", a3, b)
         self._reset(mark)
         if (
             (self._tmp_75(),)
@@ -3731,12 +3748,12 @@ class XonshParser(Parser):
             and (self.expect("*"))
             and (self._tmp_77())
             and (self.repeated(self.param_maybe_default),)
-            and (a := self.expect("/"))
+            and (a4 := self.expect("/"))
         ):
-            return self.raise_syntax_error_known_location("/ must be ahead of *", a)
+            return self.raise_syntax_error_known_location("/ must be ahead of *", a4)
         self._reset(mark)
-        if (self.repeated(self.param_maybe_default)) and (self.expect("/")) and (a := self.expect("*")):
-            return self.raise_syntax_error_known_location("expected comma between / and *", a)
+        if (self.repeated(self.param_maybe_default)) and (self.expect("/")) and (a5 := self.expect("*")):
+            return self.raise_syntax_error_known_location("expected comma between / and *", a5)
         self._reset(mark)
         return None
 
@@ -3804,29 +3821,33 @@ class XonshParser(Parser):
         if (a := self.expect("/")) and (self.expect(",")):
             return self.raise_syntax_error_known_location("at least one argument must precede /", a)
         self._reset(mark)
-        if (self._tmp_83()) and (self.repeated(self.lambda_param_maybe_default),) and (a := self.expect("/")):
-            return self.raise_syntax_error_known_location("/ may appear only once", a)
+        if (
+            (self._tmp_83())
+            and (self.repeated(self.lambda_param_maybe_default),)
+            and (a1 := self.expect("/"))
+        ):
+            return self.raise_syntax_error_known_location("/ may appear only once", a1)
         self._reset(mark)
         if (
             self.call_invalid_rules
             and (self.lambda_slash_no_default(),)
             and (self.repeated(self.lambda_param_no_default),)
             and (self.invalid_lambda_parameters_helper())
-            and (a := self.lambda_param_no_default())
+            and (a2 := self.lambda_param_no_default())
         ):
             return self.raise_syntax_error_known_location(
-                "parameter without a default follows parameter with a default", a
+                "parameter without a default follows parameter with a default", a2
             )
         self._reset(mark)
         if (
             (self.repeated(self.lambda_param_no_default),)
-            and (a := self.expect("("))
+            and (a3 := self.expect("("))
             and (self.gathered(self.lambda_param, self.expect, ","))
             and (self.expect(","),)
             and (b := self.expect(")"))
         ):
             return self.raise_syntax_error_known_range(
-                "Lambda expression parameters cannot be parenthesized", a, b
+                "Lambda expression parameters cannot be parenthesized", a3, b
             )
         self._reset(mark)
         if (
@@ -3835,16 +3856,16 @@ class XonshParser(Parser):
             and (self.expect("*"))
             and (self._tmp_85())
             and (self.repeated(self.lambda_param_maybe_default),)
-            and (a := self.expect("/"))
+            and (a4 := self.expect("/"))
         ):
-            return self.raise_syntax_error_known_location("/ must be ahead of *", a)
+            return self.raise_syntax_error_known_location("/ must be ahead of *", a4)
         self._reset(mark)
         if (
             (self.repeated(self.lambda_param_maybe_default))
             and (self.expect("/"))
-            and (a := self.expect("*"))
+            and (a5 := self.expect("*"))
         ):
-            return self.raise_syntax_error_known_location("expected comma between / and *", a)
+            return self.raise_syntax_error_known_location("expected comma between / and *", a5)
         self._reset(mark)
         return None
 
@@ -3891,12 +3912,12 @@ class XonshParser(Parser):
             (self.expect("**"))
             and (self.lambda_param())
             and (self.expect(","))
-            and (a := self.lambda_param())
+            and (a1 := self.lambda_param())
         ):
-            return self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a)
+            return self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a1)
         self._reset(mark)
-        if (self.expect("**")) and (self.lambda_param()) and (self.expect(",")) and (a := self._tmp_82()):
-            return self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a)
+        if (self.expect("**")) and (self.lambda_param()) and (self.expect(",")) and (a2 := self._tmp_82()):
+            return self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a2)
         self._reset(mark)
         return None
 
@@ -4600,6 +4621,14 @@ class XonshParser(Parser):
         self._reset(mark)
         if single_subscript_attribute_target := self.single_subscript_attribute_target():
             return single_subscript_attribute_target
+        self._reset(mark)
+        return None
+
+    def _tmp_8(self) -> Any | None:
+        # _tmp_8: '=' annotated_rhs
+        mark = self._mark()
+        if (self.expect("=")) and (d1 := self.annotated_rhs()):
+            return d1
         self._reset(mark)
         return None
 

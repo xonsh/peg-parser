@@ -91,21 +91,21 @@ assignment:
             LOCATIONS,
         )
      }
-    | a=('(' b=single_target ')' { b }
-         | single_subscript_attribute_target) ':' b=expression c=['=' d=annotated_rhs { d }] {
+    | a1=('(' b=single_target ')' { b }
+         | single_subscript_attribute_target) ':' b1=expression c1=['=' d1=annotated_rhs { d1 }] {
         ast.AnnAssign(
-            target=a,
-            annotation=b,
-            value=c,
+            target=a1,
+            annotation=b1,
+            value=c1,
             simple=0,
             LOCATIONS,
         )
      }
-    | a=(z=star_targets '=' { z })+ b=annotated_rhs !'=' tc=[TYPE_COMMENT] {
-         ast.Assign(targets=a, value=b, type_comment=tc, LOCATIONS)
+    | a2=(z=star_targets '=' { z })+ b2=annotated_rhs !'=' tc=[TYPE_COMMENT] {
+         ast.Assign(targets=a2, value=b2, type_comment=tc, LOCATIONS)
      }
-    | a=single_target b=augassign ~ c=annotated_rhs {
-        ast.AugAssign(target = a, op=b, value=c, LOCATIONS)
+    | a3=single_target b3=augassign ~ c3=annotated_rhs {
+        ast.AugAssign(target=a3, op=b3, value=c3, LOCATIONS)
      }
     | invalid_assignment
 
@@ -166,8 +166,8 @@ import_from[ast.ImportFrom]:
     | 'from' a=('.' | '...')* b=dotted_name 'import' c=import_from_targets {
         ast.ImportFrom(module=b, names=c, level=self.extract_import_level(a), LOCATIONS)
      }
-    | 'from' a=('.' | '...')+ 'import' b=import_from_targets {
-        ast.ImportFrom(names=b, level=self.extract_import_level(a), LOCATIONS)
+    | 'from' a1=('.' | '...')+ 'import' b1=import_from_targets {
+        ast.ImportFrom(names=b1, level=self.extract_import_level(a1), LOCATIONS)
      }
 import_from_targets[List[ast.alias]]:
     | '(' a=import_from_as_names [','] ')' { a }
@@ -184,7 +184,7 @@ dotted_as_name[ast.alias]:
     | a=dotted_name b=['as' z=NAME { z.string }] { ast.alias(name=a, asname=b, LOCATIONS) }
 dotted_name[str]:
     | a=dotted_name '.' b=NAME { a + "." + b.string }
-    | a=NAME { a.string }
+    | a1=NAME { a1.string }
 
 # COMPOUND STATEMENTS
 # ===================
@@ -308,16 +308,16 @@ parameters[ast.arguments]:
     | a=slash_no_default b=param_no_default* c=param_with_default* d=[star_etc] {
         self.make_arguments(a, [], b, c, d)
      }
-    | a=slash_with_default b=param_with_default* c=[star_etc] {
-        self.make_arguments(None, a, None, b, c)
+    | a1=slash_with_default b1=param_with_default* c1=[star_etc] {
+        self.make_arguments(None, a1, None, b1, c1)
      }
-    | a=param_no_default+ b=param_with_default* c=[star_etc] {
-        self.make_arguments(None, [], a, b, c)
+    | a2=param_no_default+ b2=param_with_default* c2=[star_etc] {
+        self.make_arguments(None, [], a2, b2, c2)
      }
-    | a=param_with_default+ b=[star_etc] {
-        self.make_arguments(None, [], None, a, b)
+    | a3=param_with_default+ b3=[star_etc] {
+        self.make_arguments(None, [], None, a3, b3)
      }
-    | a=star_etc { self.make_arguments(None, [], None, None, a) }
+    | a4=star_etc { self.make_arguments(None, [], None, None, a4) }
 
 # Some duplication here because we can't write (',' | &')'),
 # which is because we don't support empty alternatives (yet).
@@ -948,20 +948,20 @@ await_primary (memo):
 
 primary:
     | a=primary '.' b=NAME { ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS) }
-    | a=primary b=genexp { ast.Call(func=a, args=[b], keywords=[], LOCATIONS) }
-    | a=func_macro_start ~ b=[MACRO_PARAM*] &&')' { self.macro_call(a, b, LOCATIONS) }
-    | a=primary '(' b=[arguments] ')' {
+    | a1=primary b1=genexp { ast.Call(func=a1, args=[b1], keywords=[], LOCATIONS) }
+    | a2=func_macro_start ~ b2=[MACRO_PARAM*] &&')' { self.macro_call(a2, b2, LOCATIONS) }
+    | a3=primary '(' b3=[arguments] ')' {
         ast.Call(
-            func=a,
-            args=b[0] if b else [],
-            keywords=b[1] if b else [],
+            func=a3,
+            args=b3[0] if b3 else [],
+            keywords=b3[1] if b3 else [],
             LOCATIONS,
         )
      }
-    | a=primary '[' b=slices ']' { ast.Subscript(value=a, slice=b, ctx=Load, LOCATIONS) }
+    | a4=primary '[' b4=slices ']' { ast.Subscript(value=a4, slice=b4, ctx=Load, LOCATIONS) }
     | &('$(' | '$[' | '![' | '!(') ~ sub_procs
     | env_atom
-    | a=(".".help_atom+) { self.expand_help(a, LOCATIONS) }
+    | a5=(".".help_atom+) { self.expand_help(a5, LOCATIONS) }
     | atom
 
 func_macro_start:
@@ -1077,16 +1077,16 @@ lambda_parameters[ast.arguments]:
     | a=lambda_slash_no_default b=lambda_param_no_default* c=lambda_param_with_default* d=[lambda_star_etc] {
         self.make_arguments(a, [], b, c, d)
      }
-    | a=lambda_slash_with_default b=lambda_param_with_default* c=[lambda_star_etc] {
-        self.make_arguments(None, a, None, b, c)
+    | a1=lambda_slash_with_default b1=lambda_param_with_default* c1=[lambda_star_etc] {
+        self.make_arguments(None, a1, None, b1, c1)
      }
-    | a=lambda_param_no_default+ b=lambda_param_with_default* c=[lambda_star_etc] {
-        self.make_arguments(None, [], a, b, c)
+    | a2=lambda_param_no_default+ b2=lambda_param_with_default* c2=[lambda_star_etc] {
+        self.make_arguments(None, [], a2, b2, c2)
      }
-    | a=lambda_param_with_default+ b=[lambda_star_etc] {
-        self.make_arguments(None, [], None, a, b)
+    | a3=lambda_param_with_default+ b3=[lambda_star_etc] {
+        self.make_arguments(None, [], None, a3, b3)
      }
-    | a=lambda_star_etc { self.make_arguments(None, [], None, [], a) }
+    | a4=lambda_star_etc { self.make_arguments(None, [], None, [], a4) }
 
 lambda_slash_no_default[List[Tuple[ast.arg, None]]]:
     | a=lambda_param_no_default+ '/' ',' { [(p, None) for p in a] }
@@ -1295,9 +1295,9 @@ target_with_star_atom (memo):
 
 star_atom:
     | a=NAME { ast.Name(id=a.string, ctx=Store, LOCATIONS) }
-    | '(' a=target_with_star_atom ')' { self.set_expr_context(a, Store) }
-    | '(' a=[star_targets_tuple_seq] ')' { ast.Tuple(elts=a, ctx=Store, LOCATIONS) }
-    | '[' a=[star_targets_list_seq] ']' {  ast.List(elts=a, ctx=Store, LOCATIONS) }
+    | '(' a1=target_with_star_atom ')' { self.set_expr_context(a1, Store) }
+    | '(' a2=[star_targets_tuple_seq] ')' { ast.Tuple(elts=a2, ctx=Store, LOCATIONS) }
+    | '[' a3=[star_targets_list_seq] ']' {  ast.List(elts=a3, ctx=Store, LOCATIONS) }
 
 single_target:
     | single_subscript_attribute_target
@@ -1364,39 +1364,39 @@ invalid_arguments[NoReturn]:
             a[1][-1] if a[1] else a[0][-1],
         )
      }
-    | a=expression b=for_if_clauses ',' [args | expression for_if_clauses] {
+    | a1=expression b=for_if_clauses ',' [args | expression for_if_clauses] {
         self.raise_syntax_error_known_range(
             "Generator expression must be parenthesized",
-            a,
+            a1,
             (b[-1].ifs[-1] if b[-1].ifs else b[-1].iter)
         )
      }
-    | a=NAME b='=' expression for_if_clauses {
+    | a2=NAME b2='=' expression for_if_clauses {
         self.raise_syntax_error_known_range(
-            "invalid syntax. Maybe you meant '==' or ':=' instead of '='?", a, b
+            "invalid syntax. Maybe you meant '==' or ':=' instead of '='?", a2, b2
         )
      }
-    | (args ',')? a=NAME b='=' &(',' | ')') {
-        self.raise_syntax_error_known_range("expected argument value expression", a, b)
+    | (args ',')? a3=NAME b3='=' &(',' | ')') {
+        self.raise_syntax_error_known_range("expected argument value expression", a3, b3)
      }
-    | a=args b=for_if_clauses {
+    | a4=args b4=for_if_clauses {
         self.raise_syntax_error_known_range(
             "Generator expression must be parenthesized",
-            a[0][-1],
-            (b[-1].ifs[-1] if b[-1].ifs else b[-1].iter),
-        ) if len(a[0]) > 1 else None
+            a4[0][-1],
+            (b4[-1].ifs[-1] if b4[-1].ifs else b4[-1].iter),
+        ) if len(a4[0]) > 1 else None
      }
-    | args ',' a=expression b=for_if_clauses {
+    | args ',' a5=expression b5=for_if_clauses {
         self.raise_syntax_error_known_range(
             "Generator expression must be parenthesized",
-            a,
-            (b[-1].ifs[-1] if b[-1].ifs else b[-1].iter),
+            a5,
+            (b5[-1].ifs[-1] if b5[-1].ifs else b5[-1].iter),
         )
      }
-    | a=args ',' args {
+    | a6=args ',' args {
         self.raise_syntax_error(
             "positional argument follows keyword argument unpacking"
-            if a[1][-1].arg is None else
+            if a6[1][-1].arg is None else
             "positional argument follows keyword argument",
         )
      }
@@ -1445,12 +1445,12 @@ invalid_expression[NoReturn]:
             else None
         )
      }
-    | a=disjunction 'if' b=disjunction !('else'|':') {
-        self.raise_syntax_error_known_range("expected 'else' after 'if' expression", a, b)
+    | a1=disjunction 'if' b1=disjunction !('else'|':') {
+        self.raise_syntax_error_known_range("expected 'else' after 'if' expression", a1, b1)
      }
-    | a='lambda' [lambda_params] b=':' &(FSTRING_MIDDLE | fstring_replacement_field)  {
+    | a2='lambda' [lambda_params] b2=':' &(FSTRING_MIDDLE | fstring_replacement_field)  {
         self.raise_syntax_error_known_range(
-            "f-string: lambda expressions are not allowed without parentheses", a, b
+            "f-string: lambda expressions are not allowed without parentheses", a2, b2
         )
      }
 invalid_named_expression[NoReturn]:
@@ -1502,8 +1502,8 @@ invalid_assignment[NoReturn]:
      }
 invalid_ann_assign_target[ast.AST]:
     | a=plist { a }
-    | a=ptuple { a }
-    | '(' a=invalid_ann_assign_target ')' { a }
+    | a1=ptuple { a1 }
+    | '(' a2=invalid_ann_assign_target ')' { a2 }
 invalid_del_stmt[NoReturn]:
     | 'del' a=star_expressions {
         self.raise_syntax_error_invalid_target(Target.DEL_TARGETS, a)
@@ -1532,24 +1532,24 @@ invalid_parameters[NoReturn]:
     | a="/" ',' {
         self.raise_syntax_error_known_location("at least one argument must precede /", a)
      }
-    | (slash_no_default | slash_with_default) param_maybe_default* a='/' {
-        self.raise_syntax_error_known_location("/ may appear only once", a)
+    | (slash_no_default | slash_with_default) param_maybe_default* a1='/' {
+        self.raise_syntax_error_known_location("/ may appear only once", a1)
      }
-    | slash_no_default? param_no_default* invalid_parameters_helper a=param_no_default {
+    | slash_no_default? param_no_default* invalid_parameters_helper a2=param_no_default {
         self.raise_syntax_error_known_location(
-            "parameter without a default follows parameter with a default", a
+            "parameter without a default follows parameter with a default", a2
         )
      }
-    | param_no_default* a='(' param_no_default+ ','? b=')' {
+    | param_no_default* a3='(' param_no_default+ ','? b=')' {
         self.raise_syntax_error_known_range(
-            "Function parameters cannot be parenthesized", a, b
+            "Function parameters cannot be parenthesized", a3, b
         )
      }
-    | (slash_no_default | slash_with_default)? param_maybe_default* '*' (',' | param_no_default) param_maybe_default* a='/' {
-        self.raise_syntax_error_known_location("/ must be ahead of *", a)
+    | (slash_no_default | slash_with_default)? param_maybe_default* '*' (',' | param_no_default) param_maybe_default* a4='/' {
+        self.raise_syntax_error_known_location("/ must be ahead of *", a4)
      }
-    | param_maybe_default+ '/' a='*' {
-        self.raise_syntax_error_known_location("expected comma between / and *", a)
+    | param_maybe_default+ '/' a5='*' {
+        self.raise_syntax_error_known_location("expected comma between / and *", a5)
      }
 invalid_default:
     | a='=' &(')'|',') {
@@ -1583,24 +1583,24 @@ invalid_lambda_parameters[NoReturn]:
     | a="/" ',' {
         self.raise_syntax_error_known_location("at least one argument must precede /", a)
      }
-    | (lambda_slash_no_default | lambda_slash_with_default) lambda_param_maybe_default* a='/' {
-        self.raise_syntax_error_known_location("/ may appear only once", a)
+    | (lambda_slash_no_default | lambda_slash_with_default) lambda_param_maybe_default* a1='/' {
+        self.raise_syntax_error_known_location("/ may appear only once", a1)
      }
-    | lambda_slash_no_default? lambda_param_no_default* invalid_lambda_parameters_helper a=lambda_param_no_default {
+    | lambda_slash_no_default? lambda_param_no_default* invalid_lambda_parameters_helper a2=lambda_param_no_default {
         self.raise_syntax_error_known_location(
-            "parameter without a default follows parameter with a default", a
+            "parameter without a default follows parameter with a default", a2
         )
      }
-    | lambda_param_no_default* a='(' ','.lambda_param+ ','? b=')' {
+    | lambda_param_no_default* a3='(' ','.lambda_param+ ','? b=')' {
         self.raise_syntax_error_known_range(
-            "Lambda expression parameters cannot be parenthesized", a, b
+            "Lambda expression parameters cannot be parenthesized", a3, b
         )
      }
-    | (lambda_slash_no_default | lambda_slash_with_default)? lambda_param_maybe_default* '*' (',' | lambda_param_no_default) lambda_param_maybe_default* a='/' {
-        self.raise_syntax_error_known_location("/ must be ahead of *", a)
+    | (lambda_slash_no_default | lambda_slash_with_default)? lambda_param_maybe_default* '*' (',' | lambda_param_no_default) lambda_param_maybe_default* a4='/' {
+        self.raise_syntax_error_known_location("/ must be ahead of *", a4)
      }
-    | lambda_param_maybe_default+ '/' a='*' {
-        self.raise_syntax_error_known_location("expected comma between / and *", a)
+    | lambda_param_maybe_default+ '/' a5='*' {
+        self.raise_syntax_error_known_location("expected comma between / and *", a5)
      }
 invalid_lambda_parameters_helper:
     | a=lambda_slash_with_default { [a] }
@@ -1619,11 +1619,11 @@ invalid_lambda_kwds:
     | '**' lambda_param a='=' {
         self.raise_syntax_error_known_location("var-keyword argument cannot have default value", a)
      }
-    | '**' lambda_param ',' a=lambda_param {
-        self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a)
+    | '**' lambda_param ',' a1=lambda_param {
+        self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a1)
      }
-    | '**' lambda_param ',' a=('*'|'**'|'/') {
-        self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a)
+    | '**' lambda_param ',' a2=('*'|'**'|'/') {
+        self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a2)
      }
 invalid_double_type_comments[NoReturn]:
     | TYPE_COMMENT NEWLINE TYPE_COMMENT NEWLINE INDENT {

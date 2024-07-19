@@ -163,7 +163,7 @@ allow_redefinition = true
 local_partial_types = true
 warn_unreachable = false
 disable_error_code = [
-    "assignment", # 24
+#    "assignment", # 24
     "no-any-return", # 19
     "func-returns-value", # 59
     "var-annotated", # 28
