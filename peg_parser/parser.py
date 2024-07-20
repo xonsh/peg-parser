@@ -573,7 +573,7 @@ class XonshParser(Parser):
                 keywords=b[1] if b else [],
                 body=c,
                 decorator_list=[],
-                **{"type_params": t} if t else {},
+                **{"type_params": t or []} if sys.version_info >= (3, 12) else {},
                 **self.span(_lnum, _col),
             )
         self._reset(mark)
@@ -615,7 +615,7 @@ class XonshParser(Parser):
                 returns=a,
                 body=b,
                 type_comment=tc,
-                **{"type_params": t} if t else {},
+                **{"type_params": t or []} if sys.version_info >= (3, 12) else {},
                 **self.span(_lnum, _col),
             )
         self._reset(mark)
@@ -638,7 +638,7 @@ class XonshParser(Parser):
                 returns=a,
                 body=b,
                 type_comment=tc,
-                **{"type_params": t} if t else {},
+                **{"type_params": t or []} if sys.version_info >= (3, 12) else {},
                 **self.span(_lnum, _col),
             )
         self._reset(mark)

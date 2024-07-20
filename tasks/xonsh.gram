@@ -229,7 +229,7 @@ class_def_raw[ast.ClassDef]:
                 keywords=b[1] if b else [],
                 body=c,
                 decorator_list=[],
-                **({'type_params': t} if t else {}),
+                **({'type_params': t or []} if sys.version_info >= (3, 12) else {}),
                 LOCATIONS,
             )
         )
@@ -252,7 +252,7 @@ function_def_raw[Union[ast.FunctionDef, ast.AsyncFunctionDef]]:
                 returns=a,
                 body=b,
                 type_comment=tc,
-                **({'type_params': t} if t else {}),
+                **({'type_params': t or []} if sys.version_info >= (3, 12) else {}),
                 LOCATIONS,
             )
         )
@@ -265,7 +265,8 @@ function_def_raw[Union[ast.FunctionDef, ast.AsyncFunctionDef]]:
                 returns=a,
                 body=b,
                 type_comment=tc,
-                **({'type_params': t} if t else {}),
+                                **({'type_params': t or []} if sys.version_info >= (3, 12) else {}),
+
                 LOCATIONS,
             )
        )
