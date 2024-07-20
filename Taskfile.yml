@@ -29,12 +29,20 @@ tasks:
       - pylint --enable=R0801 --disable=W,C,R0916,R0911,R0912,R0904  --min-similarity-lines=1 peg_parser/parser.py
       - jscpd peg_parser/parser.py
 
+  profile-tasks:
+    cmds:
+      - python tasks/profile_mem.py | tee -a {{.LOG_FILE}}
+      - python tasks/simple.py | tee -a {{.LOG_FILE}}
+    vars:
+      LOG_FILE:
+        sh: echo ".local/logs/xonsh-parser-$(date "+%Y%m%d-%H%M%S").$(git rev-parse --short HEAD).log"
+
   profile:
+    deps:
+      - profile-tasks
     cmds:
       - mkdir -p .local/logs
       - asv run --python=same --show-stderr | tee -a {{.LOG_FILE}}
-      - python tasks/profile_mem.py | tee -a {{.LOG_FILE}}
-      - python tasks/simple.py | tee -a {{.LOG_FILE}}
       - asv profile --python=same benchmarks.PeakMemSuite.peakmem_parser_large_file | tee -a {{.LOG_FILE}}
     vars:
       LOG_FILE:
@@ -100,8 +108,8 @@ tasks:
     cmds:
       - env COMPILE_WITH_CYTHON=1 pip install -e . --no-build-isolation
     sources:
-      - peg_parser/subheader.py
-      - peg_parser/toke*.py
+      - peg_parser/*.py
+      - peg_parser/*.pxd
 
   clean:
     cmds:
