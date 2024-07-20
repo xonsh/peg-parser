@@ -10,7 +10,7 @@ import itertools
 import sys
 from typing import Any, Optional, Union, List, Tuple, NoReturn
 
-from peg_parser.subheader import Del, Load, Parser, Store, Target, logger, memoize, memoize_left_rec
+from peg_parser.subheader import Del, Load, Parser, Store, Target, logger, memoize, memoize_left_rec, Node
 '''
 
 @trailer''
@@ -23,7 +23,7 @@ from peg_parser.subheader import Del, Load, Parser, Store, Target, logger, memoi
 file[ast.Module]: a=[statements] ENDMARKER { ast.Module(body=a or [], type_ignores=[]) }
 interactive[ast.Interactive]: a=statement_newline { ast.Interactive(body=a) }
 eval[ast.Expression]: a=expressions NEWLINE* ENDMARKER { ast.Expression(body=a) }
-fstring[ast.Expr]: star_expressions
+fstring[ast.expr]: star_expressions
 
 # GENERAL STATEMENTS
 # ==================
@@ -145,7 +145,7 @@ del_stmt[ast.Delete]:
     | 'del' a=del_targets &(';' | NEWLINE) { ast.Delete(targets=a, LOCATIONS) }
     | invalid_del_stmt
 
-yield_stmt[ast.Expr]: y=yield_expr { ast.Expr(value=y, LOCATIONS) }
+yield_stmt[ast.expr]: y=yield_expr { ast.Expr(value=y, LOCATIONS) }
 
 assert_stmt[ast.Assert]: 'assert' a=expression b=[',' z=expression { z }] {
     ast.Assert(test=a, msg=b, LOCATIONS)
@@ -229,16 +229,7 @@ class_def_raw[ast.ClassDef]:
                 keywords=b[1] if b else [],
                 body=c,
                 decorator_list=[],
-                type_params=t or [],
-                LOCATIONS,
-            )
-            if sys.version_info >= (3, 12) else
-            ast.ClassDef(
-                a.string,
-                bases=b[0] if b else [],
-                keywords=b[1] if b else [],
-                body=c,
-                decorator_list=[],
+                **({'type_params': t} if t else {}),
                 LOCATIONS,
             )
         )
@@ -261,15 +252,7 @@ function_def_raw[Union[ast.FunctionDef, ast.AsyncFunctionDef]]:
                 returns=a,
                 body=b,
                 type_comment=tc,
-                type_params=t or [],
-                LOCATIONS,
-            ) if sys.version_info >= (3, 12) else
-            ast.FunctionDef(
-                name=n.string,
-                args=params or self.make_arguments(None, [], None, [], None),
-                returns=a,
-                body=b,
-                type_comment=tc,
+                **({'type_params': t} if t else {}),
                 LOCATIONS,
             )
         )
@@ -282,16 +265,7 @@ function_def_raw[Union[ast.FunctionDef, ast.AsyncFunctionDef]]:
                 returns=a,
                 body=b,
                 type_comment=tc,
-                type_params=t or [],
-                LOCATIONS,
-            )
-            if sys.version_info >= (3, 12) else
-            ast.AsyncFunctionDef(
-                name=n.string,
-                args=params or self.make_arguments(None, [], None, [], None),
-                returns=a,
-                body=b,
-                type_comment=tc,
+                **({'type_params': t} if t else {}),
                 LOCATIONS,
             )
        )
@@ -368,11 +342,11 @@ param_maybe_default[Tuple[ast.arg, Any]]:
     | a=param c=default? tc=TYPE_COMMENT? &')' { (a, c) }
 param[ast.arg]: a=NAME b=annotation? { ast.arg(arg=a.string, annotation=b, LOCATIONS) }
 param_star_annotation[ast.arg]: a=NAME b=star_annotation {
-    ast.arg(arg=a.string, annotations=b, LOCATIONS)
+    ast.arg(arg=a.string, annotation=b, LOCATIONS)
  }
-annotation[ast.Expr]: ':' a=expression { a }
+annotation[ast.expr]: ':' a=expression { a }
 star_annotation: ':' a=star_expression { a }
-default[ast.Expr]: '=' a=expression { a } | invalid_default
+default[ast.expr]: '=' a=expression { a } | invalid_default
 
 # If statement
 # ------------
@@ -606,7 +580,7 @@ pattern_capture_target[str]:
     | !"_" name=NAME !('.' | '(' | '=') { name.string }
 
 wildcard_pattern["ast.MatchAs"]:
-    | "_" { ast.MatchAs(pattern=None, target=None, LOCATIONS) }
+    | "_" { ast.MatchAs(pattern=None, LOCATIONS) }
 
 value_pattern["ast.MatchValue"]:
     | attr=attr !('.' | '(' | '=') { ast.MatchValue(value=attr, LOCATIONS) }
@@ -641,7 +615,7 @@ maybe_star_pattern:
 
 star_pattern:
     | '*' target=pattern_capture_target { ast.MatchStar(name=target, LOCATIONS) }
-    | '*' wildcard_pattern { ast.MatchStar(target=None, LOCATIONS) }
+    | '*' wildcard_pattern { ast.MatchStar(LOCATIONS) }
 
 mapping_pattern:
     | '{' '}' { ast.MatchMapping(keys=[], patterns=[], rest=None, LOCATIONS) }
@@ -731,8 +705,6 @@ type_alias["ast.TypeAlias"]:
                     value=b,
                     LOCATIONS
                 )
-                if sys.version_info >= (3, 12)
-                else None
             )
         )
      }
@@ -794,7 +766,7 @@ expressions:
     | a=expression ',' { ast.Tuple(elts=[a], ctx=Load, LOCATIONS) }
     | expression
 
-expression[ast.Expr | Any](memo):
+expression[ast.expr](memo):
     | invalid_expression
     | invalid_legacy_expression
     | a=disjunction 'if' b=disjunction 'else' c=expression {
@@ -844,22 +816,22 @@ named_expression:
     | invalid_named_expression
     | a=expression !':=' { a }
 
-disjunction (memo):
+disjunction[Node] (memo):
     | a=conjunction b=(('or' | '||') c=conjunction { c })+ { ast.BoolOp(op=ast.Or(), values=[a] + b, LOCATIONS) }
     | conjunction
 
-conjunction (memo):
+conjunction[Node] (memo):
     | a=inversion b=(('and' | '&&' ) c=inversion { c })+ { ast.BoolOp(op=ast.And(), values=[a] + b, LOCATIONS) }
     | inversion
 
-inversion (memo):
+inversion[Node] (memo):
     | 'not' a=inversion { ast.UnaryOp(op=ast.Not(), operand=a, LOCATIONS) }
     | comparison
 
 # Comparisons operators
 # ---------------------
 
-comparison:
+comparison[Node]:
     | a=bitwise_or b=compare_op_bitwise_or_pair+ {
         ast.Compare(left=a, ops=self.get_comparison_ops(b), comparators=self.get_comparators(b), LOCATIONS)
      }
@@ -1188,7 +1160,7 @@ double_starred_kvpair:
     | '**' a=bitwise_or { (None, a) }
     | kvpair
 
-kvpair[tuple[ast.Expr, ast.Expr]]: a=expression ':' b=expression { (a, b) }
+kvpair[tuple[ast.expr, ast.expr]]: a=expression ':' b=expression { (a, b) }
 
 # Comprehensions & Generators
 # ---------------------------
@@ -1422,7 +1394,7 @@ invalid_kwarg[NoReturn]:
 
 # IMPORTANT: Note that the "_without_invalid" suffix causes the rule to
 # not call invalid rules under it
-expression_without_invalid[ast.AST | Any]:
+expression_without_invalid[Node | Any]:
     | a=disjunction 'if' b=disjunction 'else' c=expression {
         ast.IfExp(body=b, test=a, orelse=c, LOCATIONS)
      }
@@ -1500,7 +1472,7 @@ invalid_assignment[NoReturn]:
             f"'{self.get_expr_name(a)}' is an illegal expression for augmented assignment", a
         )
      }
-invalid_ann_assign_target[ast.AST]:
+invalid_ann_assign_target[Node]:
     | a=plist { a }
     | a1=ptuple { a1 }
     | '(' a2=invalid_ann_assign_target ')' { a2 }

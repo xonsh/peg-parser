@@ -5,7 +5,7 @@ import itertools
 import sys
 from typing import Any
 
-from peg_parser.subheader import Del, Load, Parser, Store, Target, logger, memoize, memoize_left_rec
+from peg_parser.subheader import Del, Load, Node, Parser, Store, Target, logger, memoize, memoize_left_rec
 
 
 # Keywords and soft keywords are listed at the end of the parser definition.
@@ -339,7 +339,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def yield_stmt(self) -> ast.Expr | None:
+    def yield_stmt(self) -> ast.expr | None:
         # yield_stmt: yield_expr
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -567,25 +567,14 @@ class XonshParser(Parser):
             and (self.expect_forced(self.expect(":"), "':'"))
             and (c := self.block())
         ):
-            return (
-                ast.ClassDef(
-                    a.string,
-                    bases=b[0] if b else [],
-                    keywords=b[1] if b else [],
-                    body=c,
-                    decorator_list=[],
-                    type_params=t or [],
-                    **self.span(_lnum, _col),
-                )
-                if sys.version_info >= (3, 12)
-                else ast.ClassDef(
-                    a.string,
-                    bases=b[0] if b else [],
-                    keywords=b[1] if b else [],
-                    body=c,
-                    decorator_list=[],
-                    **self.span(_lnum, _col),
-                )
+            return ast.ClassDef(
+                a.string,
+                bases=b[0] if b else [],
+                keywords=b[1] if b else [],
+                body=c,
+                decorator_list=[],
+                **{"type_params": t} if t else {},
+                **self.span(_lnum, _col),
             )
         self._reset(mark)
         return None
@@ -620,25 +609,14 @@ class XonshParser(Parser):
             and (tc := self.func_type_comment(),)
             and (b := self.block())
         ):
-            return (
-                ast.FunctionDef(
-                    name=n.string,
-                    args=params or self.make_arguments(None, [], None, [], None),
-                    returns=a,
-                    body=b,
-                    type_comment=tc,
-                    type_params=t or [],
-                    **self.span(_lnum, _col),
-                )
-                if sys.version_info >= (3, 12)
-                else ast.FunctionDef(
-                    name=n.string,
-                    args=params or self.make_arguments(None, [], None, [], None),
-                    returns=a,
-                    body=b,
-                    type_comment=tc,
-                    **self.span(_lnum, _col),
-                )
+            return ast.FunctionDef(
+                name=n.string,
+                args=params or self.make_arguments(None, [], None, [], None),
+                returns=a,
+                body=b,
+                type_comment=tc,
+                **{"type_params": t} if t else {},
+                **self.span(_lnum, _col),
             )
         self._reset(mark)
         if (
@@ -654,25 +632,14 @@ class XonshParser(Parser):
             and (tc := self.func_type_comment(),)
             and (b := self.block())
         ):
-            return (
-                ast.AsyncFunctionDef(
-                    name=n.string,
-                    args=params or self.make_arguments(None, [], None, [], None),
-                    returns=a,
-                    body=b,
-                    type_comment=tc,
-                    type_params=t or [],
-                    **self.span(_lnum, _col),
-                )
-                if sys.version_info >= (3, 12)
-                else ast.AsyncFunctionDef(
-                    name=n.string,
-                    args=params or self.make_arguments(None, [], None, [], None),
-                    returns=a,
-                    body=b,
-                    type_comment=tc,
-                    **self.span(_lnum, _col),
-                )
+            return ast.AsyncFunctionDef(
+                name=n.string,
+                args=params or self.make_arguments(None, [], None, [], None),
+                returns=a,
+                body=b,
+                type_comment=tc,
+                **{"type_params": t} if t else {},
+                **self.span(_lnum, _col),
             )
         self._reset(mark)
         return None
@@ -885,11 +852,11 @@ class XonshParser(Parser):
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.name()) and (b := self.star_annotation()):
-            return ast.arg(arg=a.string, annotations=b, **self.span(_lnum, _col))
+            return ast.arg(arg=a.string, annotation=b, **self.span(_lnum, _col))
         self._reset(mark)
         return None
 
-    def annotation(self) -> ast.Expr | None:
+    def annotation(self) -> ast.expr | None:
         # annotation: ':' expression
         mark = self._mark()
         if (self.expect(":")) and (a := self.expression()):
@@ -905,7 +872,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def default(self) -> ast.Expr | None:
+    def default(self) -> ast.expr | None:
         # default: '=' expression | invalid_default
         mark = self._mark()
         if (self.expect("=")) and (a := self.expression()):
@@ -1515,7 +1482,7 @@ class XonshParser(Parser):
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.expect("_"):
-            return ast.MatchAs(pattern=None, target=None, **self.span(_lnum, _col))
+            return ast.MatchAs(pattern=None, **self.span(_lnum, _col))
         self._reset(mark)
         return None
 
@@ -1606,7 +1573,7 @@ class XonshParser(Parser):
             return ast.MatchStar(name=target, **self.span(_lnum, _col))
         self._reset(mark)
         if (self.expect("*")) and (self.wildcard_pattern()):
-            return ast.MatchStar(target=None, **self.span(_lnum, _col))
+            return ast.MatchStar(**self.span(_lnum, _col))
         self._reset(mark)
         return None
 
@@ -1786,9 +1753,7 @@ class XonshParser(Parser):
                     type_params=t or [],
                     value=b,
                     **self.span(_lnum, _col),
-                )
-                if sys.version_info >= (3, 12)
-                else None,
+                ),
             )
         self._reset(mark)
         return None
@@ -1877,7 +1842,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def expression(self) -> ast.Expr | Any | None:
+    def expression(self) -> ast.expr | None:
         # expression: invalid_expression | invalid_legacy_expression | disjunction 'if' disjunction 'else' expression | disjunction | lambdef
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -2002,7 +1967,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def disjunction(self) -> Any | None:
+    def disjunction(self) -> Node | None:
         # disjunction: conjunction ((('or' | '||') conjunction))+ | conjunction
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -2015,7 +1980,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def conjunction(self) -> Any | None:
+    def conjunction(self) -> Node | None:
         # conjunction: inversion ((('and' | '&&') inversion))+ | inversion
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -2028,7 +1993,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def inversion(self) -> Any | None:
+    def inversion(self) -> Node | None:
         # inversion: 'not' inversion | comparison
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -2040,7 +2005,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def comparison(self) -> Any | None:
+    def comparison(self) -> Node | None:
         # comparison: bitwise_or compare_op_bitwise_or_pair+ | bitwise_or
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -2908,7 +2873,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def kvpair(self) -> tuple[ast.Expr, ast.Expr] | None:
+    def kvpair(self) -> tuple[ast.expr, ast.expr] | None:
         # kvpair: expression ':' expression
         mark = self._mark()
         if (a := self.expression()) and (self.expect(":")) and (b := self.expression()):
@@ -3478,7 +3443,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def expression_without_invalid(self) -> ast.AST | Any | None:
+    def expression_without_invalid(self) -> Node | Any | None:
         # expression_without_invalid: disjunction 'if' disjunction 'else' expression | disjunction | lambdef
         _prev_call_invalid = self.call_invalid_rules
         self.call_invalid_rules = False
@@ -3636,7 +3601,7 @@ class XonshParser(Parser):
         self._reset(mark)
         return None
 
-    def invalid_ann_assign_target(self) -> ast.AST | None:
+    def invalid_ann_assign_target(self) -> Node | None:
         # invalid_ann_assign_target: plist | ptuple | '(' invalid_ann_assign_target ')'
         mark = self._mark()
         if a := self.plist():

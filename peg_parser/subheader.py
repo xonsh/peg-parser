@@ -4,12 +4,13 @@ import ast
 import enum
 import sys
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, ParamSpec, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, ParamSpec, Protocol, TypeVar, cast
 
 from peg_parser.tokenize import Token, TokenInfo, generate_tokens
 from peg_parser.tokenizer import Mark, Tokenizer
 
 if TYPE_CHECKING:
+    # see - https://github.com/python/mypy/blob/master/mypy/typeshed/stdlib/_ast.pyi
     from collections.abc import Iterator
     from pathlib import Path
 
@@ -20,7 +21,15 @@ Load = ast.Load()
 Store = ast.Store()
 Del = ast.Del()
 
-Node = TypeVar("Node", bound=ast.AST)
+# Node = TypeVar("Node", bound=ast.stmt | ast.expr)
+
+
+class Node(Protocol):
+    lineno: int
+    col_offset: int
+    end_lineno: int | None
+    end_col_offset: int | None
+
 
 EXPR_NAME_MAPPING = {
     ast.Attribute: "attribute",
@@ -51,9 +60,9 @@ EXPR_NAME_MAPPING = {
 }
 
 T = TypeVar("T")
-T1 = TypeVar("T1")
-T2 = TypeVar("T2")
-T3 = TypeVar("T3")
+TR = TypeVar("TR")  # repeated
+TS = TypeVar("TS")
+TG = TypeVar("TG")
 P = TypeVar("P", bound="Parser")
 P1 = ParamSpec("P1")
 F = TypeVar("F", bound=Callable[..., Any])
@@ -221,7 +230,7 @@ def xonsh_call(name: str, *args: Node, **locs: int) -> ast.Call:
     """
     return ast.Call(
         func=load_attribute_chain(name, **locs),
-        args=list(args),
+        args=list(args),  # type: ignore
         keywords=[],
         starargs=None,
         kwargs=None,
@@ -309,7 +318,7 @@ class Parser:
             return self._tokenizer.getnext()
         return None
 
-    def repeated(self, func: Callable[..., T1 | None], *args: Any) -> list[T1]:
+    def repeated(self, func: Callable[..., TR | None], *args: Any) -> list[TR]:
         mark = self._mark()
         children = []
         while result := func(*args):
@@ -320,22 +329,22 @@ class Parser:
 
     def sep_repeated(
         self,
-        func: Callable[..., T2] | tuple[Callable[..., T2], Any],
+        func: Callable[..., TS] | tuple[Callable[..., TS], Any],
         sep_func: Callable[..., Any],
         *sep_args: Any,
-    ) -> T2 | None:
+    ) -> TS | None:
         if (sep_func(*sep_args)) and (elem := self.seq_alts(func)):
             return elem
         return None
 
     def gathered(
         self,
-        func: Callable[..., T3 | None] | tuple[Callable[..., T3 | None], Any],
+        func: Callable[..., TG | None] | tuple[Callable[..., TG | None], Any],
         sep: Callable[..., Any],
         *sep_args: Any,
-    ) -> list[T3] | None:
+    ) -> list[TG] | None:
         # gather: ','.e+
-        seq: list[T3]
+        seq: list[TG]
         mark = self._mark()
         if (elem := self.seq_alts(func)) is not None and (
             seq := self.repeated(self.sep_repeated, func, sep, *sep_args)
@@ -374,7 +383,7 @@ class Parser:
             self._reset(mark)
         return None
 
-    def parse(self, rule: str, call_invalid_rules: bool = False) -> ast.AST | Any | None:
+    def parse(self, rule: str, call_invalid_rules: bool = False) -> Node | Any | None:
         self.call_invalid_rules = call_invalid_rules
         res = getattr(self, rule)()
 
@@ -433,7 +442,7 @@ class Parser:
             ) from e
         return name
 
-    def get_invalid_target(self, target: Target, node: ast.AST | None) -> ast.AST | None:
+    def get_invalid_target(self, target: Target, node: Node | None) -> Node | None:
         """Get the meaningful invalid target for different assignment type."""
         if node is None:
             return None
@@ -571,10 +580,10 @@ class Parser:
         path_tok = self._strip_path_prefix(a)
         if path_tok:
             self._path_token = path_tok
-        return ast.JoinedStr(values=b, **locs)
+        return ast.JoinedStr(values=b, **locs)  # type: ignore
 
     @staticmethod
-    def _strip_path_prefix(token: TokenInfo | ast.expr) -> TokenInfo | None:
+    def _strip_path_prefix(token: TokenInfo | Node) -> TokenInfo | None:
         if not isinstance(token, TokenInfo):
             return None
         text = token.string
@@ -600,9 +609,9 @@ class Parser:
                 level += 3
         return level
 
-    def set_decorators(self, target: FC, decorators: list[ast.expr]) -> FC:
+    def set_decorators(self, target: FC, decorators: list[Node]) -> FC:
         """Set the decorators on a function or class definition."""
-        target.decorator_list = decorators
+        target.decorator_list = decorators  # type: ignore
         return target
 
     def get_comparison_ops(self, pairs: list[tuple[T, T]]) -> list[T]:
@@ -634,7 +643,7 @@ class Parser:
 
         return ast.arguments(
             posonlyargs=[p for p, _ in pos_only],
-            args=params,
+            args=params,  # type: ignore
             defaults=defaults,
             vararg=after_star[0],
             kwonlyargs=[p for p, _ in after_star[1]],
@@ -649,7 +658,7 @@ class Parser:
             ctx = Load
         return ast.Subscript(
             value=load_attribute_chain("__xonsh__.env", **locs),
-            slice=ast.Constant(value=name.string, **locs),
+            slice=ast.Constant(value=name.string, kind=None, **locs),
             ctx=ctx,
             **locs,
         )
@@ -669,7 +678,7 @@ class Parser:
         return node
 
     def expand_env_expr(
-        self, slices: ast.expr, ctx: ast.Store | ast.Load | None = None, **locs: int
+        self, slices: Node, ctx: ast.Store | ast.Load | None = None, **locs: int
     ) -> ast.Subscript:
         if ctx is None:
             ctx = Load
@@ -681,18 +690,20 @@ class Parser:
         )
 
     @staticmethod
-    def is_adjacent(prev: TokenInfo | ast.expr, curr: TokenInfo | ast.AST) -> bool:
+    def is_adjacent(prev: TokenInfo | Node, curr: TokenInfo | Node | Node) -> bool:
         end = prev.end if isinstance(prev, TokenInfo) else (prev.end_lineno, prev.end_col_offset)
         start = curr.start if isinstance(curr, TokenInfo) else (curr.lineno, curr.col_offset)
         return end == start
 
     def _append_node_or_token(self, tree: ast.expr | None, cmd: TokenInfo | ast.expr) -> ast.expr:
         if tree is None:
-            return ast.Constant(value=cmd.string, **cmd.loc()) if isinstance(cmd, TokenInfo) else cmd
+            return (
+                ast.Constant(value=cmd.string, kind=None, **cmd.loc()) if isinstance(cmd, TokenInfo) else cmd
+            )
 
         locs = {"lineno": tree.lineno, "col_offset": tree.col_offset}
         if isinstance(tree, ast.Constant) and isinstance(cmd, TokenInfo):
-            return ast.Constant(value=tree.value + cmd.string, **locs, **cmd.loc_end())
+            return ast.Constant(value=tree.value + cmd.string, kind=None, **locs, **cmd.loc_end())
 
         # prefix@(...)
         if isinstance(tree, ast.Constant) and isinstance(cmd, ast.Starred):
@@ -700,32 +711,38 @@ class Parser:
                 elts=[tree, cmd],
                 ctx=Load,
                 **locs,
-                end_lineno=cmd.end_lineno,
-                end_col_offset=cmd.end_col_offset,
+                end_lineno=cmd.end_lineno or 0,
+                end_col_offset=cmd.end_col_offset or 0,
             )
         # @(...)suffix
         if isinstance(tree, ast.Starred | ast.Tuple) and isinstance(cmd, TokenInfo):
-            suffix = ast.Constant(value=cmd.string, **cmd.loc())
+            suffix = ast.Constant(value=cmd.string, kind=None, **cmd.loc())
             elts = [*tree.elts, suffix] if isinstance(tree, ast.Tuple) else [tree, suffix]
             return ast.Tuple(elts=elts, ctx=Load, **locs, **cmd.loc_end())
         # prefix@(...)suffix
         if isinstance(tree, ast.Tuple) and isinstance(cmd, TokenInfo):
             return ast.Tuple(
-                elts=[*tree.elts, ast.Constant(value=cmd.string, **cmd.loc())],
+                elts=[*tree.elts, ast.Constant(value=cmd.string, kind=None, **cmd.loc())],
                 ctx=Load,
                 **locs,
                 **cmd.loc_end(),
             )
+        if isinstance(cmd, TokenInfo):
+            locs["end_lineno"] = cmd.end[0]
+            locs["end_col_offset"] = cmd.end[1]
+        elif cmd.end_lineno is not None:
+            locs["end_lineno"] = cmd.end_lineno
+            locs["end_col_offset"] = cmd.end_col_offset or 0
         return ast.BinOp(
             left=tree,
             op=ast.Add(),
-            right=ast.Constant(value=cmd.string, **cmd.loc()) if isinstance(cmd, TokenInfo) else cmd,
+            right=ast.Constant(value=cmd.string, kind=None, **cmd.loc())
+            if isinstance(cmd, TokenInfo)
+            else cmd,
             **locs,
-            end_lineno=cmd.end_lineno if isinstance(cmd, ast.AST) else cmd.end[0],
-            end_col_offset=cmd.end_col_offset if isinstance(cmd, ast.AST) else cmd.end[1],
         )
 
-    def _proc_args(self, args: list[TokenInfo | ast.expr]) -> Iterator[ast.AST]:
+    def _proc_args(self, args: list[TokenInfo | ast.expr]) -> Iterator[ast.expr]:
         """split into chunks if they are not contiguous."""
         stash: None | ast.expr = None
 
@@ -743,20 +760,20 @@ class Parser:
         if stash:
             yield stash
 
-    def proc_args(self, args: list[TokenInfo | ast.expr]) -> list[ast.AST]:
+    def proc_args(self, args: list[TokenInfo | ast.expr]) -> list[ast.expr]:
         return list(self._proc_args(args))
 
-    def handle_proc(self, method: str, args: list[ast.AST], **locs: int) -> ast.Call:
+    def handle_proc(self, method: str, args: list[Node], **locs: int) -> ast.Call:
         return xonsh_call(f"__xonsh__.{method}", *args, **locs)
 
-    def proc_inject(self, args: list[ast.AST], **locs: int) -> ast.Starred:
+    def proc_inject(self, args: list[Node], **locs: int) -> ast.Starred:
         return ast.Starred(
             value=xonsh_call("__xonsh__.subproc_captured_inject", *args, **locs),
             ctx=Load,
             **locs,
         )
 
-    def proc_pyexpr(self, expr: ast.expr, **locs: int) -> ast.Starred:
+    def proc_pyexpr(self, expr: Node, **locs: int) -> ast.Starred:
         return ast.Starred(
             value=xonsh_call("__xonsh__.list_of_strs_or_callables", expr, **locs),
             ctx=Load,
@@ -764,13 +781,13 @@ class Parser:
         )
 
     def expand_search_path(self, a: TokenInfo, **locs: int) -> ast.Call:
-        return xonsh_call("__xonsh__.pathsearch", ast.Constant(value=a.string, **locs), **locs)
+        return xonsh_call("__xonsh__.pathsearch", ast.Constant(value=a.string, kind=None, **locs), **locs)
 
-    def macro_call(self, a: ast.expr, b: list[TokenInfo], **locs: int) -> ast.Call:
+    def macro_call(self, a: Node, b: list[TokenInfo], **locs: int) -> ast.Call:
         gbl_call = xonsh_call("globals", **locs)
         loc_call = xonsh_call("locals", **locs)
         positionals = ast.Tuple(
-            elts=[ast.Constant(value=param.string, **param.loc()) for param in b], ctx=Load, **locs
+            elts=[ast.Constant(value=param.string, kind=None, **param.loc()) for param in b], ctx=Load, **locs
         )
         return xonsh_call(
             "__xonsh__.call_macro",
@@ -784,12 +801,12 @@ class Parser:
     def handle_with_macro_stmt(self, a: ast.withitem, b: TokenInfo, **locs: int) -> ast.With:
         gblcall = xonsh_call("globals", **locs)
         loccall = xonsh_call("locals", **locs)
-        body = ast.Constant(value=b.string, **b.loc())
+        body = ast.Constant(value=b.string, kind=None, **b.loc())
         a.context_expr = xonsh_call("__xonsh__.enter_macro", a.context_expr, body, gblcall, loccall, **locs)
         self._tokenizer._with_macro = False
-        return ast.With(items=[a], body=[ast.Pass(**locs)], **locs)
+        return ast.With(items=[a], body=[ast.Pass(**locs)], type_comment=None, **locs)
 
-    def handle_func_macro_start(self, a: ast.expr) -> ast.expr:
+    def handle_func_macro_start(self, a: Node) -> Node:
         self._tokenizer._call_macro = True
         return a
 
@@ -805,7 +822,7 @@ class Parser:
         locs["col_offset"] += 1  # offset `!`
         st = "".join((tok.string if isinstance(tok, TokenInfo) else tok) for tok in a).strip()
         self._tokenizer._proc_macro = False
-        return ast.Constant(value=st, **locs)
+        return ast.Constant(value=st, kind=None, **locs)
 
     def _build_syntax_error(
         self,
@@ -837,9 +854,10 @@ class Parser:
         self,
         message: str,
         start: tuple[int, int] | None = None,
-        end: tuple[int, int] | None = None,
+        end: tuple[int | None, int | None] | None = None,
     ) -> None:
-        raise self._build_syntax_error(message, start, end)
+        eloc = (end[0] or 0, end[1] or 0) if end else None
+        raise self._build_syntax_error(message, start, eloc)
 
     def make_syntax_error(self, message: str) -> SyntaxError:
         return self._build_syntax_error(message)
@@ -864,7 +882,7 @@ class Parser:
             tok.end if sys.version_info >= (3, 12) or tok.type != Token.NEWLINE else tok.start,
         )
 
-    def raise_syntax_error_known_location(self, message: str, node: ast.AST | TokenInfo) -> None:
+    def raise_syntax_error_known_location(self, message: str, node: Node | TokenInfo) -> None:
         """Raise a syntax error that occured at a given AST node."""
         if isinstance(node, TokenInfo):
             start = node.start
@@ -878,8 +896,8 @@ class Parser:
     def raise_syntax_error_known_range(
         self,
         message: str,
-        start_node: ast.AST | TokenInfo,
-        end_node: ast.AST | TokenInfo,
+        start_node: Node | TokenInfo,
+        end_node: Node | TokenInfo,
     ) -> None:
         if isinstance(start_node, TokenInfo):
             start = start_node.start
@@ -893,7 +911,7 @@ class Parser:
 
         raise self._build_syntax_error(message, start, end)
 
-    def raise_syntax_error_starting_from(self, message: str, start_node: ast.AST | TokenInfo) -> None:
+    def raise_syntax_error_starting_from(self, message: str, start_node: Node | TokenInfo) -> None:
         if isinstance(start_node, TokenInfo):
             start = start_node.start
         else:
@@ -903,7 +921,7 @@ class Parser:
 
         raise self._build_syntax_error(message, start, last_token.start)
 
-    def raise_syntax_error_invalid_target(self, target: Target, node: ast.AST | None) -> None:
+    def raise_syntax_error_invalid_target(self, target: Target, node: Node | None) -> None:
         invalid_target = self.get_invalid_target(target, node)
 
         if invalid_target is None:
@@ -926,7 +944,7 @@ class Parser:
         path: Path,
         py_version: tuple[int, ...] | None = None,
         verbose: bool = False,
-    ) -> ast.Module | None:
+    ) -> ast.Module | Node | None:
         """Parse a file or string."""
         with open(path) as f:
             tok_stream = generate_tokens(f.readline)
@@ -937,7 +955,7 @@ class Parser:
                 filename=path.name,
                 py_version=py_version,
             )
-            return parser.parse("file")  # type: ignore
+            return parser.parse("file")
 
     @classmethod
     def parse_string(
