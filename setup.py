@@ -54,8 +54,8 @@ if os.environ.get("COMPILE_WITH_CYTHON"):
         [
             "peg_parser/tokenize.py",
             "peg_parser/tokenizer.py",
-            # "peg_parser/subheader.py",
-            # "peg_parser/parser.py",
+            "peg_parser/subheader.py",
+            "peg_parser/parser.py",
         ],
         show_all_warnings=True,
         annotate=True,

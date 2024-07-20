@@ -1,3 +1,6 @@
 # generated files
 #parser.py
 *.c
+
+# generated html by cython annotated
+*html
