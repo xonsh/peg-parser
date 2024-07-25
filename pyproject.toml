@@ -1,26 +1,33 @@
 [tool.ruff]
 line-length = 110
 extend-exclude = [
-    "tests/xonsh-data", "tests/data", "pegen", "benchmarks", "tasks/bench_utils.py",
-    "peg_parser/parser/untokenizer.py"
+    "tests/xonsh-data",
+    "tests/data",
+    "pegen",
+    "benchmarks",
+    "tasks/bench_utils.py",
+    "peg_parser/parser/untokenizer.py",
 ]
 
 [tool.ruff.lint]
-extend-select = ["B", "I", "UP",
+extend-select = [
+    "B",
+    "I",
+    "UP",
     "C90", # mccaabe complexity
-    "N", # pep8 naming
+    "N",   # pep8 naming
     "YTT", # flake8-2020 sys.version
-#    "ANN", # flake8 annotations
-    "A", # flake8-builtins
-    "C4", # flake8-comprehensions
-    "FA", # flake8-future-annotations
-    "PIE", # flake8-pie
-    "PT", # pytest
-    "SIM", # simplify
-    "TCH", # type checking
-    "PL", # pylint
+    #    "ANN", # flake8 annotations
+    "A",    # flake8-builtins
+    "C4",   # flake8-comprehensions
+    "FA",   # flake8-future-annotations
+    "PIE",  # flake8-pie
+    "PT",   # pytest
+    "SIM",  # simplify
+    "TCH",  # type checking
+    "PL",   # pylint
     "PERF", # performance
-#    "FURB", # modernize
+    #    "FURB", # modernize
     "RUF", # ruff
 ]
 extend-safe-fixes = ["FA", "TCH", "PT"]
@@ -28,24 +35,22 @@ extend-safe-fixes = ["FA", "TCH", "PT"]
 # ruff ignore file "xonsh_parser/ply/yacc.py"
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = [
-    "ANN", # requiring annotations
-    "PL", # pylint
-    "PT023", # [*] Use `@pytest.mark.xfail()` over `@pytest.mark.xfail`
-    "PT001", # [*] Use `@pytest.mark.parametrize` instead of `@pytest.mark.parametrize`
-    "PT006", # need tuple
-    "PT007", # Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+    "ANN",    # requiring annotations
+    "PL",     # pylint
+    "PT023",  # [*] Use `@pytest.mark.xfail()` over `@pytest.mark.xfail`
+    "PT001",  # [*] Use `@pytest.mark.parametrize` instead of `@pytest.mark.parametrize`
+    "PT006",  # need tuple
+    "PT007",  # Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
     "RUF001", # similar chars
 ]
 "peg_parser/parser.py" = [
-    "A", # flake8-builtins
-    "C90", # mccaabe complexity
-    "PLR0", # Too many arguments
+    "A",      # flake8-builtins
+    "C90",    # mccaabe complexity
+    "PLR0",   # Too many arguments
     "RUF005", # concatenation
-    "F841", # [*] Local variable `strstart` is assigned to but never used
+    "F841",   # [*] Local variable `strstart` is assigned to but never used
 ]
-"tests/test_subproc_macros.py" = [
-    "PT014"
-]
+"tests/test_subproc_macros.py" = ["PT014"]
 "tasks/generator.py" = ["N802", "PLR0913", "PLR2004", "C901"]
 "*/subheader.py" = [
     "C901",
@@ -60,7 +65,7 @@ extend-safe-fixes = ["FA", "TCH", "PT"]
     "F821", # Undefined name `strstart`
     "F841", # [*] Local variable `strstart` is assigned to but never used
     "B904", # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
-    "PLR", # pylint
+    "PLR",  # pylint
     "C901", # too complex
     "N818", # exception naming
 ]
@@ -73,7 +78,8 @@ extend-safe-fixes = ["FA", "TCH", "PT"]
 log_file = "pytest.log"
 log_file_level = "DEBUG"
 log_file_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
-addopts = "--benchmark-skip"
+addopts = "--benchmark-skip --benchmark-columns=mean,stddev,median,iqr,ops,rounds,iterations"
+
 
 [tool.pdm]
 [project.optional-dependencies]
@@ -83,12 +89,9 @@ test = [
     "pytest-subtests>=0.12.1",
     "pytest-testmon>=2.1.1",
     "pytest-instafail>=0.5.0",
-    "pytest-benchmark>=4.0.0",
+    "pytest-benchmark[histogram]>=4.0.0",
 ]
-docs = [
-    "mkdocs-material",
-    "mkdocstrings[python]",
-]
+docs = ["mkdocs-material", "mkdocstrings[python]"]
 profile = [
     "asv>=0.5.1",
     "virtualenv>=20.21.0",
@@ -113,19 +116,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "xonsh-parser"
-authors = [
-    { name = "xonsh-parser", email = "jnoortheen@gmail.com" }
-]
+authors = [{ name = "xonsh-parser", email = "jnoortheen@gmail.com" }]
 description = "Xonsh parser using PLY"
 readme = "README.md"
 dynamic = ["version"]
-classifiers = [
-    "Programming Language :: Python :: 3 :: Only",
-]
+classifiers = ["Programming Language :: Python :: 3 :: Only"]
 requires-python = ">=3.10"
-dependencies = [
-    "mypy-extensions>=1.0.0",
-]
+dependencies = ["mypy-extensions>=1.0.0"]
 
 [tool.setuptools.package-dir]
 peg_parser = "peg_parser"
@@ -138,11 +135,7 @@ Source = "https://github.com/jnoortheen/xonsh-parser"
 [tool.mypy]
 # mypy ignore file "xonsh_parser/ply/yacc.py"
 packages = "peg_parser"
-exclude = [
-    'tests',
-    'pegen\/build.py',
-    'pegen\/grammar_parser.py',
-]
+exclude = ['tests', 'pegen\/build.py', 'pegen\/grammar_parser.py']
 check_untyped_defs = true
 ignore_missing_imports = true
 follow_imports = 'skip'
@@ -167,8 +160,8 @@ local_partial_types = true
 warn_unreachable = false
 disable_error_code = [
     "func-returns-value", # 59
-    "var-annotated", # 28
-    "arg-type", # 24 errors
+    "var-annotated",      # 28
+    "arg-type",           # 24 errors
     "return-value",
     "call-overload",
     "no-any-return",

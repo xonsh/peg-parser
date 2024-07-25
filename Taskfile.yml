@@ -1,8 +1,8 @@
-version: '3'
+version: "3"
 tasks:
   pull_grammar:
     cmds:
-#      - curl -L https://github.com/python/cpython/raw/main/Grammar/python.gram > tasks/python.gram
+      #      - curl -L https://github.com/python/cpython/raw/main/Grammar/python.gram > tasks/python.gram
       - curl -L https://github.com/we-like-parsers/pegen/raw/main/data/python.gram > tasks/python.gram
   generate-meta:
     cmds:
@@ -63,8 +63,8 @@ tasks:
       - generate
     cmds:
       - python -m pytest {{.CLI_ARGS}}
-#    sources:
-#      - '**/*.py'
+  #    sources:
+  #      - '**/*.py'
 
   test-cov:
     cmd: task test -- --cov=peg_parser --cov-report=html
@@ -120,3 +120,12 @@ tasks:
     cmds:
       - semantic-release version --no-vcs-release {{.CLI_ARGS}}
       - git push --follow-tags
+
+  pytest-bench:
+    cmds:
+#      - cd ~/src/rust/xonsh-rd-parser && maturin develop --release
+      - pytest tests/test_bench.py --benchmark-only --benchmark-histogram --benchmark-autosave | tee -a pytest-bench.log
+
+  pytest-bench-compare:
+    cmds:
+      - pytest-benchmark compare

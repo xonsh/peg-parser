@@ -128,3 +128,7 @@ pdm.lock
 .task/
 
 .testmondata*
+
+# pytest-benchmark
+benchmark_*.svg
+.benchmarks/

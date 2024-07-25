@@ -1,36 +1,40 @@
-def main():
-    from peg_parser.parser import XonshParser
+from pathlib import Path
 
-    src_txt = "print(1)"
-    return XonshParser.parse_string(src_txt, mode="eval")
+import pytest
 
 
-def large_file():
-    from pathlib import Path
+@pytest.mark.benchmark(group="small-string")
+class TestBenchSmallString:
+    def test_peg(self, benchmark):
+        @benchmark
+        def main():
+            from peg_parser.parser import XonshParser
 
-    from peg_parser.parser import XonshParser
+            src_txt = "print(1)"
+            return XonshParser.parse_string(src_txt, mode="eval")
 
+    # def test_ruff(self, benchmark):
+    #     @benchmark
+    #     def main():
+    #         import xonsh_rd_parser as parser
+    #
+    #         src_txt = "print(1)"
+    #         return parser.parse_string(src_txt)
+
+
+@pytest.mark.benchmark(group="large-file")
+class TestBenchLargeFile:
     file = Path(__file__).parent.parent / "peg_parser" / "parser.py"
-    print(f"file: {file}")
-    assert file.exists()
-    return XonshParser.parse_file(file)
 
+    def test_pegen(self, benchmark):
+        @benchmark
+        def main():
+            from peg_parser.parser import XonshParser
 
-def test_parse_string(benchmark):
-    # benchmark something
-    result = benchmark(main)
+            return XonshParser.parse_file(self.file)
 
-    # Extra code, to verify that the run completed correctly.
-    # Sometimes you may want to check the result, fast functions
-    # are no good if they return incorrect results :-)
-    assert result
-
-
-def test_parse_file(benchmark):
-    # benchmark something
-    result = benchmark(large_file)
-
-    # Extra code, to verify that the run completed correctly.
-    # Sometimes you may want to check the result, fast functions
-    # are no good if they return incorrect results :-)
-    assert result
+    # def test_ruff(self, benchmark):
+    #     @benchmark
+    #     def main():
+    #         import xonsh_rd_parser as parser
+    #         return parser.parse_file(str(self.file))
