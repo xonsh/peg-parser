@@ -114,6 +114,8 @@ tasks:
   clean:
     cmds:
       - find peg_parser -name "*.so" -delete -print
+      - find peg_parser -name "*.c" -delete -print
+      - find peg_parser -name "*.html" -delete -print
 
   release:
     # https://python-semantic-release.readthedocs.io/en/latest/commands.html
@@ -124,7 +126,8 @@ tasks:
   pytest-bench:
     cmds:
 #      - cd ~/src/rust/xonsh-rd-parser && maturin develop --release
-      - pytest tests/test_bench.py --benchmark-only --benchmark-histogram --benchmark-autosave | tee -a pytest-bench.log
+#  --benchmark-histogram
+      - pytest tests/test_bench.py --benchmark-only --benchmark-autosave | tee -a pytest-bench.log
 
   pytest-bench-compare:
     cmds:
