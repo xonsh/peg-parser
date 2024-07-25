@@ -148,6 +148,7 @@ warn_unreachable = true
 show_error_codes = true
 show_column_numbers = true
 show_error_context = true
+show_error_code_links = true
 error_summary = true
 pretty = true
 
@@ -159,11 +160,11 @@ allow_redefinition = true
 local_partial_types = true
 warn_unreachable = false
 disable_error_code = [
-    "func-returns-value", # 59
-    "var-annotated",      # 28
-    "arg-type",           # 24 errors
-    "return-value",
-    "call-overload",
-    "no-any-return",
+    "func-returns-value", # 61
+    "var-annotated",      # 35
+    "arg-type",           # 331 errors
+#    "return-value",
+#    "call-overload",
+#    "no-any-return",
 ]
 strict = true

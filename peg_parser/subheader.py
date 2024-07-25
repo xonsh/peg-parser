@@ -4,7 +4,7 @@ import ast
 import enum
 import sys
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, ParamSpec, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, ParamSpec, Protocol, TypedDict, TypeVar, cast
 
 from peg_parser.tokenize import Token, TokenInfo, generate_tokens
 from peg_parser.tokenizer import Mark, Tokenizer
@@ -25,6 +25,13 @@ Del = ast.Del()
 
 
 class Node(Protocol):
+    lineno: int
+    col_offset: int
+    end_lineno: int | None
+    end_col_offset: int | None
+
+
+class SpanDict(TypedDict):
     lineno: int
     col_offset: int
     end_lineno: int | None
@@ -365,7 +372,7 @@ class Parser:
         self._reset(mark)
         return not ok
 
-    def span(self, lnum: int, col: int) -> dict[str, int]:
+    def span(self, lnum: int, col: int) -> SpanDict:
         end = self._tokenizer.get_last_non_whitespace_token().end
         return {"lineno": lnum, "col_offset": col, "end_lineno": end[0], "end_col_offset": end[1]}
 

@@ -145,7 +145,7 @@ del_stmt[ast.Delete]:
     | 'del' a=del_targets &(';' | NEWLINE) { ast.Delete(targets=a, LOCATIONS) }
     | invalid_del_stmt
 
-yield_stmt[ast.expr]: y=yield_expr { ast.Expr(value=y, LOCATIONS) }
+yield_stmt[ast.Expr]: y=yield_expr { ast.Expr(value=y, LOCATIONS) }
 
 assert_stmt[ast.Assert]: 'assert' a=expression b=[',' z=expression { z }] {
     ast.Assert(test=a, msg=b, LOCATIONS)
@@ -162,7 +162,7 @@ import_stmt[ast.Import | ast.ImportFrom]:
 import_name[ast.Import]: 'import' a=dotted_as_names { ast.Import(names=a, LOCATIONS) }
 
 # note below: the ('.' | '...') is necessary because '...' is tokenized as ELLIPSIS
-import_from[ast.ImportFrom]:
+import_from[ast.ImportFrom | Any]:
     | 'from' a=('.' | '...')* b=dotted_name 'import' c=import_from_targets {
         ast.ImportFrom(module=b, names=c, level=self.extract_import_level(a), LOCATIONS)
      }
@@ -242,9 +242,9 @@ function_def[Union[ast.FunctionDef, ast.AsyncFunctionDef]]:
     | d=decorators f=function_def_raw { self.set_decorators(f, d) }
     | f=function_def_raw {self.set_decorators(f, [])}
 
-function_def_raw[Union[ast.FunctionDef, ast.AsyncFunctionDef]]:
+function_def_raw[Union[ast.FunctionDef, ast.AsyncFunctionDef, Any]]:
     | invalid_def_raw
-    | 'def' n=NAME t=[type_params] &&'(' params=[params] ')' a=['->' z=expression { z }] &&':' tc=[func_type_comment] b=block {
+    | 'def' n=NAME t=[type_params] &&'(' params=[params] ')' a=[return_expr] &&':' tc=[func_type_comment] b=block {
         (
             ast.FunctionDef(
                 name=n.string,
@@ -257,7 +257,7 @@ function_def_raw[Union[ast.FunctionDef, ast.AsyncFunctionDef]]:
             )
         )
      }
-    | 'async' 'def' n=NAME t=[type_params] &&'(' params=[params] ')' a=['->' z=expression { z }] &&':' tc=[func_type_comment] b=block {
+    | 'async' 'def' n=NAME t=[type_params] &&'(' params=[params] ')' a=[return_expr] &&':' tc=[func_type_comment] b=block {
        (
             ast.AsyncFunctionDef(
                 name=n.string,
@@ -272,10 +272,13 @@ function_def_raw[Union[ast.FunctionDef, ast.AsyncFunctionDef]]:
        )
      }
 
+return_expr[ast.expr]:
+    | '->' z=expression { z }
+
 # Function parameters
 # -------------------
 
-params:
+params[ast.arguments]:
     | invalid_parameters
     | parameters
 
@@ -616,7 +619,7 @@ maybe_star_pattern:
 
 star_pattern:
     | '*' target=pattern_capture_target { ast.MatchStar(name=target, LOCATIONS) }
-    | '*' wildcard_pattern { ast.MatchStar(LOCATIONS) }
+    | '*' wildcard_pattern { ast.MatchStar(name=None, LOCATIONS) }
 
 mapping_pattern:
     | '{' '}' { ast.MatchMapping(keys=[], patterns=[], rest=None, LOCATIONS) }
@@ -817,22 +820,22 @@ named_expression:
     | invalid_named_expression
     | a=expression !':=' { a }
 
-disjunction[Node] (memo):
+disjunction[ast.expr] (memo):
     | a=conjunction b=(('or' | '||') c=conjunction { c })+ { ast.BoolOp(op=ast.Or(), values=[a] + b, LOCATIONS) }
     | conjunction
 
-conjunction[Node] (memo):
+conjunction[ast.expr] (memo):
     | a=inversion b=(('and' | '&&' ) c=inversion { c })+ { ast.BoolOp(op=ast.And(), values=[a] + b, LOCATIONS) }
     | inversion
 
-inversion[Node] (memo):
+inversion[ast.expr] (memo):
     | 'not' a=inversion { ast.UnaryOp(op=ast.Not(), operand=a, LOCATIONS) }
     | comparison
 
 # Comparisons operators
 # ---------------------
 
-comparison[Node]:
+comparison[ast.expr]:
     | a=bitwise_or b=compare_op_bitwise_or_pair+ {
         ast.Compare(left=a, ops=self.get_comparison_ops(b), comparators=self.get_comparators(b), LOCATIONS)
      }
@@ -1318,10 +1321,10 @@ del_t_atom:
 # TYPING ELEMENTS
 # ---------------
 
-func_type_comment:
+func_type_comment[str]:
     | NEWLINE t=TYPE_COMMENT &(NEWLINE INDENT) { t.string }  # Must be followed by indented block
     | invalid_double_type_comments
-    | TYPE_COMMENT
+    | t=TYPE_COMMENT { t.string }
 
 # ========================= END OF THE GRAMMAR ===========================
 
@@ -1762,7 +1765,7 @@ invalid_for_stmt[NoReturn]:
         )
      }
 invalid_def_raw[NoReturn]:
-    | ['async'] a='def' NAME  [type_params] '(' [params] ')' ['->' expression] ':' NEWLINE !INDENT {
+    | ['async'] a='def' NAME  [type_params] '(' [params] ')' [return_expr] ':' NEWLINE !INDENT {
         self.raise_indentation_error(
             f"expected an indented block after function definition on line {a.start[0]}"
         )
