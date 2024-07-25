@@ -8,9 +8,10 @@ from __future__ import annotations
 import ast
 import itertools
 import sys
-from typing import Any, Optional, Union, List, Tuple, NoReturn
+from typing import Any, Optional, Union, List, Tuple, NoReturn, cast
 
 from peg_parser.subheader import Del, Load, Parser, Store, Target, logger, memoize, memoize_left_rec, Node
+from peg_parser.tokenize import TokenInfo
 '''
 
 @trailer''
@@ -44,7 +45,7 @@ simple_stmts[list[Any]]:
 
 # NOTE: assignment MUST precede expression, else parsing a simple assignment
 # will throw a SyntaxError.
-simple_stmt (memo):
+simple_stmt[ast.stmt] (memo):
     | assignment
     | &"type" type_alias
     | e=star_expressions { ast.Expr(value=e, LOCATIONS) }
@@ -74,7 +75,7 @@ compound_stmt:
 # =================
 
 # NOTE: annotated_rhs may start with 'yield'; yield_expr must start with 'yield'
-assignment:
+assignment[ast.stmt]:
     | a=NAME ':' b=expression c=['=' d=annotated_rhs { d }] {
         ast.AnnAssign(
             target=ast.Name(
@@ -101,13 +102,15 @@ assignment:
             LOCATIONS,
         )
      }
-    | a2=(z=star_targets '=' { z })+ b2=annotated_rhs !'=' tc=[TYPE_COMMENT] {
+    | a2=(assignment_lhs)+ b2=annotated_rhs !'=' tc=[TYPE_COMMENT] {
          ast.Assign(targets=a2, value=b2, type_comment=tc, LOCATIONS)
      }
     | a3=single_target b3=augassign ~ c3=annotated_rhs {
         ast.AugAssign(target=a3, op=b3, value=c3, LOCATIONS)
      }
     | invalid_assignment
+
+assignment_lhs[ast.expr]: z=star_targets '=' { z }
 
 annotated_rhs: yield_expr | star_expressions
 
@@ -163,12 +166,13 @@ import_name[ast.Import]: 'import' a=dotted_as_names { ast.Import(names=a, LOCATI
 
 # note below: the ('.' | '...') is necessary because '...' is tokenized as ELLIPSIS
 import_from[ast.ImportFrom | Any]:
-    | 'from' a=('.' | '...')* b=dotted_name 'import' c=import_from_targets {
+    | 'from' a=dot_or_ellipsis* b=dotted_name 'import' c=import_from_targets {
         ast.ImportFrom(module=b, names=c, level=self.extract_import_level(a), LOCATIONS)
      }
-    | 'from' a1=('.' | '...')+ 'import' b1=import_from_targets {
+    | 'from' a1=dot_or_ellipsis+ 'import' b1=import_from_targets {
         ast.ImportFrom(names=b1, level=self.extract_import_level(a1), LOCATIONS)
      }
+dot_or_ellipsis[TokenInfo]: '.' | '...'
 import_from_targets[List[ast.alias]]:
     | '(' a=import_from_as_names [','] ')' { a }
     | import_from_as_names !','
@@ -198,19 +202,19 @@ block[list[Any]] (memo):
     | invalid_block
 
 decorators: decorator+
-decorator:
-    | a=('@' f=dec_maybe_call NEWLINE { f }) { a }
+decorator[ast.expr]:
+#    | a=('@' f=dec_maybe_call NEWLINE { f }) { a }
     | a=('@' f=named_expression NEWLINE { f }) {
         a
      }
-dec_maybe_call:
-    | dn=dec_primary '(' z=[arguments] ')' {
-        ast.Call(func=dn, args=z[0] if z else [], keywords=z[1] if z else [], LOCATIONS)
-     }
-    | dec_primary
-dec_primary:
-    | a=dec_primary '.' b=NAME { ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS) }
-    | a=NAME { ast.Name(id=a.string, ctx=Load, LOCATIONS) }
+#dec_maybe_call:
+#    | dn=dec_primary '(' z=[arguments] ')' {
+#        ast.Call(func=dn, args=z[0] if z else [], keywords=z[1] if z else [], LOCATIONS)
+#     }
+#    | dec_primary
+#dec_primary:
+#    | a=dec_primary '.' b=NAME { ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS) }
+#    | a=NAME { ast.Name(id=a.string, ctx=Load, LOCATIONS) }
 
 # Class definitions
 # -----------------
@@ -498,22 +502,22 @@ patterns:
      }
     | pattern
 
-pattern:
+pattern[ast.pattern]:
     | as_pattern
     | or_pattern
 
-as_pattern["ast.MatchAs"]:
+as_pattern[ast.pattern]:
     | pattern=or_pattern 'as' target=pattern_capture_target {
         ast.MatchAs(pattern=pattern, name=target, LOCATIONS)
      }
     | invalid_as_pattern
 
-or_pattern["ast.MatchOr"]:
+or_pattern[ast.pattern]:
     | patterns='|'.closed_pattern+ {
         ast.MatchOr(patterns=patterns, LOCATIONS) if len(patterns) > 1 else patterns[0]
      }
 
-closed_pattern:
+closed_pattern[ast.pattern]:
     | literal_pattern
     | capture_pattern
     | wildcard_pattern
@@ -610,10 +614,10 @@ open_sequence_pattern:
         [pattern] + (patterns or [])
      }
 
-maybe_sequence_pattern:
+maybe_sequence_pattern[list[ast.pattern]]:
     | patterns=','.maybe_star_pattern+ ','? { patterns }
 
-maybe_star_pattern:
+maybe_star_pattern[ast.pattern]:
     | star_pattern
     | pattern
 
@@ -645,7 +649,7 @@ mapping_pattern:
 items_pattern:
     | ','.key_value_pattern+
 
-key_value_pattern:
+key_value_pattern[tuple[ast.expr, ast.pattern]]:
     | key=(literal_expr | attr) ':' pattern=pattern { (key, pattern) }
 
 double_star_pattern:
@@ -678,13 +682,13 @@ class_pattern["ast.MatchClass"]:
      }
     | invalid_class_pattern
 
-positional_patterns[list[ast.MatchAs | ast.MatchOr]]:
+positional_patterns[list[ast.pattern]]:
     | args=','.pattern+ { args }
 
 keyword_patterns:
     | ','.keyword_pattern+
 
-keyword_pattern:
+keyword_pattern[tuple[str, ast.pattern]]:
     | arg=NAME '=' value=pattern { (arg.string, value) }
 
 # Type statement
@@ -726,13 +730,11 @@ type_params[list[Any]]: '[' t=type_param_seq  ']' {
 
 type_param_seq[list[Any]]: a=','.type_param+ [','] { a }
 
-type_param (memo):
+type_param[ast.type_param] (memo):
     | a=NAME b=[type_param_bound] {
         ast.TypeVar(name=a.string, bound=b, LOCATIONS)
-        if sys.version_info >= (3, 12)
-        else object()
      }
-    | '*' a=NAME colon=':' e=expression {
+    | '*' NAME colon=':' e=expression {
         self.raise_syntax_error_starting_from(
             "cannot use constraints with TypeVarTuple"
             if isinstance(e, ast.Tuple)
@@ -742,8 +744,6 @@ type_param (memo):
      }
     | '*' a=NAME {
         ast.TypeVarTuple(name=a.string, LOCATIONS)
-        if sys.version_info >= (3, 12)
-        else object()
      }
     | '**' a=NAME colon=':' e=expression {
         self.raise_syntax_error_starting_from(
@@ -755,8 +755,6 @@ type_param (memo):
      }
     | '**' a=NAME {
         ast.ParamSpec(name=a.string, LOCATIONS)
-        if sys.version_info >= (3, 12)
-        else object()
      }
 
 type_param_bound: ':' e=expression { e }
@@ -764,11 +762,13 @@ type_param_bound: ':' e=expression { e }
 # EXPRESSIONS
 # -----------
 
-expressions:
-    | a=expression b=(',' c=expression { c })+ [','] {
+expressions[ast.expr]:
+    | a=expression b=(comma_expression)+ [','] {
         ast.Tuple(elts=[a] + b, ctx=Load, LOCATIONS) }
     | a=expression ',' { ast.Tuple(elts=[a], ctx=Load, LOCATIONS) }
     | expression
+
+comma_expression[ast.expr]: ',' c=expression { c }
 
 expression[ast.expr](memo):
     | invalid_expression
@@ -783,23 +783,25 @@ yield_expr:
     | 'yield' 'from' a=expression { ast.YieldFrom(value=a, LOCATIONS) }
     | 'yield' a=[star_expressions] { ast.Yield(value=a, LOCATIONS) }
 
-star_expressions:
-    | a=star_expression b=(',' c=star_expression { c })+ [','] {
+star_expressions[ast.expr]:
+    | a=star_expression b=(comma_star_expr)+ [','] {
         ast.Tuple(elts=[a] + b, ctx=Load, LOCATIONS) }
     | a=star_expression ',' { ast.Tuple(elts=[a], ctx=Load, LOCATIONS) }
     | star_expression
 
-star_expression (memo):
+comma_star_expr[ast.expr]: ',' c=star_expression { c }
+
+star_expression[ast.expr] (memo):
     | '*' a=bitwise_or { ast.Starred(value=a, ctx=Load, LOCATIONS) }
     | expression
 
 star_named_expressions: a=','.star_named_expression+ [','] { a }
 
-star_named_expression:
+star_named_expression[ast.Starred | ast.expr]:
     | '*' a=bitwise_or { ast.Starred(value=a, ctx=Load, LOCATIONS) }
     | named_expression
 
-assignment_expression:
+assignment_expression[ast.expr]:
     | a=NAME ':=' ~ b=expression {
         ast.NamedExpr(
             target=ast.Name(
@@ -815,18 +817,24 @@ assignment_expression:
         )
      }
 
-named_expression:
+named_expression[ast.expr]:
     | assignment_expression
     | invalid_named_expression
     | a=expression !':=' { a }
 
 disjunction[ast.expr] (memo):
-    | a=conjunction b=(('or' | '||') c=conjunction { c })+ { ast.BoolOp(op=ast.Or(), values=[a] + b, LOCATIONS) }
+    | a=conjunction b=(disjunction_part)+ { ast.BoolOp(op=ast.Or(), values=[a] + b, LOCATIONS) }
     | conjunction
 
+disjunction_part[ast.expr]:
+    | ('or' | '||') c=conjunction { c }
+
 conjunction[ast.expr] (memo):
-    | a=inversion b=(('and' | '&&' ) c=inversion { c })+ { ast.BoolOp(op=ast.And(), values=[a] + b, LOCATIONS) }
+    | a=inversion b=conjunction_part+ { ast.BoolOp(op=ast.And(), values=[a] + b, LOCATIONS) }
     | inversion
+
+conjunction_part[ast.expr]:
+    | ('and' | '&&' ) c=inversion { c }
 
 inversion[ast.expr] (memo):
     | 'not' a=inversion { ast.UnaryOp(op=ast.Not(), operand=a, LOCATIONS) }
@@ -842,7 +850,7 @@ comparison[ast.expr]:
     | bitwise_or
 
 # Make a tuple of operator and comparator
-compare_op_bitwise_or_pair:
+compare_op_bitwise_or_pair[tuple[ast.cmpop, ast.expr]]:
     | eq_bitwise_or
     | noteq_bitwise_or
     | lte_bitwise_or
@@ -854,18 +862,18 @@ compare_op_bitwise_or_pair:
     | isnot_bitwise_or
     | is_bitwise_or
 
-eq_bitwise_or: '==' a=bitwise_or { (ast.Eq(), a) }
+eq_bitwise_or[tuple[ast.cmpop, ast.expr]]: '==' a=bitwise_or { (ast.Eq(), a) }
 # Do not support the Barry as BDFL <> for not eq
 noteq_bitwise_or[tuple[ast.NotEq, Any]]:
     | '!=' a=bitwise_or { (ast.NotEq(), a) }
-lte_bitwise_or: '<=' a=bitwise_or { (ast.LtE(), a) }
-lt_bitwise_or: '<' a=bitwise_or { (ast.Lt(), a) }
-gte_bitwise_or: '>=' a=bitwise_or { (ast.GtE(), a) }
-gt_bitwise_or: '>' a=bitwise_or { (ast.Gt(), a) }
-notin_bitwise_or: 'not' 'in' a=bitwise_or { (ast.NotIn(), a) }
-in_bitwise_or: 'in' a=bitwise_or { (ast.In(), a) }
-isnot_bitwise_or: 'is' 'not' a=bitwise_or { (ast.IsNot(), a) }
-is_bitwise_or: 'is' a=bitwise_or { (ast.Is(), a) }
+lte_bitwise_or[tuple[ast.cmpop, ast.expr]]: '<=' a=bitwise_or { (ast.LtE(), a) }
+lt_bitwise_or[tuple[ast.cmpop, ast.expr]]: '<' a=bitwise_or { (ast.Lt(), a) }
+gte_bitwise_or[tuple[ast.cmpop, ast.expr]]: '>=' a=bitwise_or { (ast.GtE(), a) }
+gt_bitwise_or[tuple[ast.cmpop, ast.expr]]: '>' a=bitwise_or { (ast.Gt(), a) }
+notin_bitwise_or[tuple[ast.cmpop, ast.expr]]: 'not' 'in' a=bitwise_or { (ast.NotIn(), a) }
+in_bitwise_or[tuple[ast.cmpop, ast.expr]]: 'in' a=bitwise_or { (ast.In(), a) }
+isnot_bitwise_or[tuple[ast.cmpop, ast.expr]]: 'is' 'not' a=bitwise_or { (ast.IsNot(), a) }
+is_bitwise_or[tuple[ast.cmpop, ast.expr]]: 'is' a=bitwise_or { (ast.Is(), a) }
 
 # Logical operators
 # -----------------
@@ -945,16 +953,16 @@ func_macro_start:
         self.handle_func_macro_start(a)
     }
 
-sub_procs:
+sub_procs[ast.Call]:
     | '$(' ~ args=proc_cmds ')' { self.handle_proc("subproc_captured", args, LOCATIONS) }
     | '$[' ~ args=proc_cmds ']' { self.handle_proc("subproc_uncaptured", args, LOCATIONS) }
     | '![' ~ args=proc_cmds ']' { self.handle_proc("subproc_captured_hiddenobject", args, LOCATIONS) }
     | '!(' ~ args=proc_cmds ')' { self.handle_proc("subproc_captured_object", args, LOCATIONS) }
 
-help_atom:
+help_atom[tuple[ast.Name, TokenInfo]]:
     | a=atom b=('??' | '?') { (a, b) }
 
-env_atom:
+env_atom[ast.Subscript]:
     | '$' a=NAME { self.expand_env_name(a, LOCATIONS) }
     | '${' a=slices '}' { self.expand_env_expr(a, LOCATIONS) }
 
@@ -962,12 +970,12 @@ proc_cmds:
     | a=proc_cmd+ { self.proc_args(a) }
 
 
-proc_cmd:
+proc_cmd[ast.expr | TokenInfo]:
     | sub_procs
     | '@(' ~ a=(bare_genexp | expressions) ')' { self.proc_pyexpr(a, LOCATIONS) }
     | '@$(' ~ a=proc_cmds ')' { self.proc_inject(a, LOCATIONS) }
     | env_atom
-    | help_atom
+#    | help_atom
     | search_path
     | proc_macro_start ~ a=(cmd_group | any_cmd )* { self.proc_macro_arg(a, LOCATIONS) }
     | a=cmd_group { self.proc_macro_arg(a, LOCATIONS) }
@@ -976,18 +984,18 @@ proc_cmd:
 proc_macro_start:
     | &cmd_name a='!' { self.handle_proc_macro_start(a) }
 
-cmd_name:
+cmd_name[TokenInfo]:
     | NAME
     | NUMBER
     | STRING
     | !']' !')' !'}' OP
 
-any_cmd:
+any_cmd[TokenInfo]:
     | cmd_name
     | WS
     | KEYWORD
 
-cmd_group:
+cmd_group[str]:
     | a=('(' | '!(' | '$(') b=any_cmd* c=')'   { ''.join(i.string for i in [a, *b, c]) }
     | a=('[' | '![' | '$[') b=any_cmd* c=']'   { ''.join(i.string for i in [a, *b, c]) }
 
@@ -1026,7 +1034,7 @@ atom:
         ast.Constant(value=Ellipsis, LOCATIONS)
      }
 
-search_path: a=SEARCH_PATH { self.expand_search_path(a, LOCATIONS) }
+search_path[ast.Call]: a=SEARCH_PATH { self.expand_search_path(a, LOCATIONS) }
 
 group:
     | '(' a=(yield_expr | named_expression) ')' { a }
@@ -1120,14 +1128,14 @@ fstring_replacement_field[ast.FormattedValue]:
     | invalid_replacement_field
 fstring_conversion[int]:
     | '!' conv=NAME { self.check_fstring_conversion(conv) }
-fstring_full_format_spec:
+fstring_full_format_spec[ast.JoinedStr]:
     | ':' spec=fstring_format_spec* {
         ast.JoinedStr(
-            values=spec if spec and (len(spec) > 1 or spec[0].value) else [],
+            values=spec if spec and (len(spec) > 1 or cast(ast.Constant, spec[0]).value) else [],
             LOCATIONS,
         )
      }
-fstring_format_spec:
+fstring_format_spec[ast.Constant | ast.FormattedValue]:
     | t=FSTRING_MIDDLE { ast.Constant(value=t.string, LOCATIONS) }
     | fstring_replacement_field
 fstring[ast.JoinedStr]:
@@ -1135,9 +1143,13 @@ fstring[ast.JoinedStr]:
         self.handle_fstring(a, b, LOCATIONS)
      }
 
-strings (memo): a=(fstring|STRING)+ {
+strings (memo): a=(anystr)+ {
     self.concatenate_strings(a)
 }
+
+anystr[ast.JoinedStr | TokenInfo]:
+    | fstring
+    | STRING
 
 plist[ast.List]:
     | '[' a=[star_named_expressions] ']' { ast.List(elts=a or [], ctx=Load, LOCATIONS) }
@@ -1160,7 +1172,7 @@ dict[ast.Dict]:
 
 double_starred_kvpairs[list[Any]]: a=','.double_starred_kvpair+ [','] { a }
 
-double_starred_kvpair:
+double_starred_kvpair[tuple[ast.expr, ast.expr]]:
     | '**' a=bitwise_or { (None, a) }
     | kvpair
 
@@ -1173,12 +1185,15 @@ for_if_clauses[List[ast.comprehension]]:
     | a=for_if_clause+ { a }
 
 for_if_clause[ast.comprehension]:
-    | 'async' 'for' a=star_targets 'in' ~ b=disjunction c=('if' z=disjunction { z })* {
+    | 'async' 'for' a=star_targets 'in' ~ b=disjunction c=(for_if_disjunction)* {
         ast.comprehension(target=a, iter=b, ifs=c, is_async=1)
      }
-    | 'for' a=star_targets 'in' ~ b=disjunction c=('if' z=disjunction { z })* {
+    | 'for' a=star_targets 'in' ~ b=disjunction c=(for_if_disjunction)* {
        ast.comprehension(target=a, iter=b, ifs=c, is_async=0) }
     | invalid_for_target
+
+for_if_disjunction[ast.expr]:
+    | 'if' z=disjunction { z }
 
 listcomp[ast.ListComp]:
     | '[' a=named_expression b=for_if_clauses ']' { ast.ListComp(elt=a, generators=b, LOCATIONS) }
@@ -1208,7 +1223,7 @@ arguments[tuple[list[Any], list[Any]]] (memo):
     | invalid_arguments
 
 args[tuple[list[Any], list[Any]]]:
-    | a=','.(starred_expression | ( assignment_expression | expression !':=') !'=')+ b=[',' k=kwargs {k}] {
+    | a=','.args_arg+ b=[',' k=kwargs {k}] {
         (a + ([e for e in b if isinstance(e, ast.Starred)] if b else []),
          ([e for e in b if not isinstance(e, ast.Starred)] if b else [])
         )
@@ -1218,21 +1233,25 @@ args[tuple[list[Any], list[Any]]]:
          [e for e in a if not isinstance(e, ast.Starred)])
     }
 
+args_arg[ast.expr | Any]:
+    | starred_expression
+    | ( assignment_expression | expression !':=') !'='
+
 kwargs[list[Any]]:
     | a=','.kwarg_or_starred+ ',' b=','.kwarg_or_double_starred+ { a + b }
     | ','.kwarg_or_starred+
     | ','.kwarg_or_double_starred+
 
-starred_expression:
+starred_expression[ast.Starred]:
     | invalid_starred_expression
     | '*' a=expression { ast.Starred(value=a, ctx=Load, LOCATIONS) }
 
-kwarg_or_starred:
+kwarg_or_starred[ast.keyword | ast.Starred]:
     | invalid_kwarg
     | a=NAME '=' b=expression { ast.keyword(arg=a.string, value=b, LOCATIONS) }
-    | a=starred_expression { a }
+    | a1=starred_expression { a1 }
 
-kwarg_or_double_starred:
+kwarg_or_double_starred[ast.keyword | ast.Starred]:
     | invalid_kwarg
     | a=NAME '=' b=expression { ast.keyword(arg=a.string, value=b, LOCATIONS) }   # XXX Unreachable
     | '**' a1=expression { ast.keyword(arg=None, value=a1, LOCATIONS) }
@@ -1244,32 +1263,35 @@ kwarg_or_double_starred:
 # ---------------
 
 # NOTE: star_targets may contain *bitwise_or, targets may not.
-star_targets:
+star_targets[ast.expr]:
     | a=star_target !',' { a }
-    | a=star_target b=(',' c=star_target { c })* [','] {
+    | a=star_target b=star_target_a* [','] {
         ast.Tuple(elts=[a] + b, ctx=Store, LOCATIONS)
      }
 
 star_targets_list_seq[list[Any]]: a=','.star_target+ [','] { a }
 
 star_targets_tuple_seq[list[Any]]:
-    | a=star_target b=(',' c=star_target { c })+ [','] { [a] + b }
+    | a=star_target b=star_target_a+ [','] { [a] + b }
     | a=star_target ',' { [a] }
 
-star_target (memo):
+star_target_a[ast.expr]:
+    | ',' c=star_target { c }
+
+star_target[ast.expr] (memo):
     | '*' a=(!'*' star_target) {
         ast.Starred(value=self.set_expr_context(a, Store), ctx=Store, LOCATIONS)
      }
     | target_with_star_atom
 
-target_with_star_atom (memo):
+target_with_star_atom[ast.expr] (memo):
     | a=t_primary '.' b=NAME !t_lookahead { ast.Attribute(value=a, attr=b.string, ctx=Store, LOCATIONS) }
     | a=t_primary '[' b=slices ']' !t_lookahead { ast.Subscript(value=a, slice=b, ctx=Store, LOCATIONS) }
     | '$' a=NAME { self.expand_env_name(a, ctx=Store, LOCATIONS) }
     | '${' a=slices '}' { self.expand_env_expr(a, ctx=Store, LOCATIONS) }
     | star_atom
 
-star_atom:
+star_atom[ast.expr]:
     | a=NAME { ast.Name(id=a.string, ctx=Store, LOCATIONS) }
     | '(' a1=target_with_star_atom ')' { self.set_expr_context(a1, Store) }
     | '(' a2=[star_targets_tuple_seq] ')' { ast.Tuple(elts=a2, ctx=Store, LOCATIONS) }
@@ -1306,16 +1328,16 @@ t_lookahead: '(' | '[' | '.'
 
 del_targets: a=','.del_target+ [','] { a }
 
-del_target (memo):
+del_target[ast.expr] (memo):
     | a=t_primary '.' b=NAME !t_lookahead { ast.Attribute(value=a, attr=b.string, ctx=Del, LOCATIONS) }
     | a=t_primary '[' b=slices ']' !t_lookahead { ast.Subscript(value=a, slice=b, ctx=Del, LOCATIONS) }
     | del_t_atom
 
-del_t_atom:
+del_t_atom[ast.expr]:
     | a=NAME { ast.Name(id=a.string, ctx=Del, LOCATIONS) }
-    | '(' a=del_target ')' { self.set_expr_context(a, Del) }
-    | '(' a=[del_targets] ')' { ast.Tuple(elts=a, ctx=Del, LOCATIONS) }
-    | '[' a=[del_targets] ']' { ast.List(elts=a, ctx=Del, LOCATIONS) }
+    | '(' b=del_target ')' { self.set_expr_context(b, Del) }
+    | '(' c=[del_targets] ')' { ast.Tuple(elts=c, ctx=Del, LOCATIONS) }
+    | '[' c=[del_targets] ']' { ast.List(elts=c, ctx=Del, LOCATIONS) }
 
 
 # TYPING ELEMENTS
@@ -1487,8 +1509,8 @@ invalid_del_stmt[NoReturn]:
 invalid_block[NoReturn]:
     | NEWLINE !INDENT { self.raise_indentation_error("expected an indented block") }
 invalid_comprehension[NoReturn]:
-    | ('[' | '(' | '{') a=starred_expression for_if_clauses {
-        self.raise_syntax_error_known_location("iterable unpacking cannot be used in comprehension", a)
+    | ('[' | '(' | '{') a1=starred_expression for_if_clauses {
+        self.raise_syntax_error_known_location("iterable unpacking cannot be used in comprehension", a1)
      }
     | ('[' | '{') a=star_named_expression ',' b=star_named_expressions for_if_clauses {
         self.raise_syntax_error_known_range(
@@ -1619,8 +1641,8 @@ invalid_group[NoReturn]:
     | '(' a=starred_expression ')' {
         self.raise_syntax_error_known_location("cannot use starred expression here", a)
      }
-    | '(' a='**' expression ')' {
-        self.raise_syntax_error_known_location("cannot use double starred expression here", a)
+    | '(' b='**' expression ')' {
+        self.raise_syntax_error_known_location("cannot use double starred expression here", b)
      }
 invalid_import:
     | a='import' ','.dotted_name+ 'from' dotted_name {

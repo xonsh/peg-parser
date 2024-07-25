@@ -31,6 +31,10 @@ class Node(Protocol):
     end_col_offset: int | None
 
 
+class NodeCtx(Protocol):
+    ctx: ast.expr_context
+
+
 class SpanDict(TypedDict):
     lineno: int
     col_offset: int
@@ -70,6 +74,7 @@ T = TypeVar("T")
 TR = TypeVar("TR")  # repeated
 TS = TypeVar("TS")
 TG = TypeVar("TG")
+TCtx = ast.Name | ast.Attribute
 P = TypeVar("P", bound="Parser")
 P1 = ParamSpec("P1")
 F = TypeVar("F", bound=Callable[..., Any])
@@ -481,7 +486,7 @@ class Parser:
             return None
         return node
 
-    def set_expr_context(self, node: Any, context: ast.Load | ast.Store | ast.Del) -> Any:
+    def set_expr_context(self, node: TCtx, context: ast.Load | ast.Store | ast.Del) -> TCtx:
         """Set the context (Load, Store, Del) of an ast node."""
         node.ctx = context
         return node
