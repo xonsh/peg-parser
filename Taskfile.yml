@@ -73,7 +73,7 @@ tasks:
     cmds:
       - watchexec -e py,gram --clear -- task test -- --ff -x -vv --testmon
 
-  bench:
+  asv-bench:
     cmds:
       - asv run "main^!" -v
       - asv publish
