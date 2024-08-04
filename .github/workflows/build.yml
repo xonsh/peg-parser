@@ -8,8 +8,11 @@ on:
     branches:
       - main
 
-#permissions:
-#  contents: read
+permissions:
+  # deployments permission to deploy GitHub pages website
+  deployments: write
+  # contents permission to update benchmark contents in gh-pages branch
+  contents: write
 
 jobs:
   test:
