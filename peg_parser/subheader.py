@@ -6,8 +6,8 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, ParamSpec, Protocol, TypedDict, TypeVar, cast
 
-from peg_parser.tokenize import Token, TokenInfo, generate_tokens
-from peg_parser.tokenizer import Mark, Tokenizer
+from peg_parser.tokenizer import Mark, Token, Tokenizer
+from xonsh_tokenizer import TokenInfo, tokenize_file, tokenize_str
 
 if TYPE_CHECKING:
     # see - https://github.com/python/mypy/blob/master/mypy/typeshed/stdlib/_ast.pyi

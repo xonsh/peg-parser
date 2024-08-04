@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import IntEnum, auto
 from typing import TYPE_CHECKING, Final, NewType
 
 from xonsh_tokenizer import TokenInfo
@@ -10,26 +11,25 @@ if TYPE_CHECKING:
 Mark = NewType("Mark", int)
 
 
-
-class Token:
-    ENDMARKER = "ENDMARKER"
-    NAME = "NAME"
-    NUMBER = "NUMBER"
-    STRING = "STRING"
-    NEWLINE = "NEWLINE"
-    INDENT = "INDENT"
-    DEDENT = "DEDENT"
-    OP = "OP"
-    FSTRING_START = "FSTRING_START"
-    FSTRING_MIDDLE = "FSTRING_MIDDLE"
-    FSTRING_END = "FSTRING_END"
-    ERRORTOKEN = "ERRORTOKEN"
-    COMMENT = "COMMENT"
-    NL = "NL"
-    SEARCH_PATH = "SEARCH_PATH"
-    WS = "WS"
-    TYPE_COMMENT = "TYPE_COMMENT"
-    MACRO_PARAM = "MACRO_PARAM"
+class Token(IntEnum):
+    ENDMARKER = auto()
+    NAME = auto()
+    NUMBER = auto()
+    STRING = auto()
+    NEWLINE = auto()
+    INDENT = auto()
+    DEDENT = auto()
+    OP = auto()
+    FSTRING_START = auto()
+    FSTRING_MIDDLE = auto()
+    FSTRING_END = auto()
+    ERRORTOKEN = auto()
+    COMMENT = auto()
+    NL = auto()
+    SEARCH_PATH = auto()
+    WS = auto()
+    TYPE_COMMENT = auto()
+    MACRO_PARAM = auto()
 
 
 WS_TOKENS = {Token.ENDMARKER, Token.NEWLINE, Token.DEDENT, Token.INDENT}
