@@ -41,7 +41,12 @@ jobs:
         pip install -U pip
         pip install -e ".[test]"
     - name: Test
-      run: pytest --cov=peg_parser tests/ --cov-report=term-missing --cov-report=xml
+      run: pytest --cov=peg_parser tests/ --cov-report=term-missing --cov-report=xml --junit-xml=test-results.xml
+    - name: Surface failing tests
+      if: always()
+      uses: pmeier/pytest-results-action@main
+      with:
+        path: test-results.xml
 #    - uses: codecov/codecov-action@v4.0.1
 #      with:
 #        token: ${{ secrets.CODECOV_TOKEN }}
