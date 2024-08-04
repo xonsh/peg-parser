@@ -127,7 +127,7 @@ tasks:
     cmds:
 #      - cd ~/src/rust/xonsh-rd-parser && maturin develop --release
 #  --benchmark-histogram
-      - pytest tests/test_bench.py --benchmark-only --benchmark-autosave | tee -a pytest-bench.log
+      - pytest tests/benchmarks.py --benchmark-only --benchmark-autosave | tee -a pytest-bench.log
 
   pytest-bench-compare:
     cmds:

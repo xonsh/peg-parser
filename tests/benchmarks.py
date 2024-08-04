@@ -28,6 +28,18 @@ def ply_parser():
     return Parser()
 
 
+@pytest.fixture
+def tree_sitter():
+    try:
+        import tree_sitter_python as tspython
+        from tree_sitter import Language, Parser
+    except ImportError:
+        pytest.skip("tree_sitter not installed")
+
+    lang = Language(tspython.language())
+    return Parser(lang)
+
+
 @pytest.mark.benchmark(group="small-string")
 class TestBenchSmallString:
     src_txt = "print(1)"
@@ -46,6 +58,11 @@ class TestBenchSmallString:
         @benchmark
         def main():
             return ply_parser.parse(self.src_txt)
+
+    def test_tree_sitter(self, benchmark, tree_sitter):
+        @benchmark
+        def main():
+            return tree_sitter.parse(self.src_txt.encode("utf-8"))
 
 
 @pytest.mark.benchmark(group="large-file")
