@@ -38,12 +38,13 @@ class PeakMemSuite:
 def get_process_memory():
     from psutil import Process
 
+
     p = Process()
-    return p.memory_info().rss
+    return round(p.memory_info().rss / 1024**2, 3)
 
 class TrackSuite:
     params = BaseParser.parsers
-    units = "bytes"
+    units = "MiB"
 
     def setup(self, parser):
         self.parser = parser()
