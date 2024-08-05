@@ -38,12 +38,12 @@ tasks:
         sh: echo ".local/logs/xonsh-parser-$(date "+%Y%m%d-%H%M%S").$(git rev-parse --short HEAD).log"
 
   profile:
-    deps:
-      - profile-tasks
+#    deps:
+#      - profile-tasks
     cmds:
       - mkdir -p .local/logs
       - asv run --python=same --show-stderr | tee -a {{.LOG_FILE}}
-      - asv profile --python=same benchmarks.PeakMemSuite.peakmem_parser_large_file | tee -a {{.LOG_FILE}}
+#      - asv profile --python=same benchmarks.PeakMemSuite.peakmem_parser_large_file | tee -a {{.LOG_FILE}}
     vars:
       LOG_FILE:
         sh: echo ".local/logs/xonsh-parser-$(date "+%Y%m%d-%H%M%S").$(git rev-parse --short HEAD).log"

@@ -1,9 +1,15 @@
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
 
 class BaseParser:
+    parsers: ClassVar = []
+
+    def __init_subclass__(cls, **kwargs):
+        cls.parsers.append(cls)
+
     def parse_string(self, src_txt: str):
         raise NotImplementedError
 
@@ -71,7 +77,7 @@ class TreeSitter(BaseParser):
         return self.parser.parse(file.read_bytes())
 
 
-@pytest.fixture(params=[PegenParser, RuffParser, PlyParser, TreeSitter])
+@pytest.fixture(params=BaseParser.parsers)
 def parser(request) -> BaseParser:
     return request.param()
 

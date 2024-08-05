@@ -1,51 +1,123 @@
 {
-    "benchmarks.PeakMemSuite.peakmem_parse_small": {
-        "code": "class PeakMemSuite:\n    def peakmem_parse_small(self):\n        parse(\"![ls -alh]\")",
-        "name": "benchmarks.PeakMemSuite.peakmem_parse_small",
-        "param_names": [],
-        "params": [],
+    "benchmarks.PeakMemSuite.peakmem_parser_large_string": {
+        "code": "class PeakMemSuite:\n    def peakmem_parser_large_string(self, _):\n        self.parser.parse_file(file)\n\n    def setup(self, parser):\n        self.parser = parser()",
+        "name": "benchmarks.PeakMemSuite.peakmem_parser_large_string",
+        "param_names": [
+            "param1"
+        ],
+        "params": [
+            [
+                "<class 'tests.benchmarks.PegenParser'>",
+                "<class 'tests.benchmarks.RuffParser'>",
+                "<class 'tests.benchmarks.PlyParser'>",
+                "<class 'tests.benchmarks.TreeSitter'>"
+            ]
+        ],
         "type": "peakmemory",
         "unit": "bytes",
-        "version": "65abaa17b84b8e7f12233f9ab9d91f00fc2adb92b37cd7c09440e8f0c0d5c88b"
+        "version": "6907a2d7aa08e670708346cc46eac864cbba00881d887ab45c829f3dd5771e10"
     },
-    "benchmarks.PeakMemSuite.peakmem_parser_large_file": {
-        "code": "class PeakMemSuite:\n    def peakmem_parser_large_file(self):\n        parse(file)",
-        "name": "benchmarks.PeakMemSuite.peakmem_parser_large_file",
-        "param_names": [],
-        "params": [],
+    "benchmarks.PeakMemSuite.peakmem_parser_small_string": {
+        "code": "class PeakMemSuite:\n    def peakmem_parser_small_string(self, _):\n        self.parser.parse_string(small_string)\n\n    def setup(self, parser):\n        self.parser = parser()",
+        "name": "benchmarks.PeakMemSuite.peakmem_parser_small_string",
+        "param_names": [
+            "param1"
+        ],
+        "params": [
+            [
+                "<class 'tests.benchmarks.PegenParser'>",
+                "<class 'tests.benchmarks.RuffParser'>",
+                "<class 'tests.benchmarks.PlyParser'>",
+                "<class 'tests.benchmarks.TreeSitter'>"
+            ]
+        ],
         "type": "peakmemory",
         "unit": "bytes",
-        "version": "2e340a318725c374d320a613da113eb4a4f20928fe042dd305f113ebc8ef72aa"
+        "version": "7860a2ef10ef78d54df750537a5b057670a895ea0244f28d8cef2014ed592bae"
     },
     "benchmarks.TimeSuite.time_large_files": {
-        "code": "class TimeSuite:\n    def time_large_files(self):\n        parse(file)",
+        "code": "class TimeSuite:\n    def time_large_files(self, _):\n        self.parser.parse_file(file)\n\n    def setup(self, parser):\n        self.parser = parser()",
         "min_run_count": 2,
         "name": "benchmarks.TimeSuite.time_large_files",
         "number": 0,
-        "param_names": [],
-        "params": [],
+        "param_names": [
+            "param1"
+        ],
+        "params": [
+            [
+                "<class 'tests.benchmarks.PegenParser'>",
+                "<class 'tests.benchmarks.RuffParser'>",
+                "<class 'tests.benchmarks.PlyParser'>",
+                "<class 'tests.benchmarks.TreeSitter'>"
+            ]
+        ],
         "repeat": 0,
         "rounds": 2,
         "sample_time": 0.01,
         "type": "time",
         "unit": "seconds",
-        "version": "8ff5636d4a0d1c39582d9ad629e6c1ec4041c4543378d5f03be4a0fc79b35043",
+        "version": "dcf913fc7d2a745c5e60af28dbfacceeae2f120d95e5db8a82486e3069edd6ba",
         "warmup_time": -1
     },
     "benchmarks.TimeSuite.time_parse_small_string": {
-        "code": "class TimeSuite:\n    def time_parse_small_string(self):\n        parse(small_code)",
+        "code": "class TimeSuite:\n    def time_parse_small_string(self, _):\n        self.parser.parse_string(small_string)\n\n    def setup(self, parser):\n        self.parser = parser()",
         "min_run_count": 2,
         "name": "benchmarks.TimeSuite.time_parse_small_string",
         "number": 0,
-        "param_names": [],
-        "params": [],
+        "param_names": [
+            "param1"
+        ],
+        "params": [
+            [
+                "<class 'tests.benchmarks.PegenParser'>",
+                "<class 'tests.benchmarks.RuffParser'>",
+                "<class 'tests.benchmarks.PlyParser'>",
+                "<class 'tests.benchmarks.TreeSitter'>"
+            ]
+        ],
         "repeat": 0,
         "rounds": 2,
         "sample_time": 0.01,
         "type": "time",
         "unit": "seconds",
-        "version": "dffdd003f5d676c9b9b82dce1e1bca08eb544cae17d3c02243f2dd09bb94393f",
+        "version": "8d97597a3e73b649aa9061f8f601dfa9b48f365b6d45940bb417d1687a2c9cec",
         "warmup_time": -1
+    },
+    "benchmarks.TrackSuite.track_mem_large_file": {
+        "code": "class TrackSuite:\n    def track_mem_large_file(self, _):\n        self.parser.parse_file(file)\n        return get_process_memory()\n\n    def setup(self, parser):\n        self.parser = parser()",
+        "name": "benchmarks.TrackSuite.track_mem_large_file",
+        "param_names": [
+            "param1"
+        ],
+        "params": [
+            [
+                "<class 'tests.benchmarks.PegenParser'>",
+                "<class 'tests.benchmarks.RuffParser'>",
+                "<class 'tests.benchmarks.PlyParser'>",
+                "<class 'tests.benchmarks.TreeSitter'>"
+            ]
+        ],
+        "type": "track",
+        "unit": "unit",
+        "version": "f5f1c6523fa6b5523e8f2a1be5992075731eb3f03633a89fd1ca3dec21fc232d"
+    },
+    "benchmarks.TrackSuite.track_mem_small_string": {
+        "code": "class TrackSuite:\n    def track_mem_small_string(self, _):\n        self.parser.parse_string(small_string)\n        return get_process_memory()\n\n    def setup(self, parser):\n        self.parser = parser()",
+        "name": "benchmarks.TrackSuite.track_mem_small_string",
+        "param_names": [
+            "param1"
+        ],
+        "params": [
+            [
+                "<class 'tests.benchmarks.PegenParser'>",
+                "<class 'tests.benchmarks.RuffParser'>",
+                "<class 'tests.benchmarks.PlyParser'>",
+                "<class 'tests.benchmarks.TreeSitter'>"
+            ]
+        ],
+        "type": "track",
+        "unit": "unit",
+        "version": "919b2df97acdba0d2506cbec08330af092e23034a728dd74fded40c026cb3e6f"
     },
     "benchmarks.timeraw_import_parser": {
         "code": "def timeraw_import_parser():\n    return \"\"\"\n    from peg_parser.parser import XonshParser\n    \"\"\"",
