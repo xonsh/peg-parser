@@ -14,6 +14,8 @@
 
 **Source Code**: <a href="https://github.com/jnoortheen/xonsh-parser" target="_blank">https://github.com/jnoortheen/xonsh-parser</a>
 
+**Benchmarks**: https://xonsh.github.io/peg-parser/dev/bench/
+
 ---
 
 ## Development
