@@ -3,83 +3,86 @@ from pathlib import Path
 import pytest
 
 
-@pytest.fixture
-def pegen_parser():
-    from peg_parser.parser import XonshParser
+class BaseParser:
+    def parse_string(self, src_txt: str):
+        raise NotImplementedError
 
-    return XonshParser
-
-
-@pytest.fixture
-def ruff_parser():
-    try:
-        import xonsh_rd_parser as parser
-    except ImportError:
-        pytest.skip("xonsh_rd_parser not installed")
-    return parser
+    def parse_file(self, file):
+        raise NotImplementedError
 
 
-@pytest.fixture
-def ply_parser():
-    try:
-        from xonsh.parser import Parser
-    except ImportError:
-        pytest.skip("xonsh not installed")
-    return Parser()
+class PegenParser(BaseParser):
+    def __init__(self):
+        from peg_parser.parser import XonshParser
+
+        self.parser = XonshParser
+
+    def parse_string(self, src_txt):
+        return self.parser.parse_string(src_txt, mode="exec")
+
+    def parse_file(self, file):
+        return self.parser.parse_file(file)
 
 
-@pytest.fixture
-def tree_sitter():
-    try:
-        import tree_sitter_python as tspython
-        from tree_sitter import Language, Parser
-    except ImportError:
-        pytest.skip("tree_sitter not installed")
+class RuffParser(BaseParser):
+    def __init__(self):
+        try:
+            import xonsh_rd_parser as parser
+        except ImportError:
+            pytest.skip("xonsh_rd_parser not installed")
+        self.parser = parser
 
-    lang = Language(tspython.language())
-    return Parser(lang)
+    def parse_string(self, src_txt):
+        return self.parser.parse_string(src_txt)
+
+    def parse_file(self, file):
+        return self.parser.parse_file(str(file))
+
+
+class PlyParser(BaseParser):
+    def __init__(self):
+        try:
+            from xonsh.parser import Parser
+        except ImportError:
+            pytest.skip("xonsh not installed")
+        self.parser = Parser()
+
+    def parse_string(self, src_txt):
+        return self.parser.parse(src_txt)
+
+    def parse_file(self, file):
+        return self.parser.parse(file.read_text())
+
+
+class TreeSitter(BaseParser):
+    def __init__(self):
+        try:
+            import tree_sitter_python as tspython
+            from tree_sitter import Language, Parser
+        except ImportError:
+            pytest.skip("tree_sitter not installed")
+        lang = Language(tspython.language())
+        self.parser = Parser(lang)
+
+    def parse_string(self, src_txt):
+        return self.parser.parse(src_txt.encode("utf-8"))
+
+    def parse_file(self, file):
+        return self.parser.parse(file.read_bytes())
+
+
+@pytest.fixture(params=[PegenParser, RuffParser, PlyParser, TreeSitter])
+def parser(request) -> BaseParser:
+    return request.param()
 
 
 @pytest.mark.benchmark(group="small-string")
-class TestBenchSmallString:
+def test_small_string(benchmark, parser):
     src_txt = "print(1)"
-
-    def test_peg(self, benchmark, pegen_parser):
-        @benchmark
-        def main():
-            return pegen_parser.parse_string(self.src_txt, mode="eval")
-
-    def test_ruff(self, benchmark, ruff_parser):
-        @benchmark
-        def main():
-            return ruff_parser.parse_string(self.src_txt)
-
-    def test_ply(self, benchmark, ply_parser):
-        @benchmark
-        def main():
-            return ply_parser.parse(self.src_txt)
-
-    def test_tree_sitter(self, benchmark, tree_sitter):
-        @benchmark
-        def main():
-            return tree_sitter.parse(self.src_txt.encode("utf-8"))
+    benchmark(parser.parse_string, src_txt)
 
 
 @pytest.mark.benchmark(group="large-file")
-class TestBenchLargeFile:
+def test_large_file(benchmark, parser):
     file = Path(__file__).parent.parent / "peg_parser" / "parser.py"
-
-    def test_pegen(self, benchmark, pegen_parser):
-        @benchmark
-        def main():
-            return pegen_parser.parse_file(self.file)
-
-    def test_ruff(self, benchmark, ruff_parser):
-        @benchmark
-        def main():
-            return ruff_parser.parse_file(str(self.file))
-
-    def test_ply(self, benchmark, ply_parser):
-        @benchmark
-        def main():
-            return ply_parser.parse(self.file.read_text(), filename=str(self.file))
+    benchmark(parser.parse_file, file)
