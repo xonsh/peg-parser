@@ -138,8 +138,10 @@ class XonshParserGenerator(PythonParserGenerator):
         grammar: grammar.Grammar,
         file: IO[str] | None,
         unreachable_formatting: str | None = None,
+        memoize_all: bool = False,
     ):
         self.tokens_enum = Token
+        self.memoize_all = memoize_all
         tokens = {t.name for t in Token}
         tokens.update(["SOFT_KEYWORD", "KEYWORD", "ANY_TOKEN"])
         ParserGenerator.__init__(self, grammar, tokens, file)
@@ -206,7 +208,7 @@ class XonshParserGenerator(PythonParserGenerator):
                 # Non-leader rules in a cycle are not memoized,
                 # but they must still be logged.
                 self.print("@logger")
-        elif node.memo:
+        elif node.memo or self.memoize_all:
             self.print("@memoize")
             # method_args = ", mark: Mark"
         node_type = node.type or "Any"
