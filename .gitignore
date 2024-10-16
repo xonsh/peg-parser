@@ -125,6 +125,7 @@ pdm.lock
 # ply parser debug logs
 *.out
 .pdm-python
+uv.lock
 .task/
 
 .testmondata*
