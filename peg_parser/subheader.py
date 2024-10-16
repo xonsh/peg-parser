@@ -541,7 +541,7 @@ class Parser:
 
         # Combine the different parts
         seen_joined = False
-        values: list[Any] = []  # ast.Constant | ast.FormattedValue
+        values: list[ast.Constant | ast.FormattedValue | ast.expr] = []
         ss: list[TokenInfo] = []
 
         if path_tok := (self._strip_path_prefix(parts[0])):
@@ -562,13 +562,13 @@ class Parser:
             values.append(self._concat_strings_in_constant(ss))
 
         consolidated: list[Any] = []  # ast.Constant | ast.FormattedValue
-        for p in values:
-            if consolidated and isinstance(consolidated[-1], ast.Constant) and isinstance(p, ast.Constant):
-                consolidated[-1].value += p.value  # type: ignore[unreachable]
-                consolidated[-1].end_lineno = p.end_lineno
-                consolidated[-1].end_col_offset = p.end_col_offset
+        for pv in values:
+            if consolidated and isinstance(consolidated[-1], ast.Constant) and isinstance(pv, ast.Constant):
+                consolidated[-1].value += pv.value  # type: ignore[unreachable]
+                consolidated[-1].end_lineno = pv.end_lineno
+                consolidated[-1].end_col_offset = pv.end_col_offset
             else:
-                consolidated.append(p)
+                consolidated.append(pv)
 
         if not seen_joined and len(values) == 1 and isinstance(values[0], ast.Constant):
             node: ast.Constant | ast.JoinedStr | ast.Call = values[0]
@@ -577,8 +577,8 @@ class Parser:
                 values=consolidated,
                 lineno=start[0] if start else values[0].lineno,
                 col_offset=start[1] if start else values[0].col_offset,
-                end_lineno=end[0] if end else values[-1].end_lineno,
-                end_col_offset=end[1] if end else values[-1].end_col_offset,
+                end_lineno=(end[0] if end else values[-1].end_lineno) or 0,
+                end_col_offset=(end[1] if end else values[-1].end_col_offset) or 0,
             )
 
         if path_tok := (path_tok or self._path_token):

@@ -69,9 +69,7 @@ class Tokenizer:
             return True
         if tok.type == Token.ERRORTOKEN and tok.string.isspace():
             return True
-        if tok.type == Token.NEWLINE and self._tokens and self._tokens[-1].type == Token.NEWLINE:
-            return True
-        return False
+        return bool(tok.type == Token.NEWLINE and self._tokens and self._tokens[-1].type == Token.NEWLINE)
 
     def consume_macro_params(self) -> TokenInfo:  # noqa: C901, PLR0912
         # loop until we get , or ) without consuming it

@@ -1774,7 +1774,7 @@ class XonshParser(Parser):
             return ast.TypeVar(name=a.string, bound=b, **self.span(_lnum, _col))
         self._reset(mark)
         if (self.expect("*")) and (self.name()) and (colon := self.expect(":")) and (e := self.expression()):
-            return self.raise_syntax_error_starting_from(
+            self.raise_syntax_error_starting_from(
                 "cannot use constraints with TypeVarTuple"
                 if isinstance(e, ast.Tuple)
                 else "cannot use bound with TypeVarTuple",
@@ -1785,7 +1785,7 @@ class XonshParser(Parser):
             return ast.TypeVarTuple(name=a.string, **self.span(_lnum, _col))
         self._reset(mark)
         if (self.expect("**")) and (self.name()) and (colon := self.expect(":")) and (e := self.expression()):
-            return self.raise_syntax_error_starting_from(
+            self.raise_syntax_error_starting_from(
                 "cannot use constraints with ParamSpec"
                 if isinstance(e, ast.Tuple)
                 else "cannot use bound with ParamSpec",
@@ -3394,7 +3394,7 @@ class XonshParser(Parser):
         # invalid_arguments: args ',' '*' | expression for_if_clauses ',' [args | expression for_if_clauses] | NAME '=' expression for_if_clauses | [(args ',')] NAME '=' &(',' | ')') | args for_if_clauses | args ',' expression for_if_clauses | args ',' args
         mark = self._mark()
         if (a := self.args()) and (self.expect(",")) and (self.expect("*")):
-            return self.raise_syntax_error_known_location(
+            self.raise_syntax_error_known_location(
                 "iterable argument unpacking follows keyword argument unpacking",
                 a[1][-1] if a[1] else a[0][-1],
             )
@@ -3405,7 +3405,7 @@ class XonshParser(Parser):
             and (self.expect(","))
             and (self._tmp_45(),)
         ):
-            return self.raise_syntax_error_known_range(
+            self.raise_syntax_error_known_range(
                 "Generator expression must be parenthesized", a1, b[-1].ifs[-1] if b[-1].ifs else b[-1].iter
             )
         self._reset(mark)
@@ -3415,7 +3415,7 @@ class XonshParser(Parser):
             and (self.expression())
             and (self.for_if_clauses())
         ):
-            return self.raise_syntax_error_known_range(
+            self.raise_syntax_error_known_range(
                 "invalid syntax. Maybe you meant '==' or ':=' instead of '='?", a2, b2
             )
         self._reset(mark)
@@ -3425,18 +3425,14 @@ class XonshParser(Parser):
             and (b3 := self.expect("="))
             and (self.positive_lookahead(self._tmp_47))
         ):
-            return self.raise_syntax_error_known_range("expected argument value expression", a3, b3)
+            self.raise_syntax_error_known_range("expected argument value expression", a3, b3)
         self._reset(mark)
         if (a4 := self.args()) and (b4 := self.for_if_clauses()):
-            return (
-                self.raise_syntax_error_known_range(
-                    "Generator expression must be parenthesized",
-                    a4[0][-1],
-                    b4[-1].ifs[-1] if b4[-1].ifs else b4[-1].iter,
-                )
-                if len(a4[0]) > 1
-                else None
-            )
+            self.raise_syntax_error_known_range(
+                "Generator expression must be parenthesized",
+                a4[0][-1],
+                b4[-1].ifs[-1] if b4[-1].ifs else b4[-1].iter,
+            ) if len(a4[0]) > 1 else None
         self._reset(mark)
         if (
             (self.args())
@@ -3444,26 +3440,25 @@ class XonshParser(Parser):
             and (a5 := self.expression())
             and (b5 := self.for_if_clauses())
         ):
-            return self.raise_syntax_error_known_range(
+            self.raise_syntax_error_known_range(
                 "Generator expression must be parenthesized",
                 a5,
                 b5[-1].ifs[-1] if b5[-1].ifs else b5[-1].iter,
             )
         self._reset(mark)
         if (a6 := self.args()) and (self.expect(",")) and (self.args()):
-            return self.raise_syntax_error(
+            self.raise_syntax_error(
                 "positional argument follows keyword argument unpacking"
                 if a6[1][-1].arg is None
                 else "positional argument follows keyword argument"
             )
         self._reset(mark)
-        return None
 
     def invalid_kwarg(self) -> None:
         # invalid_kwarg: ('True' | 'False' | 'None') '=' | NAME '=' expression for_if_clauses | !(NAME '=') expression '=' | '**' expression '=' expression
         mark = self._mark()
         if (a := self._tmp_48()) and (b := self.expect("=")):
-            return self.raise_syntax_error_known_range(f"cannot assign to {a.string}", a, b)
+            self.raise_syntax_error_known_range(f"cannot assign to {a.string}", a, b)
         self._reset(mark)
         if (
             (a1 := self.name())
@@ -3471,12 +3466,12 @@ class XonshParser(Parser):
             and (self.expression())
             and (self.for_if_clauses())
         ):
-            return self.raise_syntax_error_known_range(
+            self.raise_syntax_error_known_range(
                 "invalid syntax. Maybe you meant '==' or ':=' instead of '='?", a1, b1
             )
         self._reset(mark)
         if (self.negative_lookahead(self._tmp_49)) and (a2 := self.expression()) and (b2 := self.expect("=")):
-            return self.raise_syntax_error_known_range(
+            self.raise_syntax_error_known_range(
                 'expression cannot contain assignment, perhaps you meant "=="?', a2, b2
             )
         self._reset(mark)
@@ -3486,9 +3481,8 @@ class XonshParser(Parser):
             and (self.expect("="))
             and (b3 := self.expression())
         ):
-            return self.raise_syntax_error_known_range("cannot assign to keyword argument unpacking", a3, b3)
+            self.raise_syntax_error_known_range("cannot assign to keyword argument unpacking", a3, b3)
         self._reset(mark)
-        return None
 
     def expression_without_invalid(self) -> Node | Any | None:
         # expression_without_invalid: disjunction 'if' disjunction 'else' expression | disjunction | lambdef
@@ -3525,13 +3519,9 @@ class XonshParser(Parser):
             and (self.negative_lookahead(self.expect, "("))
             and (b := self.star_expressions())
         ):
-            return (
-                self.raise_syntax_error_known_range(
-                    f"Missing parentheses in call to '{a.string}' . Did you mean {a.string}(...)?", a, b
-                )
-                if a.string in ("exec", "print")
-                else None
-            )
+            self.raise_syntax_error_known_range(
+                f"Missing parentheses in call to '{a.string}' . Did you mean {a.string}(...)?", a, b
+            ) if a.string in ("exec", "print") else None
         self._reset(mark)
         return None
 
@@ -3543,11 +3533,9 @@ class XonshParser(Parser):
             and (a := self.disjunction())
             and (b := self.expression_without_invalid())
         ):
-            return (
-                self.raise_syntax_error_known_range("invalid syntax. Perhaps you forgot a comma?", a, b)
-                if not isinstance(a, ast.Name) or a.id not in ("print", "exec")
-                else None
-            )
+            self.raise_syntax_error_known_range(
+                "invalid syntax. Perhaps you forgot a comma?", a, b
+            ) if not isinstance(a, ast.Name) or a.id not in ("print", "exec") else None
         self._reset(mark)
         if (
             (a1 := self.disjunction())
@@ -3555,7 +3543,7 @@ class XonshParser(Parser):
             and (b1 := self.disjunction())
             and (self.negative_lookahead(self._tmp_51))
         ):
-            return self.raise_syntax_error_known_range("expected 'else' after 'if' expression", a1, b1)
+            self.raise_syntax_error_known_range("expected 'else' after 'if' expression", a1, b1)
         self._reset(mark)
         if (
             (a2 := self.expect("lambda"))
@@ -3563,17 +3551,16 @@ class XonshParser(Parser):
             and (b2 := self.expect(":"))
             and (self.positive_lookahead(self._tmp_52))
         ):
-            return self.raise_syntax_error_known_range(
+            self.raise_syntax_error_known_range(
                 "f-string: lambda expressions are not allowed without parentheses", a2, b2
             )
         self._reset(mark)
-        return None
 
     def invalid_named_expression(self) -> None:
         # invalid_named_expression: expression ':=' expression | NAME '=' bitwise_or !('=' | ':=') | !(plist | ptuple | genexp | 'True' | 'None' | 'False') bitwise_or '=' bitwise_or !('=' | ':=')
         mark = self._mark()
         if (a := self.expression()) and (self.expect(":=")) and (self.expression()):
-            return self.raise_syntax_error_known_location(
+            self.raise_syntax_error_known_location(
                 f"cannot use assignment expressions with {self.get_expr_name(a)}", a
             )
         self._reset(mark)
@@ -3617,7 +3604,7 @@ class XonshParser(Parser):
             and (self.expect(":"))
             and (self.expression())
         ):
-            return self.raise_syntax_error_known_location(
+            self.raise_syntax_error_known_location(
                 f"only single target (not {self.get_expr_name(a)}) can be annotated", a
             )
         self._reset(mark)
@@ -3628,25 +3615,22 @@ class XonshParser(Parser):
             and (self.expect(":"))
             and (self.expression())
         ):
-            return self.raise_syntax_error_known_location(
-                "only single target (not tuple) can be annotated", a
-            )
+            self.raise_syntax_error_known_location("only single target (not tuple) can be annotated", a)
         self._reset(mark)
         if (a := self.expression()) and (self.expect(":")) and (self.expression()):
-            return self.raise_syntax_error_known_location("illegal target for annotation", a)
+            self.raise_syntax_error_known_location("illegal target for annotation", a)
         self._reset(mark)
         if (self.repeated(self._tmp_56),) and (a := self.star_expressions()) and (self.expect("=")):
-            return self.raise_syntax_error_invalid_target(Target.STAR_TARGETS, a)
+            self.raise_syntax_error_invalid_target(Target.STAR_TARGETS, a)
         self._reset(mark)
         if (self.repeated(self._tmp_56),) and (a := self.yield_expr()) and (self.expect("=")):
-            return self.raise_syntax_error_known_location("assignment to yield expression not possible", a)
+            self.raise_syntax_error_known_location("assignment to yield expression not possible", a)
         self._reset(mark)
         if (a := self.star_expressions()) and (self.augassign()) and (self.annotated_rhs()):
-            return self.raise_syntax_error_known_location(
+            self.raise_syntax_error_known_location(
                 f"'{self.get_expr_name(a)}' is an illegal expression for augmented assignment", a
             )
         self._reset(mark)
-        return None
 
     def invalid_ann_assign_target(self) -> Node | None:
         # invalid_ann_assign_target: plist | ptuple | '(' invalid_ann_assign_target ')'
@@ -3671,25 +3655,21 @@ class XonshParser(Parser):
         # invalid_del_stmt: 'del' star_expressions
         mark = self._mark()
         if (self.expect("del")) and (a := self.star_expressions()):
-            return self.raise_syntax_error_invalid_target(Target.DEL_TARGETS, a)
+            self.raise_syntax_error_invalid_target(Target.DEL_TARGETS, a)
         self._reset(mark)
-        return None
 
     def invalid_block(self) -> None:
         # invalid_block: NEWLINE !INDENT
         mark = self._mark()
         if (self.token("NEWLINE")) and (self.negative_lookahead(self.token, "INDENT")):
-            return self.raise_indentation_error("expected an indented block")
+            self.raise_indentation_error("expected an indented block")
         self._reset(mark)
-        return None
 
     def invalid_comprehension(self) -> None:
         # invalid_comprehension: ('[' | '(' | '{') starred_expression for_if_clauses | ('[' | '{') star_named_expression ',' star_named_expressions for_if_clauses | ('[' | '{') star_named_expression ',' for_if_clauses
         mark = self._mark()
         if (self._tmp_58()) and (a1 := self.starred_expression()) and (self.for_if_clauses()):
-            return self.raise_syntax_error_known_location(
-                "iterable unpacking cannot be used in comprehension", a1
-            )
+            self.raise_syntax_error_known_location("iterable unpacking cannot be used in comprehension", a1)
         self._reset(mark)
         if (
             (self._tmp_59())
@@ -3698,7 +3678,7 @@ class XonshParser(Parser):
             and (b := self.star_named_expressions())
             and (self.for_if_clauses())
         ):
-            return self.raise_syntax_error_known_range(
+            self.raise_syntax_error_known_range(
                 "did you forget parentheses around the comprehension target?", a, b[-1]
             )
         self._reset(mark)
@@ -3708,11 +3688,10 @@ class XonshParser(Parser):
             and (b := self.expect(","))
             and (self.for_if_clauses())
         ):
-            return self.raise_syntax_error_known_range(
+            self.raise_syntax_error_known_range(
                 "did you forget parentheses around the comprehension target?", a, b
             )
         self._reset(mark)
-        return None
 
     def invalid_dict_comprehension(self) -> None:
         # invalid_dict_comprehension: '{' '**' bitwise_or for_if_clauses '}'
@@ -3724,20 +3703,17 @@ class XonshParser(Parser):
             and (self.for_if_clauses())
             and (self.expect("}"))
         ):
-            return self.raise_syntax_error_known_location(
-                "dict unpacking cannot be used in dict comprehension", a
-            )
+            self.raise_syntax_error_known_location("dict unpacking cannot be used in dict comprehension", a)
         self._reset(mark)
-        return None
 
     def invalid_parameters(self) -> None:
         # invalid_parameters: "/" ',' | (slash_no_default | slash_with_default) param_maybe_default* '/' | slash_no_default? param_no_default* invalid_parameters_helper param_no_default | param_no_default* '(' param_no_default+ ','? ')' | [(slash_no_default | slash_with_default)] param_maybe_default* '*' (',' | param_no_default) param_maybe_default* '/' | param_maybe_default+ '/' '*'
         mark = self._mark()
         if (a := self.expect("/")) and (self.expect(",")):
-            return self.raise_syntax_error_known_location("at least one argument must precede /", a)
+            self.raise_syntax_error_known_location("at least one argument must precede /", a)
         self._reset(mark)
         if (self._tmp_61()) and (self.repeated(self.param_maybe_default),) and (a1 := self.expect("/")):
-            return self.raise_syntax_error_known_location("/ may appear only once", a1)
+            self.raise_syntax_error_known_location("/ may appear only once", a1)
         self._reset(mark)
         if (
             self.call_invalid_rules
@@ -3746,7 +3722,7 @@ class XonshParser(Parser):
             and (self.invalid_parameters_helper())
             and (a2 := self.param_no_default())
         ):
-            return self.raise_syntax_error_known_location(
+            self.raise_syntax_error_known_location(
                 "parameter without a default follows parameter with a default", a2
             )
         self._reset(mark)
@@ -3757,7 +3733,7 @@ class XonshParser(Parser):
             and (self.expect(","),)
             and (b := self.expect(")"))
         ):
-            return self.raise_syntax_error_known_range("Function parameters cannot be parenthesized", a3, b)
+            self.raise_syntax_error_known_range("Function parameters cannot be parenthesized", a3, b)
         self._reset(mark)
         if (
             (self._tmp_61(),)
@@ -3767,18 +3743,17 @@ class XonshParser(Parser):
             and (self.repeated(self.param_maybe_default),)
             and (a4 := self.expect("/"))
         ):
-            return self.raise_syntax_error_known_location("/ must be ahead of *", a4)
+            self.raise_syntax_error_known_location("/ must be ahead of *", a4)
         self._reset(mark)
         if (self.repeated(self.param_maybe_default)) and (self.expect("/")) and (a5 := self.expect("*")):
-            return self.raise_syntax_error_known_location("expected comma between / and *", a5)
+            self.raise_syntax_error_known_location("expected comma between / and *", a5)
         self._reset(mark)
-        return None
 
     def invalid_default(self) -> Any | None:
         # invalid_default: '=' &(')' | ',')
         mark = self._mark()
         if (a := self.expect("=")) and (self.positive_lookahead(self._tmp_64)):
-            return self.raise_syntax_error_known_location("expected default value expression", a)
+            self.raise_syntax_error_known_location("expected default value expression", a)
         self._reset(mark)
         return None
 
@@ -3786,15 +3761,13 @@ class XonshParser(Parser):
         # invalid_star_etc: '*' (')' | ',' (')' | '**')) | '*' ',' TYPE_COMMENT | '*' param '=' | '*' (param_no_default | ',') param_maybe_default* '*' (param_no_default | ',')
         mark = self._mark()
         if (a := self.expect("*")) and (self._tmp_65()):
-            return self.raise_syntax_error_known_location("named arguments must follow bare *", a)
+            self.raise_syntax_error_known_location("named arguments must follow bare *", a)
         self._reset(mark)
         if (self.expect("*")) and (self.expect(",")) and (self.token("TYPE_COMMENT")):
-            return self.raise_syntax_error("bare * has associated type comment")
+            self.raise_syntax_error("bare * has associated type comment")
         self._reset(mark)
         if (self.expect("*")) and (self.param()) and (a := self.expect("=")):
-            return self.raise_syntax_error_known_location(
-                "var-positional argument cannot have default value", a
-            )
+            self.raise_syntax_error_known_location("var-positional argument cannot have default value", a)
         self._reset(mark)
         if (
             (self.expect("*"))
@@ -3803,7 +3776,7 @@ class XonshParser(Parser):
             and (a := self.expect("*"))
             and (self._tmp_66())
         ):
-            return self.raise_syntax_error_known_location("* argument may appear only once", a)
+            self.raise_syntax_error_known_location("* argument may appear only once", a)
         self._reset(mark)
         return None
 
@@ -3811,13 +3784,13 @@ class XonshParser(Parser):
         # invalid_kwds: '**' param '=' | '**' param ',' param | '**' param ',' ('*' | '**' | '/')
         mark = self._mark()
         if (self.expect("**")) and (self.param()) and (a := self.expect("=")):
-            return self.raise_syntax_error_known_location("var-keyword argument cannot have default value", a)
+            self.raise_syntax_error_known_location("var-keyword argument cannot have default value", a)
         self._reset(mark)
         if (self.expect("**")) and (self.param()) and (self.expect(",")) and (a1 := self.param()):
-            return self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a1)
+            self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a1)
         self._reset(mark)
         if (self.expect("**")) and (self.param()) and (self.expect(",")) and (a := self._tmp_68()):
-            return self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a)
+            self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a)
         self._reset(mark)
         return None
 
@@ -3836,14 +3809,14 @@ class XonshParser(Parser):
         # invalid_lambda_parameters: "/" ',' | (lambda_slash_no_default | lambda_slash_with_default) lambda_param_maybe_default* '/' | lambda_slash_no_default? lambda_param_no_default* invalid_lambda_parameters_helper lambda_param_no_default | lambda_param_no_default* '(' ','.lambda_param+ ','? ')' | [(lambda_slash_no_default | lambda_slash_with_default)] lambda_param_maybe_default* '*' (',' | lambda_param_no_default) lambda_param_maybe_default* '/' | lambda_param_maybe_default+ '/' '*'
         mark = self._mark()
         if (a := self.expect("/")) and (self.expect(",")):
-            return self.raise_syntax_error_known_location("at least one argument must precede /", a)
+            self.raise_syntax_error_known_location("at least one argument must precede /", a)
         self._reset(mark)
         if (
             (self._tmp_69())
             and (self.repeated(self.lambda_param_maybe_default),)
             and (a1 := self.expect("/"))
         ):
-            return self.raise_syntax_error_known_location("/ may appear only once", a1)
+            self.raise_syntax_error_known_location("/ may appear only once", a1)
         self._reset(mark)
         if (
             self.call_invalid_rules
@@ -3852,7 +3825,7 @@ class XonshParser(Parser):
             and (self.invalid_lambda_parameters_helper())
             and (a2 := self.lambda_param_no_default())
         ):
-            return self.raise_syntax_error_known_location(
+            self.raise_syntax_error_known_location(
                 "parameter without a default follows parameter with a default", a2
             )
         self._reset(mark)
@@ -3863,9 +3836,7 @@ class XonshParser(Parser):
             and (self.expect(","),)
             and (b := self.expect(")"))
         ):
-            return self.raise_syntax_error_known_range(
-                "Lambda expression parameters cannot be parenthesized", a3, b
-            )
+            self.raise_syntax_error_known_range("Lambda expression parameters cannot be parenthesized", a3, b)
         self._reset(mark)
         if (
             (self._tmp_69(),)
@@ -3875,16 +3846,15 @@ class XonshParser(Parser):
             and (self.repeated(self.lambda_param_maybe_default),)
             and (a4 := self.expect("/"))
         ):
-            return self.raise_syntax_error_known_location("/ must be ahead of *", a4)
+            self.raise_syntax_error_known_location("/ must be ahead of *", a4)
         self._reset(mark)
         if (
             (self.repeated(self.lambda_param_maybe_default))
             and (self.expect("/"))
             and (a5 := self.expect("*"))
         ):
-            return self.raise_syntax_error_known_location("expected comma between / and *", a5)
+            self.raise_syntax_error_known_location("expected comma between / and *", a5)
         self._reset(mark)
-        return None
 
     def invalid_lambda_parameters_helper(self) -> Any | None:
         # invalid_lambda_parameters_helper: lambda_slash_with_default | lambda_param_with_default+
@@ -3901,12 +3871,10 @@ class XonshParser(Parser):
         # invalid_lambda_star_etc: '*' (':' | ',' (':' | '**')) | '*' lambda_param '=' | '*' (lambda_param_no_default | ',') lambda_param_maybe_default* '*' (lambda_param_no_default | ',')
         mark = self._mark()
         if (self.expect("*")) and (self._tmp_72()):
-            return self.raise_syntax_error("named arguments must follow bare *")
+            self.raise_syntax_error("named arguments must follow bare *")
         self._reset(mark)
         if (self.expect("*")) and (self.lambda_param()) and (a := self.expect("=")):
-            return self.raise_syntax_error_known_location(
-                "var-positional argument cannot have default value", a
-            )
+            self.raise_syntax_error_known_location("var-positional argument cannot have default value", a)
         self._reset(mark)
         if (
             (self.expect("*"))
@@ -3915,15 +3883,14 @@ class XonshParser(Parser):
             and (a := self.expect("*"))
             and (self._tmp_73())
         ):
-            return self.raise_syntax_error_known_location("* argument may appear only once", a)
+            self.raise_syntax_error_known_location("* argument may appear only once", a)
         self._reset(mark)
-        return None
 
     def invalid_lambda_kwds(self) -> Any | None:
         # invalid_lambda_kwds: '**' lambda_param '=' | '**' lambda_param ',' lambda_param | '**' lambda_param ',' ('*' | '**' | '/')
         mark = self._mark()
         if (self.expect("**")) and (self.lambda_param()) and (a := self.expect("=")):
-            return self.raise_syntax_error_known_location("var-keyword argument cannot have default value", a)
+            self.raise_syntax_error_known_location("var-keyword argument cannot have default value", a)
         self._reset(mark)
         if (
             (self.expect("**"))
@@ -3931,10 +3898,10 @@ class XonshParser(Parser):
             and (self.expect(","))
             and (a1 := self.lambda_param())
         ):
-            return self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a1)
+            self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a1)
         self._reset(mark)
         if (self.expect("**")) and (self.lambda_param()) and (self.expect(",")) and (a2 := self._tmp_68()):
-            return self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a2)
+            self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a2)
         self._reset(mark)
         return None
 
@@ -3948,9 +3915,8 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.token("INDENT"))
         ):
-            return self.raise_syntax_error("Cannot have two type comments on def")
+            self.raise_syntax_error("Cannot have two type comments on def")
         self._reset(mark)
-        return None
 
     def invalid_with_item(self) -> None:
         # invalid_with_item: expression 'as' expression &(',' | ')' | ':')
@@ -3961,28 +3927,25 @@ class XonshParser(Parser):
             and (a := self.expression())
             and (self.positive_lookahead(self._tmp_15))
         ):
-            return self.raise_syntax_error_invalid_target(Target.STAR_TARGETS, a)
+            self.raise_syntax_error_invalid_target(Target.STAR_TARGETS, a)
         self._reset(mark)
-        return None
 
     def invalid_for_target(self) -> None:
         # invalid_for_target: 'async'? 'for' star_expressions
         mark = self._mark()
         if (self.expect("async"),) and (self.expect("for")) and (a := self.star_expressions()):
-            return self.raise_syntax_error_invalid_target(Target.FOR_TARGETS, a)
+            self.raise_syntax_error_invalid_target(Target.FOR_TARGETS, a)
         self._reset(mark)
-        return None
 
     def invalid_group(self) -> None:
         # invalid_group: '(' starred_expression ')' | '(' '**' expression ')'
         mark = self._mark()
         if (self.expect("(")) and (a := self.starred_expression()) and (self.expect(")")):
-            return self.raise_syntax_error_known_location("cannot use starred expression here", a)
+            self.raise_syntax_error_known_location("cannot use starred expression here", a)
         self._reset(mark)
         if (self.expect("(")) and (b := self.expect("**")) and (self.expression()) and (self.expect(")")):
-            return self.raise_syntax_error_known_location("cannot use double starred expression here", b)
+            self.raise_syntax_error_known_location("cannot use double starred expression here", b)
         self._reset(mark)
-        return None
 
     def invalid_import(self) -> Any | None:
         # invalid_import: 'import' ','.dotted_name+ 'from' dotted_name
@@ -3993,9 +3956,7 @@ class XonshParser(Parser):
             and (self.expect("from"))
             and (self.dotted_name())
         ):
-            return self.raise_syntax_error_starting_from(
-                "Did you mean to use 'from ... import ...' instead?", a
-            )
+            self.raise_syntax_error_starting_from("Did you mean to use 'from ... import ...' instead?", a)
         self._reset(mark)
         return None
 
@@ -4003,9 +3964,8 @@ class XonshParser(Parser):
         # invalid_import_from_targets: import_from_as_names ',' NEWLINE
         mark = self._mark()
         if (self.import_from_as_names()) and (self.expect(",")) and (self.token("NEWLINE")):
-            return self.raise_syntax_error("trailing comma not allowed without surrounding parentheses")
+            self.raise_syntax_error("trailing comma not allowed without surrounding parentheses")
         self._reset(mark)
-        return None
 
     def invalid_with_stmt(self) -> None:
         # invalid_with_stmt: 'async'? 'with' ','.(expression ['as' star_target])+ &&':' | 'async'? 'with' '(' ','.(expressions ['as' star_target])+ ','? ')' &&':'
@@ -4042,7 +4002,7 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
-            return self.raise_indentation_error(
+            self.raise_indentation_error(
                 f"expected an indented block after 'with' statement on line {a.start[0]}"
             )
         self._reset(mark)
@@ -4057,11 +4017,10 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
-            return self.raise_indentation_error(
+            self.raise_indentation_error(
                 f"expected an indented block after 'with' statement on line {a.start[0]}"
             )
         self._reset(mark)
-        return None
 
     def invalid_try_stmt(self) -> None:
         # invalid_try_stmt: 'try' ':' NEWLINE !INDENT | 'try' ':' block !('except' | 'finally') | 'try' ':' block* except_block+ 'except' '*' expression ['as' NAME] ':' | 'try' ':' block* except_star_block+ 'except' [expression ['as' NAME]] ':'
@@ -4072,7 +4031,7 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
-            return self.raise_indentation_error(
+            self.raise_indentation_error(
                 f"expected an indented block after 'try' statement on line {a.start[0]}"
             )
         self._reset(mark)
@@ -4082,7 +4041,7 @@ class XonshParser(Parser):
             and (self.block())
             and (self.negative_lookahead(self._tmp_81))
         ):
-            return self.raise_syntax_error("expected 'except' or 'finally' block")
+            self.raise_syntax_error("expected 'except' or 'finally' block")
         self._reset(mark)
         if (
             (self.expect("try"))
@@ -4095,7 +4054,7 @@ class XonshParser(Parser):
             and (self._tmp_82(),)
             and (self.expect(":"))
         ):
-            return self.raise_syntax_error_known_range(
+            self.raise_syntax_error_known_range(
                 "cannot have both 'except' and 'except*' on the same 'try'", a, b
             )
         self._reset(mark)
@@ -4108,11 +4067,10 @@ class XonshParser(Parser):
             and (self._tmp_83(),)
             and (self.expect(":"))
         ):
-            return self.raise_syntax_error_known_location(
+            self.raise_syntax_error_known_location(
                 "cannot have both 'except' and 'except*' on the same 'try'", a
             )
         self._reset(mark)
-        return None
 
     def invalid_except_stmt(self) -> None:
         # invalid_except_stmt: 'except' '*'? expression ',' expressions ['as' NAME] ':' | 'except' '*'? expression ['as' NAME] NEWLINE | 'except' '*'? NEWLINE | 'except' '*' (NEWLINE | ':')
@@ -4126,7 +4084,7 @@ class XonshParser(Parser):
             and (self._tmp_82(),)
             and (self.expect(":"))
         ):
-            return self.raise_syntax_error_starting_from("multiple exception types must be parenthesized", a)
+            self.raise_syntax_error_starting_from("multiple exception types must be parenthesized", a)
         self._reset(mark)
         if (
             (self.expect("except"))
@@ -4135,15 +4093,14 @@ class XonshParser(Parser):
             and (self._tmp_82(),)
             and (self.token("NEWLINE"))
         ):
-            return self.raise_syntax_error("expected ':'")
+            self.raise_syntax_error("expected ':'")
         self._reset(mark)
         if (self.expect("except")) and (self.expect("*"),) and (self.token("NEWLINE")):
-            return self.raise_syntax_error("expected ':'")
+            self.raise_syntax_error("expected ':'")
         self._reset(mark)
         if (self.expect("except")) and (self.expect("*")) and (self._tmp_86()):
-            return self.raise_syntax_error("expected one or more exception types")
+            self.raise_syntax_error("expected one or more exception types")
         self._reset(mark)
-        return None
 
     def invalid_finally_stmt(self) -> None:
         # invalid_finally_stmt: 'finally' ':' NEWLINE !INDENT
@@ -4154,11 +4111,10 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
-            return self.raise_indentation_error(
+            self.raise_indentation_error(
                 f"expected an indented block after 'finally' statement on line {a.start[0]}"
             )
         self._reset(mark)
-        return None
 
     def invalid_except_stmt_indent(self) -> None:
         # invalid_except_stmt_indent: 'except' expression ['as' NAME] ':' NEWLINE !INDENT | 'except' ':' NEWLINE !INDENT
@@ -4171,7 +4127,7 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
-            return self.raise_indentation_error(
+            self.raise_indentation_error(
                 f"expected an indented block after 'except' statement on line {a.start[0]}"
             )
         self._reset(mark)
@@ -4181,11 +4137,10 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
-            return self.raise_indentation_error(
+            self.raise_indentation_error(
                 f"expected an indented block after 'except' statement on line {a.start[0]}"
             )
         self._reset(mark)
-        return None
 
     def invalid_except_star_stmt_indent(self) -> None:
         # invalid_except_star_stmt_indent: 'except' '*' expression ['as' NAME] ':' NEWLINE !INDENT
@@ -4199,17 +4154,16 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
-            return self.raise_indentation_error(
+            self.raise_indentation_error(
                 f"expected an indented block after 'except*' statement on line {a.start[0]}"
             )
         self._reset(mark)
-        return None
 
     def invalid_match_stmt(self) -> None:
         # invalid_match_stmt: "match" subject_expr !':' | "match" subject_expr ':' NEWLINE !INDENT
         mark = self._mark()
         if (self.expect("match")) and (self.subject_expr()) and (self.negative_lookahead(self.expect, ":")):
-            return self.raise_syntax_error("expected ':'")
+            self.raise_syntax_error("expected ':'")
         self._reset(mark)
         if (
             (a := self.expect("match"))
@@ -4218,11 +4172,10 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
-            return self.raise_indentation_error(
+            self.raise_indentation_error(
                 f"expected an indented block after 'match' statement on line {a.start[0]}"
             )
         self._reset(mark)
-        return None
 
     def invalid_case_block(self) -> None:
         # invalid_case_block: "case" patterns guard? !':' | "case" patterns guard? ':' NEWLINE !INDENT
@@ -4233,7 +4186,7 @@ class XonshParser(Parser):
             and (self.guard(),)
             and (self.negative_lookahead(self.expect, ":"))
         ):
-            return self.raise_syntax_error("expected ':'")
+            self.raise_syntax_error("expected ':'")
         self._reset(mark)
         if (
             (a := self.expect("case"))
@@ -4243,17 +4196,16 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
-            return self.raise_indentation_error(
+            self.raise_indentation_error(
                 f"expected an indented block after 'case' statement on line {a.start[0]}"
             )
         self._reset(mark)
-        return None
 
     def invalid_as_pattern(self) -> None:
         # invalid_as_pattern: or_pattern 'as' "_" | or_pattern 'as' !NAME expression
         mark = self._mark()
         if (self.or_pattern()) and (self.expect("as")) and (a := self.expect("_")):
-            return self.raise_syntax_error_known_location("cannot use '_' as a target", a)
+            self.raise_syntax_error_known_location("cannot use '_' as a target", a)
         self._reset(mark)
         if (
             (self.or_pattern())
@@ -4261,9 +4213,8 @@ class XonshParser(Parser):
             and (self.negative_lookahead(self.name))
             and (a1 := self.expression())
         ):
-            return self.raise_syntax_error_known_location("invalid pattern target", a1)
+            self.raise_syntax_error_known_location("invalid pattern target", a1)
         self._reset(mark)
-        return None
 
     def invalid_class_pattern(self) -> None:
         # invalid_class_pattern: name_or_attr '(' invalid_class_argument_pattern
@@ -4274,11 +4225,8 @@ class XonshParser(Parser):
             and (self.expect("("))
             and (a := self.invalid_class_argument_pattern())
         ):
-            return self.raise_syntax_error_known_range(
-                "positional patterns follow keyword patterns", a[0], a[-1]
-            )
+            self.raise_syntax_error_known_range("positional patterns follow keyword patterns", a[0], a[-1])
         self._reset(mark)
-        return None
 
     def invalid_class_argument_pattern(self) -> Any | None:
         # invalid_class_argument_pattern: [positional_patterns ','] keyword_patterns ',' positional_patterns
@@ -4297,7 +4245,7 @@ class XonshParser(Parser):
         # invalid_if_stmt: 'if' named_expression NEWLINE | 'if' named_expression ':' NEWLINE !INDENT
         mark = self._mark()
         if (self.expect("if")) and (self.named_expression()) and (self.token("NEWLINE")):
-            return self.raise_syntax_error("expected ':'")
+            self.raise_syntax_error("expected ':'")
         self._reset(mark)
         if (
             (a := self.expect("if"))
@@ -4306,17 +4254,16 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
-            return self.raise_indentation_error(
+            self.raise_indentation_error(
                 f"expected an indented block after 'if' statement on line {a.start[0]}"
             )
         self._reset(mark)
-        return None
 
     def invalid_elif_stmt(self) -> None:
         # invalid_elif_stmt: 'elif' named_expression NEWLINE | 'elif' named_expression ':' NEWLINE !INDENT
         mark = self._mark()
         if (self.expect("elif")) and (self.named_expression()) and (self.token("NEWLINE")):
-            return self.raise_syntax_error("expected ':'")
+            self.raise_syntax_error("expected ':'")
         self._reset(mark)
         if (
             (a := self.expect("elif"))
@@ -4325,11 +4272,10 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
-            return self.raise_indentation_error(
+            self.raise_indentation_error(
                 f"expected an indented block after 'elif' statement on line {a.start[0]}"
             )
         self._reset(mark)
-        return None
 
     def invalid_else_stmt(self) -> None:
         # invalid_else_stmt: 'else' ':' NEWLINE !INDENT
@@ -4340,17 +4286,16 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
-            return self.raise_indentation_error(
+            self.raise_indentation_error(
                 f"expected an indented block after 'else' statement on line {a.start[0]}"
             )
         self._reset(mark)
-        return None
 
     def invalid_while_stmt(self) -> None:
         # invalid_while_stmt: 'while' named_expression NEWLINE | 'while' named_expression ':' NEWLINE !INDENT
         mark = self._mark()
         if (self.expect("while")) and (self.named_expression()) and (self.token("NEWLINE")):
-            return self.raise_syntax_error("expected ':'")
+            self.raise_syntax_error("expected ':'")
         self._reset(mark)
         if (
             (a := self.expect("while"))
@@ -4359,11 +4304,10 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
-            return self.raise_indentation_error(
+            self.raise_indentation_error(
                 f"expected an indented block after 'while' statement on line {a.start[0]}"
             )
         self._reset(mark)
-        return None
 
     def invalid_for_stmt(self) -> None:
         # invalid_for_stmt: ASYNC? 'for' star_targets 'in' star_expressions NEWLINE | 'async'? 'for' star_targets 'in' star_expressions ':' NEWLINE !INDENT
@@ -4376,7 +4320,7 @@ class XonshParser(Parser):
             and (self.star_expressions())
             and (self.token("NEWLINE"))
         ):
-            return self.raise_syntax_error("expected ':'")
+            self.raise_syntax_error("expected ':'")
         self._reset(mark)
         if (
             (self.expect("async"),)
@@ -4388,11 +4332,10 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
-            return self.raise_indentation_error(
+            self.raise_indentation_error(
                 f"expected an indented block after 'for' statement on line {a.start[0]}"
             )
         self._reset(mark)
-        return None
 
     def invalid_def_raw(self) -> None:
         # invalid_def_raw: 'async'? 'def' NAME type_params? '(' params? ')' return_expr? ':' NEWLINE !INDENT
@@ -4410,11 +4353,10 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
-            return self.raise_indentation_error(
+            self.raise_indentation_error(
                 f"expected an indented block after function definition on line {a.start[0]}"
             )
         self._reset(mark)
-        return None
 
     def invalid_class_def_raw(self) -> None:
         # invalid_class_def_raw: 'class' NAME type_params? ['(' arguments? ')'] NEWLINE | 'class' NAME type_params? ['(' arguments? ')'] ':' NEWLINE !INDENT
@@ -4426,7 +4368,7 @@ class XonshParser(Parser):
             and (self._tmp_90(),)
             and (self.token("NEWLINE"))
         ):
-            return self.raise_syntax_error("expected ':'")
+            self.raise_syntax_error("expected ':'")
         self._reset(mark)
         if (
             (a := self.expect("class"))
@@ -4437,11 +4379,10 @@ class XonshParser(Parser):
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
-            return self.raise_indentation_error(
+            self.raise_indentation_error(
                 f"expected an indented block after class definition on line {a.start[0]}"
             )
         self._reset(mark)
-        return None
 
     def invalid_double_starred_kvpairs(self) -> None:
         # invalid_double_starred_kvpairs: ','.double_starred_kvpair+ ',' invalid_kvpair | expression ':' '*' bitwise_or | expression ':' &('}' | ',')
@@ -4455,14 +4396,10 @@ class XonshParser(Parser):
             return None
         self._reset(mark)
         if (self.expression()) and (self.expect(":")) and (a := self.expect("*")) and (self.bitwise_or()):
-            return self.raise_syntax_error_starting_from(
-                "cannot use a starred expression in a dictionary value", a
-            )
+            self.raise_syntax_error_starting_from("cannot use a starred expression in a dictionary value", a)
         self._reset(mark)
         if (self.expression()) and (a := self.expect(":")) and (self.positive_lookahead(self._tmp_92)):
-            return self.raise_syntax_error_known_location(
-                "expression expected after dictionary key and ':'", a
-            )
+            self.raise_syntax_error_known_location("expression expected after dictionary key and ':'", a)
         self._reset(mark)
         return None
 
@@ -4470,28 +4407,21 @@ class XonshParser(Parser):
         # invalid_kvpair: expression !(':') | expression ':' '*' bitwise_or | expression ':' &('}' | ',') | expression ':'
         mark = self._mark()
         if (a := self.expression()) and (self.negative_lookahead(self.expect, ":")):
-            return self.raise_raw_syntax_error(
+            self.raise_raw_syntax_error(
                 "':' expected after dictionary key",
                 (a.lineno, a.col_offset),
                 (a.end_lineno, a.end_col_offset),
             )
         self._reset(mark)
         if (self.expression()) and (self.expect(":")) and (a1 := self.expect("*")) and (self.bitwise_or()):
-            return self.raise_syntax_error_starting_from(
-                "cannot use a starred expression in a dictionary value", a1
-            )
+            self.raise_syntax_error_starting_from("cannot use a starred expression in a dictionary value", a1)
         self._reset(mark)
         if (self.expression()) and (a2 := self.expect(":")) and (self.positive_lookahead(self._tmp_92)):
-            return self.raise_syntax_error_known_location(
-                "expression expected after dictionary key and ':'", a2
-            )
+            self.raise_syntax_error_known_location("expression expected after dictionary key and ':'", a2)
         self._reset(mark)
         if (self.expression()) and (a3 := self.expect(":")):
-            return self.raise_syntax_error_known_location(
-                "expression expected after dictionary key and ':'", a3
-            )
+            self.raise_syntax_error_known_location("expression expected after dictionary key and ':'", a3)
         self._reset(mark)
-        return None
 
     def invalid_starred_expression(self) -> Any | None:
         # invalid_starred_expression: '*' expression '=' expression
@@ -4502,7 +4432,7 @@ class XonshParser(Parser):
             and (self.expect("="))
             and (b := self.expression())
         ):
-            return self.raise_syntax_error_known_range("cannot assign to iterable argument unpacking", a, b)
+            self.raise_syntax_error_known_range("cannot assign to iterable argument unpacking", a, b)
         self._reset(mark)
         return None
 
@@ -4510,22 +4440,22 @@ class XonshParser(Parser):
         # invalid_replacement_field: '{' '=' | '{' '!' | '{' ':' | '{' '}' | '{' !annotated_rhs | '{' annotated_rhs !('=' | '!' | ':' | '}') | '{' annotated_rhs '=' !('!' | ':' | '}') | '{' annotated_rhs '='? invalid_conversion_character | '{' annotated_rhs '='? ['!' NAME] !(':' | '}') | '{' annotated_rhs '='? ['!' NAME] ':' fstring_format_spec* !'}' | '{' annotated_rhs '='? ['!' NAME] !'}'
         mark = self._mark()
         if (self.expect("{")) and (a := self.expect("=")):
-            return self.raise_syntax_error_known_location("f-string: valid expression required before '='", a)
+            self.raise_syntax_error_known_location("f-string: valid expression required before '='", a)
         self._reset(mark)
         if (self.expect("{")) and (a := self.expect("!")):
-            return self.raise_syntax_error_known_location("f-string: valid expression required before '!'", a)
+            self.raise_syntax_error_known_location("f-string: valid expression required before '!'", a)
         self._reset(mark)
         if (self.expect("{")) and (a := self.expect(":")):
-            return self.raise_syntax_error_known_location("f-string: valid expression required before ':'", a)
+            self.raise_syntax_error_known_location("f-string: valid expression required before ':'", a)
         self._reset(mark)
         if (self.expect("{")) and (a := self.expect("}")):
-            return self.raise_syntax_error_known_location("f-string: valid expression required before '}'", a)
+            self.raise_syntax_error_known_location("f-string: valid expression required before '}'", a)
         self._reset(mark)
         if (self.expect("{")) and (self.negative_lookahead(self.annotated_rhs)):
-            return self.raise_syntax_error_on_next_token("f-string: expecting a valid expression after '{'")
+            self.raise_syntax_error_on_next_token("f-string: expecting a valid expression after '{'")
         self._reset(mark)
         if (self.expect("{")) and (self.annotated_rhs()) and (self.negative_lookahead(self._tmp_94)):
-            return self.raise_syntax_error_on_next_token("f-string: expecting '=', or '!', or ':', or '}'")
+            self.raise_syntax_error_on_next_token("f-string: expecting '=', or '!', or ':', or '}'")
         self._reset(mark)
         if (
             (self.expect("{"))
@@ -4533,7 +4463,7 @@ class XonshParser(Parser):
             and (self.expect("="))
             and (self.negative_lookahead(self._tmp_95))
         ):
-            return self.raise_syntax_error_on_next_token("f-string: expecting '!', or ':', or '}'")
+            self.raise_syntax_error_on_next_token("f-string: expecting '!', or ':', or '}'")
         self._reset(mark)
         if (
             self.call_invalid_rules
@@ -4551,7 +4481,7 @@ class XonshParser(Parser):
             and (self._tmp_96(),)
             and (self.negative_lookahead(self._tmp_97))
         ):
-            return self.raise_syntax_error_on_next_token("f-string: expecting ':' or '}'")
+            self.raise_syntax_error_on_next_token("f-string: expecting ':' or '}'")
         self._reset(mark)
         if (
             (self.expect("{"))
@@ -4562,7 +4492,7 @@ class XonshParser(Parser):
             and (self.repeated(self.fstring_format_spec),)
             and (self.negative_lookahead(self.expect, "}"))
         ):
-            return self.raise_syntax_error_on_next_token("f-string: expecting '}', or format specs")
+            self.raise_syntax_error_on_next_token("f-string: expecting '}', or format specs")
         self._reset(mark)
         if (
             (self.expect("{"))
@@ -4571,7 +4501,7 @@ class XonshParser(Parser):
             and (self._tmp_96(),)
             and (self.negative_lookahead(self.expect, "}"))
         ):
-            return self.raise_syntax_error_on_next_token("f-string: expecting '}'")
+            self.raise_syntax_error_on_next_token("f-string: expecting '}'")
         self._reset(mark)
         return None
 
@@ -4579,12 +4509,11 @@ class XonshParser(Parser):
         # invalid_conversion_character: '!' &(':' | '}') | '!' !NAME
         mark = self._mark()
         if (self.expect("!")) and (self.positive_lookahead(self._tmp_97)):
-            return self.raise_syntax_error_on_next_token("f-string: missing conversion character")
+            self.raise_syntax_error_on_next_token("f-string: missing conversion character")
         self._reset(mark)
         if (self.expect("!")) and (self.negative_lookahead(self.name)):
-            return self.raise_syntax_error_on_next_token("f-string: invalid conversion character")
+            self.raise_syntax_error_on_next_token("f-string: invalid conversion character")
         self._reset(mark)
-        return None
 
     def _tmp_1(self) -> Any | None:
         # _tmp_1: 'import' | 'from'

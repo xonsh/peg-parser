@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 
 
 def nodes_equal(x, y):
-    assert type(x) == type(y), f"Ast nodes do not have the same type: '{type(x)}' != '{type(y)}' "
+    assert type(x) is type(y), f"Ast nodes do not have the same type: '{type(x)}' != '{type(y)}' "
     if isinstance(x, ast.Constant):
         assert x.value == y.value, (
             f"Constant ast nodes do not have the same value: " f"{x.value!r} != {y.value!r}"
@@ -28,7 +28,7 @@ def nodes_equal(x, y):
         assert (
             xname == yname
         ), f"Ast nodes fields differ : {xname} (of type {type(xval)}) != {yname} (of type {type(yval)})"
-        assert type(xval) == type(
+        assert type(xval) is type(
             yval
         ), f"Ast nodes fields differ : {xname} (of type {type(xval)}) != {yname} (of type {type(yval)})"
     for xchild, ychild in zip(ast.iter_child_nodes(x), ast.iter_child_nodes(y), strict=False):

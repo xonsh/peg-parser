@@ -194,7 +194,11 @@ class XonshParserGenerator(PythonParserGenerator):
             self.print(stmt)
         # terse representation of return values
         ret_val = ast.unparse(ast.parse(ret_val))
-        self.print(f"return {ret_val}")
+
+        if ret_val.startswith("self.raise_"):
+            self.print(ret_val)
+        else:
+            self.print(f"return {ret_val}")
 
     def visit_Rule(self, node: Rule) -> None:
         is_loop = node.is_loop()
