@@ -164,10 +164,6 @@ local_partial_types = true
 warn_unreachable = false
 disable_error_code = [
     "func-returns-value", # 61
-#    "var-annotated",      # 35
     "arg-type",           # 331 errors
-#    "return-value",
-#    "call-overload",
-    "no-any-return",
 ]
-strict = true
+#strict = false

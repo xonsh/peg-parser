@@ -189,7 +189,7 @@ class XonshParser(Parser):
         return None
 
     def assignment(self) -> ast.stmt | None:
-        # assignment: NAME ':' expression ['=' annotated_rhs] | ('(' single_target ')' | single_subscript_attribute_target) ':' expression ['=' annotated_rhs] | (assignment_lhs)+ annotated_rhs !'=' TYPE_COMMENT? | single_target augassign ~ annotated_rhs | invalid_assignment
+        # assignment: NAME ':' expression ['=' annotated_rhs] | ('(' single_target ')' | single_subscript_attribute_target) ':' expression ['=' annotated_rhs] | (assignment_lhs)+ annotated_rhs !'=' type_comment_str? | single_target augassign ~ annotated_rhs | invalid_assignment
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.name()) and (self.expect(":")) and (b := self.expression()) and (c := self._tmp_6(),):
@@ -220,7 +220,7 @@ class XonshParser(Parser):
             (a2 := self.repeated(self.assignment_lhs))
             and (b2 := self.annotated_rhs())
             and (self.negative_lookahead(self.expect, "="))
-            and (tc := self.token("TYPE_COMMENT"),)
+            and (tc := self.type_comment_str(),)
         ):
             return ast.Assign(targets=a2, value=b2, type_comment=tc, **self.span(_lnum, _col))
         self._reset(mark)
@@ -958,7 +958,7 @@ class XonshParser(Parser):
         return None
 
     def for_stmt(self) -> ast.For | ast.AsyncFor | None:
-        # for_stmt: invalid_for_stmt | 'for' star_targets 'in' ~ star_expressions &&':' TYPE_COMMENT? block else_block? | 'async' 'for' star_targets 'in' ~ star_expressions ':' TYPE_COMMENT? block else_block? | invalid_for_target
+        # for_stmt: invalid_for_stmt | 'for' star_targets 'in' ~ star_expressions &&':' type_comment_str? block else_block? | 'async' 'for' star_targets 'in' ~ star_expressions ':' type_comment_str? block else_block? | invalid_for_target
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_for_stmt()):
@@ -972,7 +972,7 @@ class XonshParser(Parser):
             and (cut := True)
             and (ex := self.star_expressions())
             and (self.expect_forced(self.expect(":"), "':'"))
-            and (tc := self.token("TYPE_COMMENT"),)
+            and (tc := self.type_comment_str(),)
             and (b := self.block())
             and (el := self.else_block(),)
         ):
@@ -991,7 +991,7 @@ class XonshParser(Parser):
             and (cut := True)
             and (ex := self.star_expressions())
             and (self.expect(":"))
-            and (tc := self.token("TYPE_COMMENT"),)
+            and (tc := self.type_comment_str(),)
             and (b := self.block())
             and (el := self.else_block(),)
         ):
@@ -1007,7 +1007,7 @@ class XonshParser(Parser):
         return None
 
     def with_stmt(self) -> ast.With | ast.AsyncWith | None:
-        # with_stmt: invalid_with_stmt_indent | &with_macro_start ~ with_macro_stmt | 'with' '(' ','.with_item+ ','? ')' ':' block | 'with' ','.with_item+ ':' TYPE_COMMENT? block | 'async' 'with' '(' ','.with_item+ ','? ')' ':' block | 'async' 'with' ','.with_item+ ':' TYPE_COMMENT? block | invalid_with_stmt
+        # with_stmt: invalid_with_stmt_indent | &with_macro_start ~ with_macro_stmt | 'with' '(' ','.with_item+ ','? ')' ':' block | 'with' ','.with_item+ ':' type_comment_str? block | 'async' 'with' '(' ','.with_item+ ','? ')' ':' block | 'async' 'with' ','.with_item+ ':' type_comment_str? block | invalid_with_stmt
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_with_stmt_indent()):
@@ -1038,7 +1038,7 @@ class XonshParser(Parser):
             (self.expect("with"))
             and (a := self.gathered(self.with_item, self.expect, ","))
             and (self.expect(":"))
-            and (tc := self.token("TYPE_COMMENT"),)
+            and (tc := self.type_comment_str(),)
             and (b := self.block())
         ):
             return ast.With(items=a, body=b, type_comment=tc, **self.span(_lnum, _col))
@@ -1060,7 +1060,7 @@ class XonshParser(Parser):
             and (self.expect("with"))
             and (a := self.gathered(self.with_item, self.expect, ","))
             and (self.expect(":"))
-            and (tc := self.token("TYPE_COMMENT"),)
+            and (tc := self.type_comment_str(),)
             and (b := self.block())
         ):
             return ast.AsyncWith(items=a, body=b, type_comment=tc, **self.span(_lnum, _col))
@@ -3225,10 +3225,10 @@ class XonshParser(Parser):
             return self.set_expr_context(a1, Store)
         self._reset(mark)
         if (self.expect("(")) and (a2 := self.star_targets_tuple_seq(),) and (self.expect(")")):
-            return ast.Tuple(elts=a2, ctx=Store, **self.span(_lnum, _col))
+            return ast.Tuple(elts=a2 or [], ctx=Store, **self.span(_lnum, _col))
         self._reset(mark)
         if (self.expect("[")) and (a3 := self.star_targets_list_seq(),) and (self.expect("]")):
-            return ast.List(elts=a3, ctx=Store, **self.span(_lnum, _col))
+            return ast.List(elts=a3 or [], ctx=Store, **self.span(_lnum, _col))
         self._reset(mark)
         return None
 
@@ -3319,7 +3319,7 @@ class XonshParser(Parser):
             (self.expect, "."),
         )
 
-    def del_targets(self) -> Any | None:
+    def del_targets(self) -> list[ast.expr] | None:
         # del_targets: ','.del_target+ ','?
         mark = self._mark()
         if (a := self.gathered(self.del_target, self.expect, ",")) and (self.expect(","),):
@@ -3365,15 +3365,23 @@ class XonshParser(Parser):
             return self.set_expr_context(b, Del)
         self._reset(mark)
         if (self.expect("(")) and (c := self.del_targets(),) and (self.expect(")")):
-            return ast.Tuple(elts=c, ctx=Del, **self.span(_lnum, _col))
+            return ast.Tuple(elts=c or [], ctx=Del, **self.span(_lnum, _col))
         self._reset(mark)
         if (self.expect("[")) and (c := self.del_targets(),) and (self.expect("]")):
-            return ast.List(elts=c, ctx=Del, **self.span(_lnum, _col))
+            return ast.List(elts=c or [], ctx=Del, **self.span(_lnum, _col))
+        self._reset(mark)
+        return None
+
+    def type_comment_str(self) -> str | None:
+        # type_comment_str: TYPE_COMMENT
+        mark = self._mark()
+        if t := self.token("TYPE_COMMENT"):
+            return t.string
         self._reset(mark)
         return None
 
     def func_type_comment(self) -> str | None:
-        # func_type_comment: NEWLINE TYPE_COMMENT &(NEWLINE INDENT) | invalid_double_type_comments | TYPE_COMMENT
+        # func_type_comment: NEWLINE TYPE_COMMENT &(NEWLINE INDENT) | invalid_double_type_comments | type_comment_str
         mark = self._mark()
         if (
             (self.token("NEWLINE"))
@@ -3385,8 +3393,8 @@ class XonshParser(Parser):
         if self.call_invalid_rules and (self.invalid_double_type_comments()):
             return None
         self._reset(mark)
-        if t := self.token("TYPE_COMMENT"):
-            return t.string
+        if type_comment_str := self.type_comment_str():
+            return type_comment_str
         self._reset(mark)
         return None
 

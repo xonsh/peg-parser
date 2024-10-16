@@ -102,7 +102,7 @@ assignment[ast.stmt]:
             LOCATIONS,
         )
      }
-    | a2=(assignment_lhs)+ b2=annotated_rhs !'=' tc=[TYPE_COMMENT] {
+    | a2=(assignment_lhs)+ b2=annotated_rhs !'=' tc=[type_comment_str] {
          ast.Assign(targets=a2, value=b2, type_comment=tc, LOCATIONS)
      }
     | a3=single_target b3=augassign ~ c3=annotated_rhs {
@@ -385,9 +385,9 @@ while_stmt[ast.While]:
 
 for_stmt[Union[ast.For, ast.AsyncFor]]:
     | invalid_for_stmt
-    | 'for' t=star_targets 'in' ~ ex=star_expressions &&':' tc=[TYPE_COMMENT] b=block el=[else_block] {
+    | 'for' t=star_targets 'in' ~ ex=star_expressions &&':' tc=[type_comment_str] b=block el=[else_block] {
         ast.For(target=t, iter=ex, body=b, orelse=el or [], type_comment=tc, LOCATIONS) }
-    | 'async' 'for' t=star_targets 'in' ~ ex=star_expressions ':' tc=[TYPE_COMMENT] b=block el=[else_block] {
+    | 'async' 'for' t=star_targets 'in' ~ ex=star_expressions ':' tc=[type_comment_str] b=block el=[else_block] {
         ast.AsyncFor(target=t, iter=ex, body=b, orelse=el or [], type_comment=tc, LOCATIONS) }
     | invalid_for_target
 
@@ -400,13 +400,13 @@ with_stmt[Union[ast.With, ast.AsyncWith]]:
     | 'with' '(' a=','.with_item+ ','? ')' ':' b=block {
         ast.With(items=a, body=b, LOCATIONS)
      }
-    | 'with' a=','.with_item+ ':' tc=[TYPE_COMMENT] b=block {
+    | 'with' a=','.with_item+ ':' tc=[type_comment_str] b=block {
         ast.With(items=a, body=b, type_comment=tc, LOCATIONS)
      }
     | 'async' 'with' '(' a=','.with_item+ ','? ')' ':' b=block {
        ast.AsyncWith(items=a, body=b, LOCATIONS)
      }
-    | 'async' 'with' a=','.with_item+ ':' tc=[TYPE_COMMENT] b=block {
+    | 'async' 'with' a=','.with_item+ ':' tc=[type_comment_str] b=block {
        ast.AsyncWith(items=a, body=b, type_comment=tc, LOCATIONS) }
     | invalid_with_stmt
 
@@ -1294,8 +1294,8 @@ target_with_star_atom[ast.expr] (memo):
 star_atom[ast.expr]:
     | a=NAME { ast.Name(id=a.string, ctx=Store, LOCATIONS) }
     | '(' a1=target_with_star_atom ')' { self.set_expr_context(a1, Store) }
-    | '(' a2=[star_targets_tuple_seq] ')' { ast.Tuple(elts=a2, ctx=Store, LOCATIONS) }
-    | '[' a3=[star_targets_list_seq] ']' {  ast.List(elts=a3, ctx=Store, LOCATIONS) }
+    | '(' a2=[star_targets_tuple_seq] ')' { ast.Tuple(elts=a2 or [], ctx=Store, LOCATIONS) }
+    | '[' a3=[star_targets_list_seq] ']' {  ast.List(elts=a3 or [], ctx=Store, LOCATIONS) }
 
 single_target:
     | single_subscript_attribute_target
@@ -1326,7 +1326,7 @@ t_lookahead: '(' | '[' | '.'
 # Targets for del statements
 # --------------------------
 
-del_targets: a=','.del_target+ [','] { a }
+del_targets[list[ast.expr]]: a=','.del_target+ [','] { a }
 
 del_target[ast.expr] (memo):
     | a=t_primary '.' b=NAME !t_lookahead { ast.Attribute(value=a, attr=b.string, ctx=Del, LOCATIONS) }
@@ -1336,17 +1336,20 @@ del_target[ast.expr] (memo):
 del_t_atom[ast.expr]:
     | a=NAME { ast.Name(id=a.string, ctx=Del, LOCATIONS) }
     | '(' b=del_target ')' { self.set_expr_context(b, Del) }
-    | '(' c=[del_targets] ')' { ast.Tuple(elts=c, ctx=Del, LOCATIONS) }
-    | '[' c=[del_targets] ']' { ast.List(elts=c, ctx=Del, LOCATIONS) }
+    | '(' c=[del_targets] ')' { ast.Tuple(elts=c or [], ctx=Del, LOCATIONS) }
+    | '[' c=[del_targets] ']' { ast.List(elts=c or [], ctx=Del, LOCATIONS) }
 
 
 # TYPING ELEMENTS
 # ---------------
 
+type_comment_str[str]:
+    | t=TYPE_COMMENT { t.string }
+
 func_type_comment[str]:
     | NEWLINE t=TYPE_COMMENT &(NEWLINE INDENT) { t.string }  # Must be followed by indented block
     | invalid_double_type_comments
-    | t=TYPE_COMMENT { t.string }
+    | type_comment_str
 
 # ========================= END OF THE GRAMMAR ===========================
 

@@ -74,7 +74,6 @@ T = TypeVar("T")
 TR = TypeVar("TR")  # repeated
 TS = TypeVar("TS")
 TG = TypeVar("TG")
-TCtx = ast.Name | ast.Attribute
 P = TypeVar("P", bound="Parser")
 P1 = ParamSpec("P1")
 F = TypeVar("F", bound=Callable[..., Any])
@@ -486,9 +485,10 @@ class Parser:
             return None
         return node
 
-    def set_expr_context(self, node: TCtx, context: ast.Load | ast.Store | ast.Del) -> TCtx:
+    def set_expr_context(self, node: T, context: ast.Load | ast.Store | ast.Del) -> T:
         """Set the context (Load, Store, Del) of an ast node."""
-        node.ctx = context
+        if hasattr(node, "ctx"):
+            node.ctx = context
         return node
 
     def ensure_real(self, number: TokenInfo) -> float | int:
