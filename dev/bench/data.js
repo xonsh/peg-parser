@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1729088288021,
+  "lastUpdate": 1729563271749,
   "repoUrl": "https://github.com/xonsh/peg-parser",
   "entries": {
     "Python Benchmark": [
@@ -350,6 +350,58 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.02914668072992165",
             "extra": "mean: 1.2591275293999957 sec\nrounds: 5"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jnoortheen@gmail.com",
+            "name": "Noortheen Raja",
+            "username": "jnoortheen"
+          },
+          "committer": {
+            "email": "jnoortheen@gmail.com",
+            "name": "Noortheen Raja",
+            "username": "jnoortheen"
+          },
+          "distinct": true,
+          "id": "923bfb1e3d71ae339240678214194da6f6394ecd",
+          "message": "fix: mypy linter errors",
+          "timestamp": "2024-10-16T22:49:34+05:30",
+          "tree_id": "de45543280004335d9588cfeae7e41c63e699834",
+          "url": "https://github.com/xonsh/peg-parser/commit/923bfb1e3d71ae339240678214194da6f6394ecd"
+        },
+        "date": 1729563271287,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks.py::test_small_string[PegenParser]",
+            "value": 1023.7818968075352,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000057225647509708735",
+            "extra": "mean: 976.7705437245039 usec\nrounds: 263"
+          },
+          {
+            "name": "tests/benchmarks.py::test_small_string[PlyParser]",
+            "value": 4788.44064460204,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000028355508958528326",
+            "extra": "mean: 208.836252596613 usec\nrounds: 289"
+          },
+          {
+            "name": "tests/benchmarks.py::test_large_file[PegenParser]",
+            "value": 0.2742041066861028,
+            "unit": "iter/sec",
+            "range": "stddev: 0.04113968614773901",
+            "extra": "mean: 3.6469183925999973 sec\nrounds: 5"
+          },
+          {
+            "name": "tests/benchmarks.py::test_large_file[PlyParser]",
+            "value": 0.8114129856948112,
+            "unit": "iter/sec",
+            "range": "stddev: 0.012042694906141857",
+            "extra": "mean: 1.2324180381999952 sec\nrounds: 5"
           }
         ]
       }
