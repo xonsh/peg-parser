@@ -23,10 +23,12 @@ def get_parser_cls(version: tuple[int, ...] | None = None) -> type["BaseParser"]
     return import_module(module).Parser
 
 
-def write_parser_table(yacc_debug=False, output_path: None | Path | str = None, **kwargs) -> Path:
-    from .ply import yacc
+def write_parser_table(
+    yacc_debug=False, output_path: None | Path | str = None, version=None, **kwargs
+) -> Path:
+    from .ply import write_utils, yacc
 
-    cls = get_parser_cls()
+    cls = get_parser_cls(version)
 
     if output_path is None:
         output_path = cls.default_table_name()
@@ -36,13 +38,9 @@ def write_parser_table(yacc_debug=False, output_path: None | Path | str = None, 
     if output_path.exists():
         return output_path
 
-    yacc_kwargs = dict(
-        module=cls(is_write_table=True, **kwargs),
+    parser = yacc.yacc(
         debug=yacc_debug,
         start="start_symbols",
-        output_path=str(output_path),
+        module=cls(is_write_table=True, **kwargs),
     )
-    if not yacc_debug:
-        yacc_kwargs["errorlog"] = yacc.NullLogger()
-    # create parser on main thread
-    return Path(yacc.yacc(**yacc_kwargs))
+    return write_utils.write_to_file(parser, output_path=output_path)
