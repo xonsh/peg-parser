@@ -1,7 +1,8 @@
 from pathlib import Path
 
 import pytest
-from xonsh_parser.parsers.preprocessor import translex
+
+from ply_parser.parsers.preprocessor import translex
 
 
 def get_pairs(dir_name: str):

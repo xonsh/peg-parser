@@ -3,8 +3,9 @@
 import ast as pyast
 
 import pytest
-from xonsh_parser import xast as ast
-from xonsh_parser.xast import BinOp, Call, Name, Store, Tuple, min_line
+
+from ply_parser import xast as ast
+from ply_parser.xast import BinOp, Call, Name, Store, Tuple, min_line
 
 
 def test_gather_names_name():
@@ -106,7 +107,7 @@ def test_unmodified(inp, xonsh_execer_parse):
     # Context sensitive parsing should not modify AST
     exp = pyast.parse(inp)
     obs = xonsh_execer_parse(inp)
-    from tests.tools import nodes_equal
+    from .tools import nodes_equal
 
     assert nodes_equal(exp, obs)
 

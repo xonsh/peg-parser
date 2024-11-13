@@ -6,14 +6,14 @@ import inspect
 import sys
 import types
 
-from xonsh_parser.parser import get_parser_cls
-from xonsh_parser.tools import (
+from .parser import get_parser_cls
+from .tools import (
     get_logical_line,
     replace_logical_line,
     starting_whitespace,
     subproc_toks,
 )
-from xonsh_parser.xast import CtxAwareTransformer
+from .xast import CtxAwareTransformer
 
 
 class Execer:

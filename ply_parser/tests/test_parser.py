@@ -6,8 +6,9 @@ import textwrap
 from ast import Str
 
 import pytest
-from xonsh_parser.parsers.fstring_adaptor import FStringAdaptor
-from xonsh_parser.xast import AST, Call, Pass, With
+
+from ply_parser.parsers.fstring_adaptor import FStringAdaptor
+from ply_parser.xast import AST, Call, Pass, With
 
 #
 # Tests

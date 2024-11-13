@@ -7,14 +7,13 @@ from ast import parse as pyparse
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 
-from xonsh_parser import xast as ast
-from xonsh_parser.lexer import Lexer, LexToken
-from xonsh_parser.tokenize import SearchPath, StringPrefix
-from xonsh_parser.xast import load_attribute_chain, xonsh_call
-
+from .. import xast as ast
 from ..lazyasd import LazyObject
+from ..lexer import Lexer, LexToken
 from ..platform import PYTHON_VERSION_INFO
 from ..ply import lrparser
+from ..tokenize import SearchPath, StringPrefix
+from ..xast import load_attribute_chain, xonsh_call
 from .context_check import check_contexts
 from .fstring_adaptor import FStringAdaptor
 

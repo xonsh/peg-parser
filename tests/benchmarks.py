@@ -60,6 +60,19 @@ class PlyParser(BaseParser):
         return self.parser.parse(file.read_text())
 
 
+class PlyV2Parser(BaseParser):
+    def __init__(self):
+        from ply_parser.parser import get_parser_cls
+
+        self.parser = get_parser_cls()()
+
+    def parse_string(self, src_txt):
+        return self.parser.parse(src_txt)
+
+    def parse_file(self, file):
+        return self.parser.parse(file.read_text())
+
+
 class TreeSitter(BaseParser):
     def __init__(self):
         try:

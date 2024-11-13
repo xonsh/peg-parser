@@ -3,7 +3,7 @@
 import ast
 from collections.abc import Iterable
 
-from xonsh_parser import tokenize_rt
+from .. import tokenize_rt
 
 
 def _translex(src: str) -> Iterable[str]:

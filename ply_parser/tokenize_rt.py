@@ -10,7 +10,7 @@ from collections.abc import Generator, Iterable, Sequence
 from re import Pattern
 from typing import NamedTuple
 
-from xonsh_parser import tokenize
+from . import tokenize
 
 ESCAPED_NL = "ESCAPED_NL"
 UNIMPORTANT_WS = "UNIMPORTANT_WS"

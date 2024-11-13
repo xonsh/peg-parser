@@ -2,7 +2,7 @@
 
 
 def main():
-    from xonsh_parser.parser import get_parser_cls
+    from ply_parser.parser import get_parser_cls
 
     parser = get_parser_cls()()
 
@@ -19,7 +19,7 @@ def main():
 def _write_tmp(name: str = "xonsh-lr-table", ext="py"):
     from pathlib import Path
 
-    from xonsh_parser.parser import write_parser_table
+    from ply_parser.parser import write_parser_table
 
     path = Path(f"/tmp/{name}.{ext}")
     if path.exists():
