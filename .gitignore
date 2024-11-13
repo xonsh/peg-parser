@@ -130,6 +130,8 @@ uv.lock
 
 .testmondata*
 
+prof/
+
 # pytest-benchmark
 benchmark_*.svg
 .benchmarks/
