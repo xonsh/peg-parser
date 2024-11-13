@@ -61,10 +61,6 @@ def write_to_file(lr: LRTable, output_path: Path = None) -> Path:
             fw.write(f"productions : Final = {productions!r}\n")
             fw.write(f"actions : Final = {actions!r}\n")
             fw.write(f"gotos : Final = {gotos!r}\n")
-    elif output_path.suffix == ".cpickle":
-        from .save_table import write
-
-        write(productions, actions, gotos, output_path)
     else:
         # write to a pickle file
         import pickle

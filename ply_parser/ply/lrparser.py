@@ -537,11 +537,6 @@ def load_parser(parser_table: Path | str, module: ParserProtocol) -> LRParser:
             lr_action = ns["actions"]
             lr_goto = ns["gotos"]
 
-    elif parser_table.suffix == ".cpickle":
-        from . import save_table
-
-        lr_prods, lr_action, lr_goto = save_table.load(str(parser_table))
-        del save_table
     elif parser_table.suffix == ".jsonl":
         import json
 
