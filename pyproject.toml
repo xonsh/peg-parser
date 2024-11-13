@@ -7,6 +7,9 @@ extend-exclude = [
     "benchmarks",
     "tasks/bench_utils.py",
     "peg_parser/parser/untokenizer.py",
+    "ply_parser/tests/line-items",
+    "ply_parser/ply/save_table.py",
+    "ply_parser/ply/yacc.py",
 ]
 
 [tool.ruff.lint]
@@ -72,8 +75,53 @@ extend-safe-fixes = ["FA", "TCH", "PT"]
 "*/token.py" = [
     "N802", # function name should be lowercase
 ]
-
-
+"ply_parser/*.py" = [
+    "PLR0913", # too many arguments
+    "N8", # pep8 naming
+    "UP", # pyupgrade
+    "PLR",  # pylint
+    "C901", # too complex
+    "SIM", # simplification
+    "PIE", # flake8-pie
+    "RUF",
+    "PERF", # performance
+    "E721",
+    "E741",
+    "C408", # Unnecessary `dict` call (rewrite as a literal)
+    "A001",
+    "A002"
+]
+"ply_parser/tests/*.py" = [
+    "C4",
+    "PT011",
+    "B017",
+    "F821",
+    "B021",
+    "A002", # builtin shadowing
+    "B007", # Loop control variable `rule` not used within loop body
+]
+"ply_parser/ply/*.py" = [
+    "B007", # Loop control variable `rule` not used within loop body
+    "PLW", # pylint warning
+    "B904",
+    "E741", # Ambiguous variable name: `l`
+    "E731",
+    "A0",
+    "C419",
+    "C408"
+]
+"ply_parser/parsers/*.py" = [
+    "C419", # unnecessary comprehension
+    "E741", # Ambiguous variable name: `l`
+    "C408", # Unnecessary `dict` call (rewrite as a literal)
+    "C416",
+    "A001",
+    "A002",
+    "PLW2901",
+]
+"ply_parser/xast.py" = [
+    "F401"
+]
 [tool.pytest.ini_options]
 log_file = "pytest.log"
 log_file_level = "DEBUG"
