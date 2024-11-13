@@ -1,5 +1,6 @@
 """Implements the base xonsh parser."""
 
+import itertools
 import re
 import textwrap
 import typing as tp
@@ -234,7 +235,29 @@ class BaseParser:
         self._attach_nonewline_base_rules()
         self._attach_subproc_arg_part_rules()
 
-        opt_rules = [
+        for rule in self._get_optionals():
+            self._opt_rule(rule)
+
+        for rule in self._get_list_rules():
+            self._list_rule(rule)
+
+        for rule in self._get_tok_rules():
+            self._tok_rule(rule)
+
+        parser_table = parser_table or self.default_table_name()
+
+        if not is_write_table:
+            # create parser on main thread
+            self.parser: None | lrparser.LRParser = lrparser.load_parser(parser_table, module=self)
+        else:
+            self.parser = None
+
+        # Keeps track of the last token given to yacc (the lookahead token)
+        self._last_yielded_token = None
+        self._error = None
+
+    def _get_optionals(self):
+        return [
             "newlines",
             "arglist",
             "func_call",
@@ -279,10 +302,9 @@ class BaseParser:
             "macroarglist",
             "any_raw_toks",
         ]
-        for rule in opt_rules:
-            self._opt_rule(rule)
 
-        list_rules = [
+    def _get_list_rules(self):
+        return [
             "comma_tfpdef",
             "comma_vfpdef",
             "semi_small_stmt",
@@ -315,10 +337,9 @@ class BaseParser:
             "equals_yield_expr_or_testlist",
             "comma_nocomma",
         ]
-        for rule in list_rules:
-            self._list_rule(rule)
 
-        tok_rules = [
+    def _get_tok_rules(self):
+        return [
             "def",
             "class",
             "return",
@@ -413,23 +434,7 @@ class BaseParser:
             "xorequal",
             "match",
             "case",
-            "await",
-            "async",
         ]
-        for rule in tok_rules:
-            self._tok_rule(rule)
-
-        parser_table = parser_table or self.default_table_name()
-
-        if not is_write_table:
-            # create parser on main thread
-            self.parser: None | lrparser.LRParser = lrparser.load_parser(parser_table, module=self)
-        else:
-            self.parser = None
-
-        # Keeps track of the last token given to yacc (the lookahead token)
-        self._last_yielded_token = None
-        self._error = None
 
     @classmethod
     def default_table_name(cls) -> Path:
@@ -794,6 +799,10 @@ class BaseParser:
         p1, p2 = p[1], p[2]
         targ = p2[0]
         targ.decorator_list = p1
+        # this is silly, CPython. This claims a func or class starts on
+        # the line of the first decorator, rather than the 'def' or 'class'
+        # line.  However, it retains the original col_offset.
+        targ.lineno = p1[0].lineno
         # async functions take the col number of the 'def', unless they are
         # decorated, in which case they have the col of the 'async'. WAT?
         if hasattr(targ, "_async_tok"):
@@ -881,74 +890,34 @@ class BaseParser:
     def p_typedargslist_times5_tdpdef(self, p):
         """typedargslist : TIMES tfpdef comma_tfpdef_list comma_pow_tfpdef_opt"""
         # *args, x, **kwargs
-        p0 = ast.arguments(
-            posonlyargs=[],
-            args=[],
-            vararg=None,
-            kwonlyargs=[],
-            kw_defaults=[],
-            kwarg=p[4],
-            defaults=[],
-        )
+        p0 = ast.arguments(args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=p[4], defaults=[])
         self._set_var_args(p0, p[2], p[3])  # *args
         p[0] = p0
 
     def p_typedargslist_times5_comma(self, p):
         """typedargslist : TIMES comma_tfpdef_list comma_pow_tfpdef_opt"""
         # *, x, **kwargs
-        p0 = ast.arguments(
-            posonlyargs=[],
-            args=[],
-            vararg=None,
-            kwonlyargs=[],
-            kw_defaults=[],
-            kwarg=p[3],
-            defaults=[],
-        )
+        p0 = ast.arguments(args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=p[3], defaults=[])
         self._set_var_args(p0, None, p[2])  # *args
         p[0] = p0
 
     def p_typedargslist_t5(self, p):
         """typedargslist : tfpdef equals_test_opt comma_tfpdef_list_opt comma_opt"""
         # x
-        p0 = ast.arguments(
-            posonlyargs=[],
-            args=[],
-            vararg=None,
-            kwonlyargs=[],
-            kw_defaults=[],
-            kwarg=None,
-            defaults=[],
-        )
+        p0 = ast.arguments(args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[])
         self._set_regular_args(p0, p[1], p[2], p[3], p[4])
         p[0] = p0
 
     def p_typedargslist_t7(self, p):
         """typedargslist : tfpdef equals_test_opt comma_tfpdef_list_opt comma_opt POW tfpdef"""
         # x, **kwargs
-        p0 = ast.arguments(
-            posonlyargs=[],
-            args=[],
-            vararg=None,
-            kwonlyargs=[],
-            kw_defaults=[],
-            kwarg=p[6],
-            defaults=[],
-        )
+        p0 = ast.arguments(args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=p[6], defaults=[])
         self._set_regular_args(p0, p[1], p[2], p[3], p[4])
         p[0] = p0
 
     def p_typedargslist_t8(self, p):
         """typedargslist : tfpdef equals_test_opt comma_tfpdef_list_opt comma_opt TIMES tfpdef_opt comma_tfpdef_list_opt"""
-        p0 = ast.arguments(
-            posonlyargs=[],
-            args=[],
-            vararg=None,
-            kwonlyargs=[],
-            kw_defaults=[],
-            kwarg=None,
-            defaults=[],
-        )
+        p0 = ast.arguments(args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[])
         self._set_regular_args(p0, p[1], p[2], p[3], p[4])
         self._set_var_args(p0, p[6], p[7])
         p[0] = p0
@@ -956,15 +925,7 @@ class BaseParser:
     def p_typedargslist_t10(self, p):
         """typedargslist : tfpdef equals_test_opt comma_tfpdef_list_opt comma_opt TIMES tfpdef_opt COMMA POW vfpdef"""
         # x, *args, **kwargs
-        p0 = ast.arguments(
-            posonlyargs=[],
-            args=[],
-            vararg=None,
-            kwonlyargs=[],
-            kw_defaults=[],
-            kwarg=p[9],
-            defaults=[],
-        )
+        p0 = ast.arguments(args=[], vararg=None, kwonlyargs=[], kw_defaults=[], kwarg=p[9], defaults=[])
         self._set_regular_args(p0, p[1], p[2], p[3], p[4])
         self._set_var_args(p0, p[6], None)
         p[0] = p0
@@ -983,21 +944,6 @@ class BaseParser:
         )
         self._set_regular_args(p0, p[1], p[2], p[3], p[4])
         self._set_var_args(p0, p[6], p[7])
-        p[0] = p0
-
-    def p_typedargslist_t12(self, p):
-        """
-        typedargslist : posonlyargslist comma_opt
-                      | posonlyargslist COMMA typedargslist
-        """
-        if len(p) == 4:
-            p0 = p[3]
-            p0.posonlyargs = p[1].posonlyargs
-            # If posonlyargs contain default arguments, all following arguments must have defaults.
-            if p[1].defaults and (len(p[3].defaults) != len(p[3].args)):
-                self._set_error("non-default argument follows default argument")
-        else:
-            p0 = p[1]
         p[0] = p0
 
     def p_colon_test(self, p):
@@ -1311,25 +1257,6 @@ class BaseParser:
             )
         p[0] = ast.AugAssign(target=p1, op=op(), value=p[3], lineno=p1.lineno, col_offset=p1.col_offset)
 
-    def p_expr_stmt_annassign(self, p):
-        """expr_stmt : testlist_star_expr COLON test EQUALS test
-        | testlist_star_expr COLON test
-        """
-        p1 = p[1][0]
-        lineno, col = lopen_loc(p1)
-        if len(p[1]) > 1 or not isinstance(p1, (ast.Name, ast.Attribute, ast.Subscript)):
-            loc = self.currloc(lineno, col)
-            self._set_error("only single target can be annotated", loc)
-        store_ctx(p1)
-        p[0] = ast.AnnAssign(
-            target=p1,
-            annotation=p[3],
-            value=p[5] if len(p) >= 6 else None,
-            simple=1,
-            lineno=lineno,
-            col_offset=col,
-        )
-
     def store_star_expr(self, p1, p2, targs, rhs):
         """Stores complex unpacking statements that target *x variables."""
         p1 = [] if p1 is None else p1
@@ -1479,13 +1406,9 @@ class BaseParser:
         p[0] = ast.Continue(lineno=self.lineno, col_offset=self.col)
 
     def p_return_stmt(self, p):
-        """return_stmt : return_tok testlist_star_expr_opt"""
+        """return_stmt : return_tok testlist_opt"""
         p1 = p[1]
-        p[0] = ast.Return(
-            value=p[2][0] if p[2] is not None else None,
-            lineno=p1.lineno,
-            col_offset=p1.lexpos,
-        )
+        p[0] = ast.Return(value=p[2], lineno=p1.lineno, col_offset=p1.lexpos)
 
     def p_yield_stmt(self, p):
         """yield_stmt : yield_expr"""
@@ -1657,7 +1580,7 @@ class BaseParser:
         p[0] = p[1]
 
     def p_elif_part(self, p):
-        """elif_part : ELIF namedexpr_test COLON suite"""
+        """elif_part : ELIF test COLON suite"""
         p2 = p[2]
         p[0] = [
             ast.If(
@@ -1675,8 +1598,8 @@ class BaseParser:
 
     def p_if_stmt(self, p):
         """
-        if_stmt : if_tok namedexpr_test COLON suite elif_part_list_opt
-                | if_tok namedexpr_test COLON suite elif_part_list_opt else_part
+        if_stmt : if_tok test COLON suite elif_part_list_opt
+                | if_tok test COLON suite elif_part_list_opt else_part
         """
         p1 = p[1]
         lastif = ast.If(test=p[2], body=p[4], orelse=[], lineno=p1.lineno, col_offset=p1.lexpos)
@@ -1692,8 +1615,8 @@ class BaseParser:
 
     def p_while_stmt(self, p):
         """
-        while_stmt : WHILE namedexpr_test COLON suite
-                   | WHILE namedexpr_test COLON suite else_part
+        while_stmt : WHILE test COLON suite
+                   | WHILE test COLON suite else_part
         """
         p5 = p[5] if len(p) > 5 else []
         p[0] = [ast.While(test=p[2], body=p[4], orelse=p5, lineno=self.lineno, col_offset=self.col)]
@@ -2428,22 +2351,22 @@ class BaseParser:
     def p_atom_ellip(self, p):
         """atom : ellipsis_tok"""
         p1 = p[1]
-        p[0] = ast.EllipsisNode(lineno=p1.lineno, col_offset=p1.lexpos)
+        p[0] = ast.Constant(value=..., lineno=p1.lineno, col_offset=p1.lexpos)
 
     def p_atom_none(self, p):
         """atom : none_tok"""
         p1 = p[1]
-        p[0] = ast.NameConstant(value=None, lineno=p1.lineno, col_offset=p1.lexpos)
+        p[0] = ast.const_name(value=None, lineno=p1.lineno, col_offset=p1.lexpos)
 
     def p_atom_true(self, p):
         """atom : true_tok"""
         p1 = p[1]
-        p[0] = ast.NameConstant(value=True, lineno=p1.lineno, col_offset=p1.lexpos)
+        p[0] = ast.const_name(value=True, lineno=p1.lineno, col_offset=p1.lexpos)
 
     def p_atom_false(self, p):
         """atom : false_tok"""
         p1 = p[1]
-        p[0] = ast.NameConstant(value=False, lineno=p1.lineno, col_offset=p1.lexpos)
+        p[0] = ast.const_name(value=False, lineno=p1.lineno, col_offset=p1.lexpos)
 
     def p_atom_pathsearch(self, p):
         """atom : SEARCHPATH"""
@@ -2547,7 +2470,7 @@ class BaseParser:
             p[0] = xonsh_call("__xonsh__.path_literal", [s], lineno=p1.lineno, col=p1.lexpos)
         elif "p" in prefix:
             value_without_p = prefix.replace("p", "") + p1.value[len(prefix) :]
-            s = ast.Str(
+            s = ast.const_str(
                 s=ast.literal_eval(value_without_p),
                 lineno=p1.lineno,
                 col_offset=p1.lexpos,
@@ -2571,7 +2494,7 @@ class BaseParser:
             s = ast.literal_eval(p1.value)
             is_bytes = "b" in prefix
             is_raw = "r" in prefix
-            cls = ast.Bytes if is_bytes else ast.Str
+            cls = ast.const_bytes if is_bytes else ast.const_str
             p[0] = cls(s=s, lineno=p1.lineno, col_offset=p1.lexpos, is_raw=is_raw)
 
     def p_string_literal_list(self, p):
@@ -2661,19 +2584,19 @@ class BaseParser:
     def p_number(self, p):
         """number : number_tok"""
         p1 = p[1]
-        p[0] = ast.Num(
+        p[0] = ast.const_num(
             n=ast.literal_eval(p1.value.replace("_", "")),
             lineno=p1.lineno,
             col_offset=p1.lexpos,
         )
 
     def p_testlist_comp_comp(self, p):
-        """testlist_comp : namedexpr_test_or_star_expr comp_for"""
+        """testlist_comp : test_or_star_expr comp_for"""
         p1, p2 = p[1], p[2]
         p[0] = ast.GeneratorExp(elt=p1, generators=p2["comps"], lineno=p1.lineno, col_offset=p1.col_offset)
 
     def p_testlist_comp_comma(self, p):
-        """testlist_comp : namedexpr_test_or_star_expr comma_opt"""
+        """testlist_comp : test_or_star_expr comma_opt"""
         p1, p2 = p[1], p[2]
         if p2 is None:  # split out grouping parentheses.
             p[0] = p1
@@ -2681,13 +2604,13 @@ class BaseParser:
             p[0] = ast.Tuple(elts=[p1], ctx=ast.Load(), lineno=p1.lineno, col_offset=p1.col_offset)
 
     def p_testlist_comp_many(self, p):
-        """testlist_comp : namedexpr_test_or_star_expr comma_namedexpr_test_or_star_expr_list comma_opt"""
+        """testlist_comp : test_or_star_expr comma_test_or_star_expr_list comma_opt"""
         p1, p2 = p[1], p[2]
         p[0] = ast.Tuple(elts=[p1] + p2, ctx=ast.Load(), lineno=p1.lineno, col_offset=p1.col_offset)
 
     def p_trailer_lparen(self, p):
         """trailer : LPAREN arglist_opt RPAREN"""
-        p[0] = [p[2] or dict(args=[], keywords=[], starargs=None, kwargs=None)]
+        p[0] = [p[2] or dict(args=[], keywords=[])]
 
     def p_trailer_bang_lparen(self, p):
         """
@@ -2712,7 +2635,7 @@ class BaseParser:
                 else:
                     msg = "empty macro arguments not allowed"
                     self._set_error(msg, self.currloc(*beg))
-            node = ast.Str(s=s, lineno=beg[0], col_offset=beg[1])
+            node = ast.const_str(s=s, lineno=beg[0], col_offset=beg[1])
             elts.append(node)
         p0 = ast.Tuple(elts=elts, ctx=ast.Load(), lineno=p1.lineno, col_offset=p1.lexpos)
         p[0] = [p0]
@@ -3002,8 +2925,6 @@ class BaseParser:
             name=p[2],
             bases=b,
             keywords=kw,
-            starargs=None,
-            kwargs=None,
             body=p[5],
             decorator_list=[],
             lineno=p1.lineno,
@@ -3037,7 +2958,6 @@ class BaseParser:
             comps += p5.get("comps", [])
             comp.ifs += p5.get("if", [])
         p[0] = p0
-        p[0]["comps"][0].is_async = 0
 
     def p_comp_if(self, p):
         """comp_if : IF test_nocond comp_iter_opt"""
@@ -3062,6 +2982,10 @@ class BaseParser:
     def p_yield_arg_from(self, p):
         """yield_arg : FROM test"""
         p[0] = {"from": True, "val": p[2]}
+
+    def p_yield_arg_testlist(self, p):
+        """yield_arg : testlist"""
+        p[0] = {"from": False, "val": p[1]}
 
     #
     # subprocess
@@ -3125,12 +3049,10 @@ class BaseParser:
         return ast.Call(
             func=func,
             args=[
-                ast.Str(s=var, lineno=lineno, col_offset=col),
-                ast.Str(s="", lineno=lineno, col_offset=col),
+                ast.const_str(s=var, lineno=lineno, col_offset=col),
+                ast.const_str(s="", lineno=lineno, col_offset=col),
             ],
             keywords=[],
-            starargs=None,
-            kwargs=None,
             lineno=lineno,
             col_offset=col,
         )
@@ -3138,7 +3060,7 @@ class BaseParser:
     def _envvar_by_name(self, var, lineno=None, col=None):
         """Looks up a xonsh variable by name."""
         xenv = load_attribute_chain("__xonsh__.env", lineno=lineno, col=col)
-        idx = ast.Index(value=ast.Str(s=var, lineno=lineno, col_offset=col))
+        idx = ast.Index(value=ast.const_str(s=var, lineno=lineno, col_offset=col))
         return ast.Subscript(value=xenv, slice=idx, ctx=ast.Load(), lineno=lineno, col_offset=col)
 
     def _subproc_cliargs(self, args, lineno=None, col=None):
@@ -3176,7 +3098,7 @@ class BaseParser:
              | PIPE WS
              | WS PIPE WS
         """
-        p[0] = ast.Str(s="|", lineno=self.lineno, col_offset=self.col)
+        p[0] = ast.const_str(s="|", lineno=self.lineno, col_offset=self.col)
 
     def p_amper(self, p):
         """
@@ -3185,7 +3107,7 @@ class BaseParser:
               | AMPERSAND WS
               | WS AMPERSAND WS
         """
-        p[0] = ast.Str(s="&", lineno=self.lineno, col_offset=self.col)
+        p[0] = ast.const_str(s="&", lineno=self.lineno, col_offset=self.col)
 
     def p_subproc_s2(self, p):
         """
@@ -3210,7 +3132,7 @@ class BaseParser:
                 | subproc pipe subproc_atoms WS
         """
         p1 = p[1]
-        if len(p1) > 1 and hasattr(p1[-2], "s") and p1[-2].s != "|":
+        if len(p1) > 1 and hasattr(p1[-2], "value") and p1[-2].value != "|":
             self._set_error("additional redirect following non-pipe redirect")
         cliargs = self._subproc_cliargs(p[3], lineno=self.lineno, col=self.col)
         p[0] = p1 + [p[2], cliargs]
@@ -3237,9 +3159,9 @@ class BaseParser:
         subcmd = self._source_slice((l, c), (p3.lineno, p3.lexpos))
         subcmd = subcmd.strip() + "\n"
         p0 = [
-            ast.Str(s="xonsh", lineno=l, col_offset=c),
-            ast.Str(s="-c", lineno=l, col_offset=c),
-            ast.Str(s=subcmd, lineno=l, col_offset=c),
+            ast.const_str(s="xonsh", lineno=l, col_offset=c),
+            ast.const_str(s="-c", lineno=l, col_offset=c),
+            ast.const_str(s=subcmd, lineno=l, col_offset=c),
         ]
         for arg in p0:
             arg._cliarg_action = "append"
@@ -3264,7 +3186,7 @@ class BaseParser:
     def _append_subproc_bang_empty(self, p):
         """Appends an empty string in subprocess mode to the argument list."""
         p3 = p[3]
-        node = ast.Str(s="", lineno=p3.lineno, col_offset=p3.lexpos + 1)
+        node = ast.const_str(s="", lineno=p3.lineno, col_offset=p3.lexpos + 1)
         p[2][-1].elts.append(node)
 
     def _append_subproc_bang(self, p):
@@ -3275,7 +3197,7 @@ class BaseParser:
         beg = (p3.lineno, p3.lexpos + 1)
         end = (p5.lineno, p5.lexpos)
         s = self._source_slice(beg, end).strip()
-        node = ast.Str(s=s, lineno=beg[0], col_offset=beg[1])
+        node = ast.const_str(s=s, lineno=beg[0], col_offset=beg[1])
         p[2][-1].elts.append(node)
 
     def p_subproc_atom_uncaptured(self, p):
@@ -3325,10 +3247,8 @@ class BaseParser:
         func = ast.Attribute(value=xenv, attr="get", ctx=ast.Load(), lineno=lineno, col_offset=col)
         p0 = ast.Call(
             func=func,
-            args=[p[2], ast.Str(s="", lineno=lineno, col_offset=col)],
+            args=[p[2], ast.const_str(s="", lineno=lineno, col_offset=col)],
             keywords=[],
-            starargs=None,
-            kwargs=None,
             lineno=lineno,
             col_offset=col,
         )
@@ -3381,12 +3301,20 @@ class BaseParser:
 
     def p_subproc_atom_redirect(self, p):
         """
-        subproc_atom : GT
-                     | LT
-                     | RSHIFT
-                     | IOREDIRECT
+        subproc_atom : GT WS subproc_atom
+                     | LT WS subproc_atom
+                     | RSHIFT WS subproc_atom
+                     | IOREDIRECT1 WS subproc_atom
+                     | IOREDIRECT2
         """
-        p0 = ast.Str(s=p[1], lineno=self.lineno, col_offset=self.col)
+        operator = ast.const_str(s=p[1], lineno=self.lineno, col_offset=self.col)
+        elts = [operator] if len(p) == 2 else [operator, p[3]]
+        p0 = ast.Tuple(
+            elts=elts,
+            ctx=ast.Load(),
+            lineno=self.lineno,
+            col_offset=self.col,
+        )
         p0._cliarg_action = "append"
         p[0] = p0
 
@@ -3431,25 +3359,41 @@ class BaseParser:
         """subproc_arg : subproc_arg_part"""
         p[0] = p[1]
 
+    def _arg_part_combine(self, *arg_parts):
+        """Combines arg_parts. If all arg_parts are strings, concatenate the strings.
+        Otherwise, return a list of arg_parts."""
+        if all(ast.is_const_str(ap) for ap in arg_parts):
+            return ast.const_str(
+                "".join(ap.value for ap in arg_parts),
+                lineno=arg_parts[0].lineno,
+                col_offset=arg_parts[0].col_offset,
+            )
+        else:
+            return list(
+                itertools.chain.from_iterable(ap if isinstance(ap, list) else [ap] for ap in arg_parts)
+            )
+
     def p_subproc_arg_many(self, p):
         """subproc_arg : subproc_arg subproc_arg_part"""
         # This glues the string together after parsing
+        p[0] = self._arg_part_combine(p[1], p[2])
+
+    def p_subproc_arg_part_brackets(self, p):
+        """subproc_arg_part : lbracket_tok subproc_arg rbracket_tok"""
         p1 = p[1]
         p2 = p[2]
-        if isinstance(p1, ast.Str) and isinstance(p2, ast.Str):
-            p0 = ast.Str(p1.s + p2.s, lineno=p1.lineno, col_offset=p1.col_offset)
-        elif isinstance(p1, list):
-            if isinstance(p2, list):
-                p1.extend(p2)
-            else:
-                p1.append(p2)
-            p0 = p1
-        elif isinstance(p2, list):
-            p2.insert(0, p1)
-            p0 = p2
-        else:
-            p0 = [p1, p2]
-        p[0] = p0
+        p3 = p[3]
+        p1 = ast.const_str(s=p1.value, lineno=p1.lineno, col_offset=p1.lexpos)
+        p3 = ast.const_str(s=p3.value, lineno=p3.lineno, col_offset=p3.lexpos)
+        p[0] = self._arg_part_combine(p1, p2, p3)
+
+    def p_subproc_arg_part_brackets_empty(self, p):
+        """subproc_arg_part : lbracket_tok rbracket_tok"""
+        p1 = p[1]
+        p2 = p[2]
+        p1 = ast.const_str(s=p1.value, lineno=p1.lineno, col_offset=p1.lexpos)
+        p2 = ast.const_str(s=p2.value, lineno=p2.lineno, col_offset=p2.lexpos)
+        p[0] = self._arg_part_combine(p1, p2)
 
     def _attach_subproc_arg_part_rules(self):
         toks = set(self.tokens)
@@ -3464,7 +3408,8 @@ class BaseParser:
             "LT",
             "LSHIFT",
             "RSHIFT",
-            "IOREDIRECT",
+            "IOREDIRECT1",
+            "IOREDIRECT2",
             "SEARCHPATH",
             "INDENT",
             "DEDENT",
@@ -3491,7 +3436,7 @@ class BaseParser:
         # Many tokens cannot be part of this rule, such as $, ', ", ()
         # Use a string atom instead. See above attachment functions
         p1 = p[1]
-        p[0] = ast.Str(s=p1.value, lineno=p1.lineno, col_offset=p1.lexpos)
+        p[0] = ast.const_str(s=p1.value, lineno=p1.lineno, col_offset=p1.lexpos)
 
     def p_envvar_assign_left(self, p):
         """envvar_assign_left : dollar_name_tok EQUALS"""

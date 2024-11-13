@@ -41,7 +41,7 @@ def _object_size(data, decimal_places=2):
     return _humanize_bytes(size, decimal_places)
 
 
-def write_to_file(lr: LRTable, output_path: str = None) -> Path:
+def write_to_file(lr: LRTable, output_path: Path = None) -> Path:
     import json
 
     if not output_path:
@@ -50,18 +50,18 @@ def write_to_file(lr: LRTable, output_path: str = None) -> Path:
     productions, actions, gotos = optimize_table(lr)
     # print(f'data:\n{_object_size(productions)=}\n{_object_size(actions)=} {len(actions)=}\n{_object_size(gotos)=}')
 
-    if output_path.endswith(".jsonl"):
+    if output_path.suffix == ".jsonl":
         with open(output_path, "w") as fw:
             fw.write(json.dumps(productions) + "\n")
             fw.write(json.dumps(actions) + "\n")
             fw.write(json.dumps(gotos) + "\n")
-    elif output_path.endswith(".py"):
+    elif output_path.suffix == ".py":
         with open(output_path, "w") as fw:
             fw.write("from typing import Final\n")
             fw.write(f"productions : Final = {productions!r}\n")
             fw.write(f"actions : Final = {actions!r}\n")
             fw.write(f"gotos : Final = {gotos!r}\n")
-    elif output_path.endswith(".cpickle"):
+    elif output_path.suffix == ".cpickle":
         from .save_table import write
 
         write(productions, actions, gotos, output_path)
