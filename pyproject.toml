@@ -130,17 +130,12 @@ log_file_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(line
 # --benchmark-columns=mean,stddev,median,iqr,ops,rounds,iterations
 #addopts = "--benchmark-skip"
 
-
-
-[tool.pdm.dev-dependencies]
-dev = [
-    "flask>=3.0.3",
-    "flask-wtf>=1.2.1",
-    "ipython>=8.18.1",
-    "setuptools>=69.5.1",
-    "-e file:///${PROJECT_ROOT}/xonsh_tokenizer#egg=xonsh-tokenizer",
-    "maturin-import-hook>=0.1.0",
+[tool.uv.workspace]
+members = [
+  "xonsh_tokenizer",
 ]
+[tool.uv.sources]
+xonsh_tokenizer = { workspace = true }
 
 [project.optional-dependencies]
 test = [
@@ -153,6 +148,13 @@ test = [
     "xonsh>=0.12.0",
     "tree-sitter-python @ git+https://github.com/tree-sitter/tree-sitter-python",
     "maturin-import-hook>=0.1.0",
+]
+dev = [
+    "flask>=3.0.3",
+    "flask-wtf>=1.2.1",
+    "ipython>=8.18.1",
+    "setuptools>=69.5.1",
+    "xonsh-tokenizer",
 ]
 docs = ["mkdocs-material", "mkdocstrings[python]"]
 profile = [
