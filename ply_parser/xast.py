@@ -141,35 +141,31 @@ STATEMENTS = (
 
 
 def const_str(s: str, **kwargs):
-    return Constant(value=s, kind="str", **kwargs)
+    return Constant(value=s, **kwargs)
 
 
 def is_const_str(node):
-    return isinstance(node, Constant) and node.kind == "str"
+    return isinstance(node, Constant) and isinstance(node.value, str)
 
 
 def const_bytes(s: str, **kwargs):
-    return Constant(value=s, kind="bytes", **kwargs)
+    return Constant(value=s, **kwargs)
 
 
 def is_const_bytes(node):
-    return isinstance(node, Constant) and node.kind == "bytes"
+    return isinstance(node, Constant) and isinstance(node.value, bytes)
 
 
 def const_num(n, **kwargs):
-    return Constant(value=n, kind="num", **kwargs)
+    return Constant(value=n, **kwargs)
 
 
 def is_const_num(node):
-    return isinstance(node, Constant) and node.kind == "num"
+    return isinstance(node, Constant) and isinstance(node.value, (int, float))
 
 
 def const_name(value, **kwargs):
-    return Constant(value=value, kind="name", **kwargs)
-
-
-def is_const_name(node):
-    return isinstance(node, Constant) and node.kind == "name"
+    return Constant(value=value, **kwargs)
 
 
 def leftmostname(node):

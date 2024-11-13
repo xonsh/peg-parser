@@ -16,8 +16,11 @@ def unparse_diff(**trees: ast.AST):
     return "\n".join(difflib.unified_diff(left.split("\n"), right.split("\n"), orig_name, pp_name))
 
 
-def dump_diff(**trees: ast.AST):
-    kwargs = {"include_attributes": True, "indent": "  "}
+def dump_diff(
+    attrs=True,
+    **trees: ast.AST,
+):
+    kwargs = {"include_attributes": attrs, "indent": "  "}
     orig_name, pp_name = trees.keys()
     original, pp_ast = trees.values()
     o = ast.dump(original, **kwargs)

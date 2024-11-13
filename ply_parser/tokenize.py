@@ -26,7 +26,9 @@ import typing as tp
 from token import (
     AMPER,
     AMPEREQUAL,
+    ASYNC,
     AT,
+    AWAIT,
     CIRCUMFLEX,
     CIRCUMFLEXEQUAL,
     COLON,
@@ -1050,11 +1052,7 @@ def _tokenize(readline, encoding, tolerant=False, tokenize_ioredirects=True):
                         stashed = tok
                         continue
 
-                    if (
-                        HAS_ASYNC
-                        and token == "def"
-                        and (stashed and stashed.type == NAME and stashed.string == "async")
-                    ):
+                    if token == "def" and (stashed and stashed.type == NAME and stashed.string == "async"):
                         async_def = True
                         async_def_indent = indents[-1]
 

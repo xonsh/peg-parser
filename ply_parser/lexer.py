@@ -138,14 +138,14 @@ def handle_name(state, token):
             pass
         elif token.string in kwmod.kwlist + ["match", "case"]:
             typ = token.string.upper()
-        yield _new_token(typ, token.string, token.start)
+        yield _new_token(typ, token.string, token.start, token.end)
     else:
         if has_whitespace and token.string == "and":
-            yield _new_token("AND", token.string, token.start)
+            yield _new_token("AND", token.string, token.start, token.end)
         elif has_whitespace and token.string == "or":
-            yield _new_token("OR", token.string, token.start)
+            yield _new_token("OR", token.string, token.start, token.end)
         else:
-            yield _new_token("NAME", token.string, token.start)
+            yield _new_token("NAME", token.string, token.start, token.end)
 
 
 def _end_delimiter(state, token):
@@ -168,9 +168,9 @@ def handle_rparen(state, token):
     e = _end_delimiter(state, token)
     if e is None or state["tolerant"]:
         state["last"] = token
-        yield _new_token("RPAREN", ")", token.start)
+        yield _new_token("RPAREN", ")", token.start, token.end)
     else:
-        yield _new_token("ERRORTOKEN", e, token.start)
+        yield _new_token("ERRORTOKEN", e, token.start, token.end)
 
 
 def handle_rbrace(state, token):
@@ -178,9 +178,9 @@ def handle_rbrace(state, token):
     e = _end_delimiter(state, token)
     if e is None or state["tolerant"]:
         state["last"] = token
-        yield _new_token("RBRACE", "}", token.start)
+        yield _new_token("RBRACE", "}", token.start, token.end)
     else:
-        yield _new_token("ERRORTOKEN", e, token.start)
+        yield _new_token("ERRORTOKEN", e, token.start, token.end)
 
 
 def handle_rbracket(state, token):
@@ -190,9 +190,9 @@ def handle_rbracket(state, token):
     e = _end_delimiter(state, token)
     if e is None or state["tolerant"]:
         state["last"] = token
-        yield _new_token("RBRACKET", "]", token.start)
+        yield _new_token("RBRACKET", "]", token.start, token.end)
     else:
-        yield _new_token("ERRORTOKEN", e, token.start)
+        yield _new_token("ERRORTOKEN", e, token.start, token.end)
 
 
 def handle_error_space(state, token):
@@ -201,7 +201,7 @@ def handle_error_space(state, token):
     """
     if not state["pymode"][-1][0]:
         state["last"] = token
-        yield _new_token("WS", token.string, token.start)
+        yield _new_token("WS", token.string, token.start, token.end)
     else:
         yield from []
 
@@ -216,7 +216,7 @@ def handle_error_linecont(state, token):
     if prev.end != token.start:
         return  # previous token is separated by whitespace
     state["last"] = token
-    yield _new_token("WS", "\\", token.start)
+    yield _new_token("WS", "\\", token.start, token.end)
 
 
 def handle_error_token(state, token):
@@ -230,7 +230,7 @@ def handle_error_token(state, token):
         typ = "NAME"
     else:
         typ = "ERRORTOKEN"
-    yield _new_token(typ, token.string, token.start)
+    yield _new_token(typ, token.string, token.start, token.end)
 
 
 def handle_ignore(state, token):
@@ -239,11 +239,11 @@ def handle_ignore(state, token):
 
 
 def handle_double_amps(state, token):
-    yield _new_token("AND", "and", token.start)
+    yield _new_token("AND", "and", token.start, token.end)
 
 
 def handle_double_pipe(state, token):
-    yield _new_token("OR", "or", token.start)
+    yield _new_token("OR", "or", token.start, token.end)
 
 
 def handle_redirect(state, token):
@@ -254,7 +254,7 @@ def handle_redirect(state, token):
     typ = token.type
     st = token.string
     key = (typ, st) if (typ, st) in token_map else typ
-    new_tok = _new_token(token_map[key], st, token.start)
+    new_tok = _new_token(token_map[key], st, token.start, token.end)
     if state["pymode"][-1][0]:
         if typ in (IOREDIRECT1, IOREDIRECT2):
             # Fix Python mode code that was incorrectly recognized as an
@@ -266,7 +266,7 @@ def handle_redirect(state, token):
             # IOREDIRECT token.
             lineno, lexpos = token.start
             for tok in get_tokens(token.string, state["tolerant"], tokenize_ioredirects=False):
-                yield _new_token(tok.type, tok.value, (lineno, lexpos + tok.lexpos))
+                yield _new_token(tok.type, tok.value, (lineno, lexpos + tok.lexpos), token.end)
         else:
             yield new_tok
         return
@@ -274,7 +274,7 @@ def handle_redirect(state, token):
     # add a whitespace token after a redirection, if we need to
     next_tok = next(state["stream"])
     if next_tok.start == token.end:
-        yield _new_token("WS", "", token.end)
+        yield _new_token("WS", "", token.end, token.end)
     yield from handle_token(state, next_tok)
 
 
@@ -284,7 +284,7 @@ def _make_matcher_handler(tok, typ, pymode, ender, handlers):
     def _inner_handler(state, token):
         state["pymode"].append((pymode, tok, matcher, token.start))
         state["last"] = token
-        yield _new_token(typ, tok, token.start)
+        yield _new_token(typ, tok, token.start, token.end)
 
     handlers[(OP, tok)] = _inner_handler
 
@@ -354,20 +354,20 @@ def handle_token(state, token):
             cur = token.start
             old = state["last"].end
             if cur[0] == old[0] and cur[1] > old[1]:
-                yield _new_token("WS", token.line[old[1] : cur[1]], old)
+                yield _new_token("WS", token.line[old[1] : cur[1]], old, token.end)
     if (typ, st) in special_handlers:
         yield from special_handlers[(typ, st)](state, token)
     elif (typ, st) in token_map:
         state["last"] = token
-        yield _new_token(token_map[(typ, st)], st, token.start)
+        yield _new_token(token_map[(typ, st)], st, token.start, token.end)
     elif typ in special_handlers:
         yield from special_handlers[typ](state, token)
     elif typ in token_map:
         state["last"] = token
-        yield _new_token(token_map[typ], st, token.start)
+        yield _new_token(token_map[typ], st, token.start, token.end)
     else:
         m = f"Unexpected token: {token}"
-        yield _new_token("ERRORTOKEN", m, token.start)
+        yield _new_token("ERRORTOKEN", m, token.start, token.end)
 
 
 def get_tokens(s, tolerant, pymode=True, tokenize_ioredirects=True):
@@ -391,26 +391,22 @@ def get_tokens(s, tolerant, pymode=True, tokenize_ioredirects=True):
                 pm, o, m, p = state["pymode"][-1]
                 l, c = p
                 e = 'Unmatched "{}" at line {}, column {}'
-                yield _new_token("ERRORTOKEN", e.format(o, l, c), (0, 0))
+                yield _new_token("ERRORTOKEN", e.format(o, l, c), (0, 0), (0, 0))
             break
         except TokenError as e:
             # this is recoverable in single-line mode (from the shell)
             # (e.g., EOF while scanning string literal)
-            yield _new_token("ERRORTOKEN", e.args[0], (0, 0))
+            yield _new_token("ERRORTOKEN", e.args[0], (0, 0), (0, 0))
             break
         except IndentationError as e:
             # this is never recoverable
-            yield _new_token("ERRORTOKEN", e, (0, 0))
+            yield _new_token("ERRORTOKEN", e, (0, 0), (0, 0))
             break
 
 
 # synthesize a new PLY token
-def _new_token(type, value, pos):
-    o = LexToken()
-    o.type = type
-    o.value = value
-    o.lineno, o.lexpos = pos
-    return o
+def _new_token(type, value, pos: tuple[int, int], endpos: tuple[int, int]):
+    return LexToken(type, value, lineno=pos[0], lexpos=pos[1], endlineno=endpos[0], endlexpos=endpos[1])
 
 
 class Lexer:

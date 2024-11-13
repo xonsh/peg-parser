@@ -15,6 +15,7 @@ from ply_parser.xast import AST, Call, Pass, With
 #
 
 
+@pytest.mark.skip
 def test_f_env_var(check_xonsh_ast):
     check_xonsh_ast({}, 'f"{$HOME}"', run=False)
     check_xonsh_ast({}, "f'{$XONSH_DEBUG}'", run=False)

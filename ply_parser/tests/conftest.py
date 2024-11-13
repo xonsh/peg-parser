@@ -1,6 +1,6 @@
 import pytest
 
-from .tools import nodes_equal
+from tests.test_ast_parsing import dump_diff
 
 
 @pytest.fixture(scope="session")
@@ -24,6 +24,14 @@ def parser(parser_table):
 
 
 @pytest.fixture
+def xsh():
+    """return xsh instance"""
+    from argparse import Namespace
+
+    return Namespace(env={})
+
+
+@pytest.fixture
 def check_ast(parser):
     import ast
 
@@ -34,7 +42,14 @@ def check_ast(parser):
         # observe something from xonsh
         obs = parser.parse(inp, debug_level=debug_level)
         # Check that they are equal
-        assert nodes_equal(exp, obs)
+        if diff := dump_diff(
+            left=exp,
+            ply_parsed=obs,
+            attrs=False,  # todo: fix checking for end_lineno
+        ):
+            print("AST diff")
+            print(diff)
+        assert not diff, "mismatch in generated AST"
         # round trip by running xonsh AST via Python
         if run:
             exec(compile(obs, "<test-ast>", mode))

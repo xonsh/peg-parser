@@ -20,7 +20,7 @@ def _not_assignable(x, augassign=False):
             res = _not_assignable(i)
             if res is not None:
                 return res
-    elif isinstance(x, (ast.Set, ast.Dict, ast.Num, ast.Str, ast.Bytes)):
+    elif isinstance(x, (ast.Set, ast.Dict, ast.Constant)):
         return "literal"
     elif isinstance(x, ast.Call):
         return "function call"
@@ -42,7 +42,7 @@ def _not_assignable(x, augassign=False):
         return "comparison"
     elif isinstance(x, ast.Name) and x.id in _all_keywords:
         return "keyword"
-    elif isinstance(x, ast.NameConstant):
+    elif isinstance(x, ast.Constant):
         return "keyword"
 
 
