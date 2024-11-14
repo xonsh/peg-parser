@@ -58,9 +58,9 @@ def nodes_equal(x, y):
         assert (
             xname == yname
         ), f"Ast nodes fields differ : {xname} (of type {type(xval)}) != {yname} (of type {type(yval)})"
-        assert type(xval) == type(
-            yval
-        ), f"Ast nodes fields differ : {xname} (of type {type(xval)}) != {yname} (of type {type(yval)})"
+        assert (
+            type(xval) == type(yval)
+        ), f"Ast nodes fields differ : {xname} (of type {type(xval)}: {xval}) != {yname} (of type {type(yval)}: {yval}): {ast.dump(y)}"
     for xchild, ychild in zip(ast.iter_child_nodes(x), ast.iter_child_nodes(y), strict=False):
         assert nodes_equal(xchild, ychild), "Ast node children differs"
     return True

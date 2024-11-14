@@ -24,6 +24,8 @@ from typing import (
     Union,
 )
 
+from rs_ply import StateMachine
+
 from .common import PlyLogger, format_result, format_stack_entry
 
 error_count: Final = 3  # Number of symbols that must be shifted to leave recovery mode
@@ -146,19 +148,14 @@ class LRParser:
 
     def __init__(
         self,
-        productions: tuple["Production", ...],
-        action: tuple[dict[str, int], ...],
-        goto: tuple[dict[str, int], ...],
+        fsm: StateMachine,
         errorf: Callable[[YaccSymbol | None], None] | None,
+        module: ParserProtocol,
     ) -> None:
-        self.productions = productions
-        # the int keys and values are very small around -2k to +2k
-        self.action = action
-        self.goto = goto
+        self.fsm = fsm  # finite state machine
         self.errorfunc = errorf
-        self.defaulted_states: dict[int, int] = {}
-        self.set_defaulted_states()
         self.errorok = True
+        self.module = module
 
     def errok(self) -> None:
         self.errorok = True
@@ -169,22 +166,6 @@ class LRParser:
         sym = YaccSymbol(type="$end")
         self.symstack.append(sym)
         self.statestack.append(0)
-
-    # Defaulted state support.
-    # This method identifies parser states where there is only one possible reduction action.
-    # For such states, the parser can make a choose to make a rule reduction without consuming
-    # the next look-ahead token.  This delayed invocation of the tokenizer can be useful in
-    # certain kinds of advanced parsing situations where the lexer and parser interact with
-    # each other or change states (i.e., manipulation of scope, lexer states, etc.).
-    #
-    # See:  http://www.gnu.org/software/bison/manual/html_node/Default-Reductions.html#Default-Reductions
-    def set_defaulted_states(self) -> None:
-        for state, actions in enumerate(self.action):
-            if isinstance(actions, int):
-                self.defaulted_states[state] = actions
-
-    def disable_defaulted_states(self) -> None:
-        self.defaulted_states.clear()
 
     # parse().
     #
@@ -208,10 +189,6 @@ class LRParser:
 
         lookahead: None | YaccSymbol = None  # Current lookahead symbol
         lookaheadstack: list[YaccSymbol] = []  # Stack of lookahead symbols
-        actions = self.action  # Local reference to action table (to avoid lookup on self.)
-        goto = self.goto  # Local reference to goto table (to avoid lookup on self.)
-        prod = self.productions  # Local reference to production list (to avoid lookup on self.)
-        defaulted_states = self.defaulted_states  # Local reference to defaulted states
         # Production object passed to grammar rules
         pslice = YaccProduction(lexer, self)
         errorcount = 0  # Used during error recovery
@@ -248,7 +225,11 @@ class LRParser:
             if logger:
                 logger.debug("State  : %s", state)
 
-            if state not in defaulted_states:
+            if (default_action := self.fsm.get_default_action(state)) is not None:
+                t = default_action
+                if logger:
+                    logger.debug("Defaulted state %s: Reduce using %d", state, -t)
+            else:
                 if not lookahead:
                     if not lookaheadstack:
                         lookahead = get_token()  # Get the next token
@@ -259,11 +240,7 @@ class LRParser:
 
                 # Check the action table
                 ltype = lookahead.type
-                t = actions[state].get(ltype)
-            else:
-                t = defaulted_states[state]
-                if logger:
-                    logger.debug("Defaulted state %s: Reduce using %d", state, -t)
+                t = self.fsm.get_action(state, ltype)
 
             if logger:
                 logger.debug(
@@ -291,7 +268,7 @@ class LRParser:
 
                 if t < 0:
                     # reduce a symbol on the stack, emit a production
-                    p = prod[-t]
+                    p = self.fsm.get_production(-t)
                     pname = p.name
                     plen = p.len
 
@@ -306,14 +283,14 @@ class LRParser:
                                 "["
                                 + ",".join([format_stack_entry(_v.value) for _v in symstack[-plen:]])
                                 + "]",
-                                goto[statestack[-1 - plen]][pname],
+                                self.fsm.get_goto(statestack[-1 - plen], pname),
                             )
                         else:
                             logger.info(
                                 "Action : Reduce rule [%s] with %s and goto state %d",
                                 p.str,
                                 [],
-                                goto[statestack[-1]][pname],
+                                self.fsm.get_goto(statestack[-1], pname),
                             )
 
                     if plen:
@@ -339,12 +316,12 @@ class LRParser:
                             # Call the grammar rule with our special slice object
                             del symstack[-plen:]
                             self.state = state
-                            p.callable(pslice)
+                            getattr(self.module, p.func)(pslice)
                             del statestack[-plen:]
                             if logger:
                                 logger.info("Result : %s", format_result(pslice[0]))
                             symstack.append(sym)
-                            state = goto[statestack[-1]][pname]
+                            state = self.fsm.get_goto(statestack[-1], pname)
                             statestack.append(state)
                         except SyntaxError:
                             # If an error was set. Enter error recovery state
@@ -378,11 +355,11 @@ class LRParser:
                         try:
                             # Call the grammar rule with our special slice object
                             self.state = state
-                            p.callable(pslice)
+                            getattr(self.module, p.func)(pslice)
                             if logger:
                                 logger.info("Result : %s", format_result(pslice[0]))
                             symstack.append(sym)
-                            state = goto[statestack[-1]][pname]
+                            state = self.fsm.get_goto(statestack[-1], pname)
                             statestack.append(state)
                         except SyntaxError:
                             # If an error was set. Enter error recovery state
@@ -524,40 +501,8 @@ class LRParser:
 
 
 def load_parser(parser_table: Path | str, module: ParserProtocol) -> LRParser:
-    if isinstance(parser_table, str):
-        parser_table = Path(parser_table)
-    if parser_table.suffix == ".py":
-        # Load the parser table
-        with parser_table.open("r") as fr:
-            code = compile(fr.read(), str(parser_table), "exec")
-            ns: dict[str, Any] = {}
-            exec(code, {}, ns)
-            lr_prods = ns["productions"]
-            lr_action = ns["actions"]
-            lr_goto = ns["gotos"]
+    if isinstance(parser_table, Path):
+        parser_table = str(parser_table)
 
-    elif parser_table.suffix == ".jsonl":
-        import json
-
-        with parser_table.open("r") as fr:
-            lr_prods = json.loads(fr.readline())
-            lr_action = json.loads(fr.readline())
-            lr_goto = json.loads(fr.readline())
-        del json
-    else:
-        import pickle
-
-        with parser_table.open("rb") as fr:
-            lr_prods, lr_action, lr_goto = pickle.load(fr)
-        del pickle
-    prods = tuple(
-        Production(
-            name=name,
-            str=str,
-            len=len,
-            callable=getattr(module, func) if func else None,
-        )
-        for name, len, str, func in lr_prods
-    )
-    del lr_prods
-    return LRParser(prods, lr_action, lr_goto, errorf=getattr(module, "p_error", None))
+    state = StateMachine(parser_table)
+    return LRParser(state, errorf=getattr(module, "p_error", None), module=module)
