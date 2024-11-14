@@ -140,31 +140,15 @@ STATEMENTS = (
 )
 
 
-def const_str(s: str, **kwargs):
-    return Constant(value=s, **kwargs)
-
-
 def is_const_str(node):
     return isinstance(node, Constant) and isinstance(node.value, str)
-
-
-def const_bytes(s: str, **kwargs):
-    return Constant(value=s, **kwargs)
 
 
 def is_const_bytes(node):
     return isinstance(node, Constant) and isinstance(node.value, bytes)
 
 
-def const_num(n, **kwargs):
-    return Constant(value=n, **kwargs)
-
-
-def is_const_num(node):
-    return isinstance(node, Constant) and isinstance(node.value, (int, float))
-
-
-def const_name(value, **kwargs):
+def const(value, **kwargs):
     return Constant(value=value, **kwargs)
 
 
@@ -666,8 +650,8 @@ def _getblockattr(name, lineno, col):
         "getattr",
         args=[
             Name(id=name, ctx=Load(), lineno=lineno, col_offset=col),
-            const_str(s="__xonsh_block__", lineno=lineno, col_offset=col),
-            const_name(value=False, lineno=lineno, col_offset=col),
+            const(s="__xonsh_block__", lineno=lineno, col_offset=col),
+            const(value=False, lineno=lineno, col_offset=col),
         ],
         lineno=lineno,
         col=col,

@@ -600,7 +600,7 @@ class BaseParser:
     def xonsh_pathsearch(self, pattern, pymode=False, lineno=None, col=None):
         """Creates the AST node for calling the __xonsh__.pathsearch() function.
         The pymode argument indicate if it is called from subproc or python mode"""
-        pymode = ast.const_name(value=pymode, lineno=lineno, col_offset=col)
+        pymode = ast.const(pymode, lineno=lineno, col_offset=col)
         searchfunc, pattern = RE_SEARCHPATH.match(pattern).groups()
         if not searchfunc.startswith("@") and "f" in searchfunc:
             pattern_as_str = f"f'''{pattern}'''"
@@ -614,7 +614,7 @@ class BaseParser:
                 except SyntaxError as e:
                     self._set_error(str(e), self.currloc(lineno=lineno, column=col))
         else:
-            pattern = ast.const_str(s=pattern, lineno=lineno, col_offset=col)
+            pattern = ast.const(pattern, lineno=lineno, col_offset=col)
         pathobj = False
         if searchfunc.startswith("@"):
             func = searchfunc[1:]
@@ -625,7 +625,7 @@ class BaseParser:
             func = "__xonsh__.regexsearch"
             pathobj = "p" in searchfunc
         func = load_attribute_chain(func, lineno=lineno, col=col)
-        pathobj = ast.const_name(value=pathobj, lineno=lineno, col_offset=col)
+        pathobj = ast.const(value=pathobj, lineno=lineno, col_offset=col)
         return xonsh_call(
             "__xonsh__.pathsearch",
             args=[func, pattern, pymode, pathobj],
@@ -1694,7 +1694,7 @@ class BaseParser:
         end = (p5.lineno, p5.lexpos)
         s = self._source_slice(beg, end)
         s = textwrap.dedent(s)
-        p[0] = ast.const_str(s=s, lineno=beg[0], col_offset=beg[1])
+        p[0] = ast.const(s, lineno=beg[0], col_offset=beg[1])
 
     def p_rawsuite_simple_stmt(self, p):
         """rawsuite : colon_tok nonewline newline_tok"""
@@ -1702,7 +1702,7 @@ class BaseParser:
         beg = (p1.lineno, p1.lexpos + 1)
         end = (p3.lineno, p3.lexpos)
         s = self._source_slice(beg, end).strip()
-        p[0] = ast.const_str(s=s, lineno=beg[0], col_offset=beg[1])
+        p[0] = ast.const(s, lineno=beg[0], col_offset=beg[1])
 
     def _attach_nodedent_base_rules(self):
         toks = set(self.tokens)
@@ -2268,17 +2268,17 @@ class BaseParser:
     def p_atom_none(self, p):
         """atom : none_tok"""
         p1 = p[1]
-        p[0] = ast.const_name(value=None, lineno=p1.lineno, col_offset=p1.lexpos)
+        p[0] = ast.const(value=None, lineno=p1.lineno, col_offset=p1.lexpos)
 
     def p_atom_true(self, p):
         """atom : true_tok"""
         p1 = p[1]
-        p[0] = ast.const_name(value=True, lineno=p1.lineno, col_offset=p1.lexpos)
+        p[0] = ast.const(value=True, lineno=p1.lineno, col_offset=p1.lexpos)
 
     def p_atom_false(self, p):
         """atom : false_tok"""
         p1 = p[1]
-        p[0] = ast.const_name(value=False, lineno=p1.lineno, col_offset=p1.lexpos)
+        p[0] = ast.const(value=False, lineno=p1.lineno, col_offset=p1.lexpos)
 
     def p_atom_pathsearch(self, p):
         """atom : SEARCHPATH"""
@@ -2382,7 +2382,7 @@ class BaseParser:
             p[0] = xonsh_call("__xonsh__.path_literal", [s], lineno=p1.lineno, col=p1.lexpos)
         elif "p" in prefix:
             value_without_p = prefix.replace("p", "") + p1.value[len(prefix) :]
-            s = ast.const_str(
+            s = ast.const(
                 s=ast.literal_eval(value_without_p),
                 lineno=p1.lineno,
                 col_offset=p1.lexpos,
@@ -2404,10 +2404,9 @@ class BaseParser:
             p[0] = s
         else:
             s = ast.literal_eval(p1.value)
-            is_bytes = "b" in prefix
+            # is_bytes = "b" in prefix
             is_raw = "r" in prefix
-            cls = ast.const_bytes if is_bytes else ast.const_str
-            p[0] = cls(s=s, lineno=p1.lineno, col_offset=p1.lexpos, is_raw=is_raw)
+            p[0] = ast.const(s, lineno=p1.lineno, col_offset=p1.lexpos, is_raw=is_raw)
 
     def p_string_literal_list(self, p):
         """
@@ -2496,8 +2495,8 @@ class BaseParser:
     def p_number(self, p):
         """number : number_tok"""
         p1 = p[1]
-        p[0] = ast.const_num(
-            n=ast.literal_eval(p1.value.replace("_", "")),
+        p[0] = ast.const(
+            ast.literal_eval(p1.value.replace("_", "")),
             lineno=p1.lineno,
             col_offset=p1.lexpos,
         )
@@ -2547,7 +2546,7 @@ class BaseParser:
                 else:
                     msg = "empty macro arguments not allowed"
                     self._set_error(msg, self.currloc(*beg))
-            node = ast.const_str(s=s, lineno=beg[0], col_offset=beg[1])
+            node = ast.const(s, lineno=beg[0], col_offset=beg[1])
             elts.append(node)
         p0 = ast.Tuple(elts=elts, ctx=ast.Load(), lineno=p1.lineno, col_offset=p1.lexpos)
         p[0] = [p0]
@@ -2961,8 +2960,8 @@ class BaseParser:
         return ast.Call(
             func=func,
             args=[
-                ast.const_str(s=var, lineno=lineno, col_offset=col),
-                ast.const_str(s="", lineno=lineno, col_offset=col),
+                ast.const(var, lineno=lineno, col_offset=col),
+                ast.const("", lineno=lineno, col_offset=col),
             ],
             keywords=[],
             lineno=lineno,
@@ -2972,7 +2971,7 @@ class BaseParser:
     def _envvar_by_name(self, var, lineno=None, col=None):
         """Looks up a xonsh variable by name."""
         xenv = load_attribute_chain("__xonsh__.env", lineno=lineno, col=col)
-        idx = ast.Index(value=ast.const_str(s=var, lineno=lineno, col_offset=col))
+        idx = ast.Index(value=ast.const(var, lineno=lineno, col_offset=col))
         return ast.Subscript(value=xenv, slice=idx, ctx=ast.Load(), lineno=lineno, col_offset=col)
 
     def _subproc_cliargs(self, args, lineno=None, col=None):
@@ -3010,7 +3009,7 @@ class BaseParser:
              | PIPE WS
              | WS PIPE WS
         """
-        p[0] = ast.const_str(s="|", lineno=self.lineno, col_offset=self.col)
+        p[0] = ast.const("|", lineno=self.lineno, col_offset=self.col)
 
     def p_amper(self, p):
         """
@@ -3019,7 +3018,7 @@ class BaseParser:
               | AMPERSAND WS
               | WS AMPERSAND WS
         """
-        p[0] = ast.const_str(s="&", lineno=self.lineno, col_offset=self.col)
+        p[0] = ast.const("&", lineno=self.lineno, col_offset=self.col)
 
     def p_subproc_s2(self, p):
         """
@@ -3071,9 +3070,9 @@ class BaseParser:
         subcmd = self._source_slice((l, c), (p3.lineno, p3.lexpos))
         subcmd = subcmd.strip() + "\n"
         p0 = [
-            ast.const_str(s="xonsh", lineno=l, col_offset=c),
-            ast.const_str(s="-c", lineno=l, col_offset=c),
-            ast.const_str(s=subcmd, lineno=l, col_offset=c),
+            ast.const("xonsh", lineno=l, col_offset=c),
+            ast.const("-c", lineno=l, col_offset=c),
+            ast.const(subcmd, lineno=l, col_offset=c),
         ]
         for arg in p0:
             arg._cliarg_action = "append"
@@ -3098,7 +3097,7 @@ class BaseParser:
     def _append_subproc_bang_empty(self, p):
         """Appends an empty string in subprocess mode to the argument list."""
         p3 = p[3]
-        node = ast.const_str(s="", lineno=p3.lineno, col_offset=p3.lexpos + 1)
+        node = ast.const("", lineno=p3.lineno, col_offset=p3.lexpos + 1)
         p[2][-1].elts.append(node)
 
     def _append_subproc_bang(self, p):
@@ -3109,7 +3108,7 @@ class BaseParser:
         beg = (p3.lineno, p3.lexpos + 1)
         end = (p5.lineno, p5.lexpos)
         s = self._source_slice(beg, end).strip()
-        node = ast.const_str(s=s, lineno=beg[0], col_offset=beg[1])
+        node = ast.const(s, lineno=beg[0], col_offset=beg[1])
         p[2][-1].elts.append(node)
 
     def p_subproc_atom_uncaptured(self, p):
@@ -3159,7 +3158,7 @@ class BaseParser:
         func = ast.Attribute(value=xenv, attr="get", ctx=ast.Load(), lineno=lineno, col_offset=col)
         p0 = ast.Call(
             func=func,
-            args=[p[2], ast.const_str(s="", lineno=lineno, col_offset=col)],
+            args=[p[2], ast.const("", lineno=lineno, col_offset=col)],
             keywords=[],
             lineno=lineno,
             col_offset=col,
@@ -3219,7 +3218,7 @@ class BaseParser:
                      | IOREDIRECT1 WS subproc_atom
                      | IOREDIRECT2
         """
-        operator = ast.const_str(s=p[1], lineno=self.lineno, col_offset=self.col)
+        operator = ast.const(p[1], lineno=self.lineno, col_offset=self.col)
         elts = [operator] if len(p) == 2 else [operator, p[3]]
         p0 = ast.Tuple(
             elts=elts,
@@ -3275,7 +3274,7 @@ class BaseParser:
         """Combines arg_parts. If all arg_parts are strings, concatenate the strings.
         Otherwise, return a list of arg_parts."""
         if all(ast.is_const_str(ap) for ap in arg_parts):
-            return ast.const_str(
+            return ast.const(
                 "".join(ap.value for ap in arg_parts),
                 lineno=arg_parts[0].lineno,
                 col_offset=arg_parts[0].col_offset,
@@ -3295,16 +3294,16 @@ class BaseParser:
         p1 = p[1]
         p2 = p[2]
         p3 = p[3]
-        p1 = ast.const_str(s=p1.value, lineno=p1.lineno, col_offset=p1.lexpos)
-        p3 = ast.const_str(s=p3.value, lineno=p3.lineno, col_offset=p3.lexpos)
+        p1 = ast.const(p1.value, lineno=p1.lineno, col_offset=p1.lexpos)
+        p3 = ast.const(p3.value, lineno=p3.lineno, col_offset=p3.lexpos)
         p[0] = self._arg_part_combine(p1, p2, p3)
 
     def p_subproc_arg_part_brackets_empty(self, p):
         """subproc_arg_part : lbracket_tok rbracket_tok"""
         p1 = p[1]
         p2 = p[2]
-        p1 = ast.const_str(s=p1.value, lineno=p1.lineno, col_offset=p1.lexpos)
-        p2 = ast.const_str(s=p2.value, lineno=p2.lineno, col_offset=p2.lexpos)
+        p1 = ast.const(p1.value, lineno=p1.lineno, col_offset=p1.lexpos)
+        p2 = ast.const(p2.value, lineno=p2.lineno, col_offset=p2.lexpos)
         p[0] = self._arg_part_combine(p1, p2)
 
     def _attach_subproc_arg_part_rules(self):
@@ -3348,7 +3347,7 @@ class BaseParser:
         # Many tokens cannot be part of this rule, such as $, ', ", ()
         # Use a string atom instead. See above attachment functions
         p1 = p[1]
-        p[0] = ast.const_str(s=p1.value, lineno=p1.lineno, col_offset=p1.lexpos)
+        p[0] = ast.const(p1.value, lineno=p1.lineno, col_offset=p1.lexpos)
 
     def p_envvar_assign_left(self, p):
         """envvar_assign_left : dollar_name_tok EQUALS"""
