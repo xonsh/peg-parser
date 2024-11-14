@@ -54,9 +54,11 @@ PosixPath('/tmp/v1-bytes.pickle')
 
 - there was not much difference with pickle
 
-# fixing reduce/reduce conflicts
+# PLY table Size reduction strategies
 
 1. initial sizes
+
+- actions: `list[dict[str, int] | int]` where index is state id and value is either a dict of symbol to action or a default action
 
 ```
 asizeof.asizeof(productions)=260KiB
@@ -69,6 +71,14 @@ asizeof.asizeof(gotos)=560KiB
 | pickle | 975.55KiB |
 | py     | 1.61 MiB  |
 | jsonl  | 1.61 MiB  |
+
+- timings for Xonsh v0.16 parser with `tasks.profile_mem.py::xonsh_ply_small_string()`
+
+```
+current=9197.4KiB,  peak=11233.3KiB
+Total allocated size: 8932.5 KiB
+Took:  1.21s
+```
 
 2. merge overridden actions to base class - no change in sizes
 
@@ -97,6 +107,21 @@ benchmarks.PeakMemSuite.peakmem_parser_init_                                    
                 /tmp/xonsh-lr-table.jsonl    7.53M
                /tmp/xonsh-lr-table.cpickle   7.54M
 
+4. Using default action reduction strategy [reduce_to_default_action](./ply_parser/ply/write_utils.py)
+
+```text
+_object_size(productions)='244.72 KiB'
+_object_size(actions)='5.16 MiB' len(actions)=1661
+_object_size(gotos)='465.41 KiB'
+```
+
+- timings of PLY parser with `tasks.profile_mem.py::ply_small_string()`
+```text
+
+current=3370.6KiB,  peak=10706.6KiB
+Total allocated size: 10399.7 KiB
+Took:  2.60s
+```
 
 # with PEGen based parser
 ```text

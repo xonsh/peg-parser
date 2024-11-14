@@ -17,10 +17,27 @@ def large_file():
     XonshParser.parse_file(file)
 
 
+def ply_small_string():
+    from ply_parser.parser import get_parser_cls
+
+    parser = get_parser_cls()()
+    ast = parser.parse("print(1)")
+    print(f"PLY v2 -> ast: {ast}", type(ast))
+
+
+def xonsh_ply_small_string():
+    from xonsh.parser import Parser
+
+    parser = Parser()
+    ast = parser.parse("print(1)")
+    print(f"Xonsh parser -> ast: {ast}", type(ast))
+
+
 if __name__ == "__main__":
     from bench_utils import timeit, trace
 
     with timeit(), trace():
-        main()
-    with timeit(), trace():
-        large_file()
+        #     main()
+        #     large_file()
+        #     ply_small_string()
+        xonsh_ply_small_string()

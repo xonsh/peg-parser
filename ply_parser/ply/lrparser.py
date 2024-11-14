@@ -180,9 +180,8 @@ class LRParser:
     # See:  http://www.gnu.org/software/bison/manual/html_node/Default-Reductions.html#Default-Reductions
     def set_defaulted_states(self) -> None:
         for state, actions in enumerate(self.action):
-            rules = list(actions.values())
-            if len(rules) == 1 and rules[0] < 0:
-                self.defaulted_states[state] = rules[0]
+            if isinstance(actions, int):
+                self.defaulted_states[state] = actions
 
     def disable_defaulted_states(self) -> None:
         self.defaulted_states.clear()

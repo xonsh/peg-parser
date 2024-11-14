@@ -7,13 +7,13 @@ def main():
     parser = get_parser_cls()()
 
     # cmd line
-    parser.parse("ls -alh")
+    print(parser.parse("ls -alh"))
 
     try:
         # invalid syntax
         parser.parse("print(1")
-    except Exception:
-        pass
+    except Exception as ex:
+        print("Error:", ex)
 
 
 def _write_tmp(name: str = "xonsh-lr-table", ext="py"):
@@ -30,6 +30,5 @@ def _write_tmp(name: str = "xonsh-lr-table", ext="py"):
 if __name__ == "__main__":
     # main()
     _write_tmp(ext="pickle")
-    # _write_tmp(ext="cpickle")
     _write_tmp(ext="jsonl")
-    _write_tmp(ext="py")
+    # _write_tmp(ext="py")

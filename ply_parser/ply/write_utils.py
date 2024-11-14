@@ -3,14 +3,21 @@ from pathlib import Path
 from .yacc import LRTable
 
 
+def reduce_to_default_action(actions: dict[str, int]) -> int | dict[str, int]:
+    """return a list of default reductions"""
+    if len(actions) == 1 and list(actions.values())[0] < 0:
+        return list(actions.values())[0]
+    return actions
+
+
 def optimize_table(lr):
     """return an optimized version of the LR table variables for pickling"""
     productions = tuple((p.name, p.len, p.str, p.func) for p in lr.lr_productions)
     actions = [None] * len(lr.lr_action)
     gotos = [None] * len(lr.lr_goto)
-    for idx, vals in lr.lr_action.items():
-        assert not actions[idx]
-        actions[idx] = vals
+    for state_id, items in lr.lr_action.items():
+        assert not actions[state_id]
+        actions[state_id] = reduce_to_default_action(items)
     for idx, vals in lr.lr_goto.items():
         assert not gotos[idx]
         gotos[idx] = vals
@@ -48,7 +55,13 @@ def write_to_file(lr: LRTable, output_path: Path = None) -> Path:
         output_path = "parser.out.jsonl"
 
     productions, actions, gotos = optimize_table(lr)
-    # print(f'data:\n{_object_size(productions)=}\n{_object_size(actions)=} {len(actions)=}\n{_object_size(gotos)=}')
+
+    try:
+        print(
+            f"data:\n{_object_size(productions)=}\n{_object_size(actions)=} {len(actions)=}\n{_object_size(gotos)=}"
+        )
+    except ImportError:
+        pass
 
     if output_path.suffix == ".jsonl":
         with open(output_path, "w") as fw:
