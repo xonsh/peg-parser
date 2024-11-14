@@ -437,9 +437,8 @@ class BaseParser:
 
     @classmethod
     def default_table_name(cls) -> Path:
-        py_version = ".".join(str(x) for x in PYTHON_VERSION_INFO[:2])
         format = "v1"
-        filename = f"{cls.__name__}.table.{py_version}.{format}.pickle"
+        filename = f"{cls.__module__.rsplit('.')[-1]}.{cls.__name__}.table.{format}.jsonl"
         return Path(__file__).parent / filename
 
     def reset(self):
