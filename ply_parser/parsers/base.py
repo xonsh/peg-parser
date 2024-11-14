@@ -2383,7 +2383,7 @@ class BaseParser:
         elif "p" in prefix:
             value_without_p = prefix.replace("p", "") + p1.value[len(prefix) :]
             s = ast.const(
-                s=ast.literal_eval(value_without_p),
+                ast.literal_eval(value_without_p),
                 lineno=p1.lineno,
                 col_offset=p1.lexpos,
             )

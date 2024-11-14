@@ -24,7 +24,7 @@ def get_parser_cls(version: tuple[int, ...] | None = None) -> type["BaseParser"]
 
 
 def write_parser_table(
-    yacc_debug=False, output_path: None | Path | str = None, version=None, **kwargs
+    yacc_debug=False, output_path: None | Path | str = None, version=None, overwrite_table=False, **kwargs
 ) -> Path:
     from .ply import write_utils, yacc
 
@@ -35,7 +35,7 @@ def write_parser_table(
     elif isinstance(output_path, str):
         output_path = Path(output_path)
 
-    if output_path.exists():
+    if output_path.exists() and (not overwrite_table):
         return output_path
 
     parser = yacc.yacc(

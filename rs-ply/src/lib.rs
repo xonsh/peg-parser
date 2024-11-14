@@ -1,9 +1,11 @@
+use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::io::BufRead;
+use serde::{Deserialize};
 
 #[pyclass(get_all, frozen)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 struct Production {
     name: String,
     str: String,
@@ -15,15 +17,16 @@ type MiniProduction = (String, u8, String, Option<String>);
 
 /// the int keys and values are very small around -2k to +2k
 type Actions = HashMap<String, i16>;
-type Goto = HashMap<String, u16>;
+type Gotos = HashMap<String, u16>;
 
 /// A class for representing parser objects.
 #[pyclass]
+#[derive(Debug)]
 struct StateMachine {
     /// A field for the name
     productions: Vec<Production>,
     actions: Vec<Actions>,
-    gotos: Vec<Goto>,
+    gotos: Vec<Gotos>,
 
     /// # Defaulted state support.
     //     # This method identifies parser states where there is only one possible reduction action.
@@ -36,6 +39,17 @@ struct StateMachine {
     defaults: HashMap<u16, i16>,
 }
 
+fn json_error_to_py_err(err: serde_json::Error) -> PyErr {
+    PyValueError::new_err(err.to_string())
+}
+
+fn parse_json<'a, T>(input: &'a str) -> Result<T, PyErr>
+where
+    T: serde::de::Deserialize<'a>,
+{
+    serde_json::from_str(input).map_err(json_error_to_py_err)
+}
+
 #[pymethods]
 impl StateMachine {
     #[new]
@@ -45,29 +59,31 @@ impl StateMachine {
         let mut reader = std::io::BufReader::new(file).lines();
 
         let first_line = reader.next().unwrap()?;
-        let _prods: Vec<MiniProduction> = serde_json::from_str(&first_line).unwrap();
+        let productions: Vec<MiniProduction> = parse_json(&first_line)?;
+        let productions: Vec<Production> = productions.iter().map(
+            |(name, len, text, func)| {
+                Production {
+                name: name.to_string(),
+                str: text.to_string(),
+                func: func.clone().unwrap_or("".to_string()),
+                len: len.clone(),
+            }
+            }
+        ).collect();
         let second_line = reader.next().unwrap()?;
-        let actions: Vec<Actions> = serde_json::from_str(&second_line).unwrap();
+        let actions: Vec<Actions> = parse_json(&second_line)?;
         let third_line = reader.next().unwrap()?;
-        let gotos: Vec<Goto> = serde_json::from_str(&third_line).unwrap();
-        let mut productions = vec![];
+        let gotos: Vec<Gotos> = parse_json(&third_line)?;
         let mut defaults: HashMap<u16, i16> = HashMap::new();
 
         for (state, act) in actions.iter().enumerate() {
             if act.len() == 1 {
-                // insert first value of act to defaults
-                defaults.insert(state as u16, act.values().next().unwrap().clone());
+                let first = act.values().next().unwrap().clone();
+                if first < 0 {
+                    // insert first value of act to defaults
+                    defaults.insert(state as u16, act.values().next().unwrap().clone());
+                }
             }
-        }
-
-        for (name, len, text, func) in _prods {
-            let prod = Production {
-                name,
-                str: text,
-                func: func.unwrap_or("".to_string()),
-                len,
-            };
-            productions.push(prod);
         }
 
         Ok(Self {
@@ -82,16 +98,27 @@ impl StateMachine {
         self.defaults.get(&state).copied()
     }
 
-    fn get_action(&self, state: u16, sym: &str) -> Option<i16> {
-        let symbols = self.actions.get(state as usize)?;
-        symbols.get(sym).copied()
+    fn get_action(&self, state: usize, sym: &str) -> Option<i16> {
+        let symbols = self
+            .actions
+            .get(state)
+            .unwrap();
+        let action = symbols.get(sym);
+        action.map(|x| *x)
     }
-    fn get_production(&self, index: usize) -> Production {
+    fn expect_production(&self, index: usize) -> Production {
         let prod = self.productions.get(index).unwrap();
         prod.clone()
     }
-    fn get_goto(&self, index: usize, sym: &str) -> Option<u16> {
-        self.gotos.get(index)?.get(sym).copied()
+    fn expect_goto(&self, state: usize, sym: &str) -> PyResult<u16> {
+        let gotos = self
+            .gotos
+            .get(state)
+            .ok_or_else(|| PyIndexError::new_err(format!("Goto state {} not found", state)))?;
+        let got = gotos.get(sym).ok_or_else(|| {
+            PyIndexError::new_err(format!("Goto symbol {}.{} not found", state, sym))
+        })?;
+        Ok(*got)
     }
 }
 
@@ -109,7 +136,13 @@ mod tests {
     #[test]
     fn test_parse() {
         let path = "/Users/noor/src/py/xonsh-parser/ply_parser/parsers/v310.Parser.table.v1.jsonl";
-        let sm = StateMachine::new_from_file(path).unwrap();
-        println!("{:?}", sm.productions.len());
+        pyo3::prepare_freethreaded_python();
+        let sm = StateMachine::new_from_file(path);
+        if sm.is_ok() {
+            let sm = sm.unwrap();
+            println!("{:?} {:?}", sm.productions.len(), sm.actions.len());
+        } else {
+            println!("Failed to create {:?}", sm)
+        }
     }
 }

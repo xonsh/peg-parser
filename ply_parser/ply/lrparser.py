@@ -225,7 +225,7 @@ class LRParser:
             if logger:
                 logger.debug("State  : %s", state)
 
-            if (default_action := self.fsm.get_default_action(state)) is not None:
+            if default_action := self.fsm.get_default_action(state):
                 t = default_action
                 if logger:
                     logger.debug("Defaulted state %s: Reduce using %d", state, -t)
@@ -268,7 +268,7 @@ class LRParser:
 
                 if t < 0:
                     # reduce a symbol on the stack, emit a production
-                    p = self.fsm.get_production(-t)
+                    p = self.fsm.expect_production(-t)
                     pname = p.name
                     plen = p.len
 
@@ -283,14 +283,14 @@ class LRParser:
                                 "["
                                 + ",".join([format_stack_entry(_v.value) for _v in symstack[-plen:]])
                                 + "]",
-                                self.fsm.get_goto(statestack[-1 - plen], pname),
+                                self.fsm.expect_goto(statestack[-1 - plen], pname),
                             )
                         else:
                             logger.info(
                                 "Action : Reduce rule [%s] with %s and goto state %d",
                                 p.str,
                                 [],
-                                self.fsm.get_goto(statestack[-1], pname),
+                                self.fsm.expect_goto(statestack[-1], pname),
                             )
 
                     if plen:
@@ -321,7 +321,7 @@ class LRParser:
                             if logger:
                                 logger.info("Result : %s", format_result(pslice[0]))
                             symstack.append(sym)
-                            state = self.fsm.get_goto(statestack[-1], pname)
+                            state = self.fsm.expect_goto(statestack[-1], pname)
                             statestack.append(state)
                         except SyntaxError:
                             # If an error was set. Enter error recovery state
@@ -359,7 +359,7 @@ class LRParser:
                             if logger:
                                 logger.info("Result : %s", format_result(pslice[0]))
                             symstack.append(sym)
-                            state = self.fsm.get_goto(statestack[-1], pname)
+                            state = self.fsm.expect_goto(statestack[-1], pname)
                             statestack.append(state)
                         except SyntaxError:
                             # If an error was set. Enter error recovery state

@@ -44,7 +44,7 @@ def _file_size(path: str, decimal_places=2):
 
 
 def _object_size(data, decimal_places=2):
-    """Returns a human readable string representation of python objects"""
+    """Returns a human-readable string representation of python objects"""
     from pympler import asizeof
 
     size = asizeof.asizeof(data)

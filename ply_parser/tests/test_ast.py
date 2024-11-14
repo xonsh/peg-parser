@@ -1,7 +1,5 @@
 """Xonsh AST tests."""
 
-import ast as pyast
-
 import pytest
 
 from ply_parser import xast as ast
@@ -103,13 +101,9 @@ for root, dirs, files in os.walk(path):
     """,
     ],
 )
-def test_unmodified(inp, xonsh_execer_parse):
+def test_unmodified(inp, check_ast):
     # Context sensitive parsing should not modify AST
-    exp = pyast.parse(inp)
-    obs = xonsh_execer_parse(inp)
-    from .tools import nodes_equal
-
-    assert nodes_equal(exp, obs)
+    check_ast(inp, mode="exec", run=False)
 
 
 @pytest.mark.parametrize(
