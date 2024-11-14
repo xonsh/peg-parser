@@ -10,14 +10,17 @@ def reduce_to_default_action(actions: dict[str, int]) -> int | dict[str, int]:
     return actions
 
 
-def optimize_table(lr):
+def optimize_table(lr, reduce_actions=False):
     """return an optimized version of the LR table variables for pickling"""
     productions = tuple((p.name, p.len, p.str, p.func) for p in lr.lr_productions)
     actions = [None] * len(lr.lr_action)
     gotos = [None] * len(lr.lr_goto)
     for state_id, items in lr.lr_action.items():
         assert not actions[state_id]
-        actions[state_id] = reduce_to_default_action(items)
+        if reduce_actions:
+            actions[state_id] = reduce_to_default_action(items)
+        else:
+            actions[state_id] = items
     for idx, vals in lr.lr_goto.items():
         assert not gotos[idx]
         gotos[idx] = vals
