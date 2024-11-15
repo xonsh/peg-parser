@@ -245,11 +245,8 @@ class BaseParser:
 
         parser_table = parser_table or self.default_table_name()
 
-        if not is_write_table:
-            # create parser on main thread
-            self.parser: None | lrparser.LRParser = lrparser.load_parser(parser_table, module=self)
-        else:
-            self.parser = None
+        # create parser on main thread
+        self.parser = None if is_write_table else lrparser.load_parser(parser_table, module=self)
 
         # Keeps track of the last token given to yacc (the lookahead token)
         self._last_yielded_token = None
