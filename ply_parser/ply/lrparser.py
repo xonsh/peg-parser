@@ -128,6 +128,9 @@ class YaccProduction:
     def error(self) -> None:
         raise SyntaxError
 
+    def call(self, production):
+        return getattr(self.parser.module, production.func)(self)
+
 
 CallBack = Callable[[YaccProduction], None]
 
@@ -143,6 +146,29 @@ class ParserProtocol(Protocol):
     def p_error(self, p: YaccProduction) -> None: ...
 
 
+@dataclass
+class ParserState:
+    statestack: list[int]  # Stack of parsing states
+    symstack: list["YaccSymbol"]  # Stack of grammar symbols
+    lookahead: Optional["YaccSymbol"]  # Current lookahead symbol
+    lookaheadstack: list["YaccSymbol"]  # Stack of lookahead symbols
+    errorcount: int  # Used during error recovery
+    state: int
+    errtoken: Optional["YaccSymbol"] = None
+    tracking: bool = False
+
+    def log_state(state, logger: "PlyLogger"):
+        logger.debug("State  : %s", state.state)
+
+    def log_stack(state, logger: "PlyLogger"):
+        logger.debug(
+            "Stack  : %s",
+            (
+                "{} . {}".format(" ".join([xx.type for xx in state.symstack][1:]), str(state.lookahead))
+            ).lstrip(),
+        )
+
+
 class LRParser:
     """The LR Parsing engine.  This is the core of the PLY parser generator."""
 
@@ -156,16 +182,6 @@ class LRParser:
         self.errorfunc = errorf
         self.errorok = True
         self.module = module
-
-    def errok(self) -> None:
-        self.errorok = True
-
-    def restart(self) -> None:
-        del self.statestack[:]
-        del self.symstack[:]
-        sym = YaccSymbol(type="$end")
-        self.symstack.append(sym)
-        self.statestack.append(0)
 
     # parse().
     #
@@ -183,321 +199,322 @@ class LRParser:
         tracking: bool = False,
     ) -> AST | None:
         # If debugging has been specified as a flag, turn it into a logging object
-        logger: None | PlyLogger = None
-        if isinstance(debug, int) and debug:
-            logger = PlyLogger(sys.stderr)
+        logger = self._setup_logger(debug)
+        parser_state = self._initialize_parser_state(lexer, input, tracking)
 
-        lookahead: None | YaccSymbol = None  # Current lookahead symbol
-        lookaheadstack: list[YaccSymbol] = []  # Stack of lookahead symbols
         # Production object passed to grammar rules
         pslice = YaccProduction(lexer, self)
-        errorcount = 0  # Used during error recovery
+        pslice.stack = parser_state.symstack
 
-        if logger:
-            logger.info("PLY: PARSE DEBUG START")
-
-        # If input was supplied, pass to lexer
-        if input is not None:
-            lexer.input(input)
-
-        # Set the token function
-        get_token = self.token = lexer.token
-
-        # Set up the state and symbol stacks
-        self.statestack: list[int] = []  # Stack of parsing states
-        statestack = self.statestack
-        self.symstack: list[YaccSymbol] = []  # Stack of grammar symbols
-        symstack = self.symstack
-        pslice.stack = symstack  # Put in the production
-        errtoken = None  # Err token
-
-        # The start state is assumed to be (0,$end)
-
-        statestack.append(0)
-        sym = YaccSymbol(type="$end")
-        symstack.append(sym)
-        state = 0
         while True:
             # Get the next symbol on the input.  If a lookahead symbol
             # is already set, we just use that. Otherwise, we'll pull
             # the next token off of the lookaheadstack or from the lexer
 
             if logger:
-                logger.debug("State  : %s", state)
-
-            if default_action := self.fsm.get_default_action(state):
-                t = default_action
-                if logger:
-                    logger.debug("Defaulted state %s: Reduce using %d", state, -t)
-            else:
-                if not lookahead:
-                    if not lookaheadstack:
-                        lookahead = get_token()  # Get the next token
-                    else:
-                        lookahead = lookaheadstack.pop()
-                    if not lookahead:
-                        lookahead = YaccSymbol(type="$end")
-
-                # Check the action table
-                ltype = lookahead.type
-                t = self.fsm.get_action(state, ltype)
+                parser_state.log_state(logger)
+            action = self._get_next_action(parser_state, logger)
 
             if logger:
-                logger.debug(
-                    "Stack  : %s",
-                    ("{} . {}".format(" ".join([xx.type for xx in symstack][1:]), str(lookahead))).lstrip(),
-                )
+                parser_state.log_stack(logger)
 
-            if t is not None:
-                if t > 0:
-                    # shift a symbol on the stack
-                    statestack.append(t)
-                    state = t
-
-                    if logger:
-                        logger.debug("Action : Shift and goto state %s", t)
-
-                    if lookahead is not None:
-                        symstack.append(lookahead)
-                    lookahead = None
-
-                    # Decrease error count on successful shift
-                    if errorcount:
-                        errorcount -= 1
+            if action is not None:
+                if action > 0:
+                    self._handle_shift(parser_state, action, logger)
                     continue
-
-                if t < 0:
+                elif action < 0:
                     # reduce a symbol on the stack, emit a production
-                    p = self.fsm.expect_production(-t)
-                    pname = p.name
-                    plen = p.len
-
-                    # Get production function
-                    sym = YaccSymbol(type=pname, value=None)  # Production name
-
-                    if logger:
-                        if plen:
-                            logger.info(
-                                "Action : Reduce rule [%s] with %s and goto state %d",
-                                p.str,
-                                "["
-                                + ",".join([format_stack_entry(_v.value) for _v in symstack[-plen:]])
-                                + "]",
-                                self.fsm.expect_goto(statestack[-1 - plen], pname),
-                            )
-                        else:
-                            logger.info(
-                                "Action : Reduce rule [%s] with %s and goto state %d",
-                                p.str,
-                                [],
-                                self.fsm.expect_goto(statestack[-1], pname),
-                            )
-
-                    if plen:
-                        targ = symstack[-plen - 1 :]
-                        targ[0] = sym
-
-                        if tracking:
-                            t1 = targ[1]
-                            sym.lineno = t1.lineno
-                            sym.lexpos = t1.lexpos
-                            t1 = targ[-1]
-                            sym.endlineno = getattr(t1, "endlineno", t1.lineno)
-                            sym.endlexpos = getattr(t1, "endlexpos", t1.lexpos)
-
-                        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        # The code enclosed in this section is duplicated
-                        # below as a performance optimization.  Make sure
-                        # changes get made in both locations.
-
-                        pslice.slice = targ
-
-                        try:
-                            # Call the grammar rule with our special slice object
-                            del symstack[-plen:]
-                            self.state = state
-                            getattr(self.module, p.func)(pslice)
-                            del statestack[-plen:]
-                            if logger:
-                                logger.info("Result : %s", format_result(pslice[0]))
-                            symstack.append(sym)
-                            state = self.fsm.expect_goto(statestack[-1], pname)
-                            statestack.append(state)
-                        except SyntaxError:
-                            # If an error was set. Enter error recovery state
-                            if lookahead:
-                                lookaheadstack.append(lookahead)  # Save the current lookahead token
-                            symstack.extend(targ[1:-1])  # Put the production slice back on the stack
-                            statestack.pop()  # Pop back one state (before the reduce)
-                            state = statestack[-1]
-                            sym.type = "error"
-                            sym.value = "error"
-                            lookahead = sym
-                            errorcount = error_count
-                            self.errorok = False
-
-                        continue
-
-                    else:
-                        if tracking:
-                            sym.lineno = lexer.lineno
-                            sym.lexpos = lexer.lexpos
-
-                        targ = [sym]
-
-                        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        # The code enclosed in this section is duplicated
-                        # above as a performance optimization.  Make sure
-                        # changes get made in both locations.
-
-                        pslice.slice = targ
-
-                        try:
-                            # Call the grammar rule with our special slice object
-                            self.state = state
-                            getattr(self.module, p.func)(pslice)
-                            if logger:
-                                logger.info("Result : %s", format_result(pslice[0]))
-                            symstack.append(sym)
-                            state = self.fsm.expect_goto(statestack[-1], pname)
-                            statestack.append(state)
-                        except SyntaxError:
-                            # If an error was set. Enter error recovery state
-                            if lookahead:
-                                lookaheadstack.append(lookahead)  # Save the current lookahead token
-                            statestack.pop()  # Pop back one state (before the reduce)
-                            state = statestack[-1]
-                            sym.type = "error"
-                            sym.value = "error"
-                            lookahead = sym
-                            errorcount = error_count
-                            self.errorok = False
-
-                        continue
-
-                if t == 0:
-                    n = symstack[-1]
-                    result = getattr(n, "value", None)
-
-                    if logger:
-                        logger.info("Done   : Returning %s", format_result(result))
-                        logger.info("PLY: PARSE DEBUG END")
-
-                    return result
-
-            if t is None:
-                if logger:
-                    logger.error(
-                        "Error  : %s",
-                        (
-                            "{} . {}".format(
-                                " ".join([xx.type for xx in symstack][1:]),
-                                str(lookahead),
-                            )
-                        ).lstrip(),
-                    )
-
-                # We have some kind of parsing error here.  To handle
-                # this, we are going to push the current token onto
-                # the tokenstack and replace it with an 'error' token.
-                # If there are any synchronization rules, they may
-                # catch it.
-                #
-                # In addition to pushing the error token, we call call
-                # the user defined p_error() function if this is the
-                # first syntax error.  This function is only called if
-                # errorcount == 0.
-                if errorcount == 0 or self.errorok:
-                    errorcount = error_count
-                    self.errorok = False
-                    if lookahead and lookahead.type == "$end":
-                        errtoken = None  # End of file!
-                    else:
-                        errtoken = lookahead
-                    if self.errorfunc:
-                        # if errtoken and not hasattr(errtoken, 'lexer'):
-                        #     errtoken.lexer = lexer
-                        self.state = state
-                        tok: None = self.errorfunc(errtoken)
-                        if self.errorok:
-                            # User must have done some kind of panic
-                            # mode recovery on their own.  The
-                            # returned token is the next lookahead
-                            lookahead = tok
-                            errtoken = None
-                            continue
-                    else:
-                        if errtoken:
-                            if hasattr(errtoken, "lineno"):
-                                lineno = errtoken.lineno
-                            else:
-                                lineno = 0
-                            if lineno:
-                                sys.stderr.write(
-                                    "yacc: Syntax error at line %d, token=%s\n" % (lineno, errtoken.type)
-                                )
-                            else:
-                                sys.stderr.write("yacc: Syntax error, token=%s" % errtoken.type)
-                        else:
-                            sys.stderr.write("yacc: Parse error in input. EOF\n")
-                            return None
-
-                else:
-                    errorcount = error_count
-
-                # case 1:  the statestack only has 1 entry on it.  If we're in this state, the
-                # entire parse has been rolled back and we're completely hosed.   The token is
-                # discarded and we just keep going.
-
-                if len(statestack) <= 1 and lookahead and lookahead.type != "$end":
-                    lookahead = None
-                    errtoken = None
-                    state = 0
-                    # Nuke the pushback stack
-                    del lookaheadstack[:]
+                    try:
+                        self._handle_reduce(parser_state, action, pslice, logger)
+                    except SyntaxError:
+                        self._handle_syntax_error(parser_state, pslice)
                     continue
+                elif action == 0:
+                    return self._handle_accept(parser_state, logger)
 
-                # case 2: the statestack has a couple of entries on it, but we're
-                # at the end of the file. nuke the top entry and generate an error token
+            # Handle error case when action is None
+            if not self._handle_error(parser_state, lexer, logger):
+                return None
 
-                # Start nuking entries on the stack
-                if lookahead and lookahead.type == "$end":
-                    # Whoa. We're really hosed here. Bail out
-                    return None
+    @staticmethod
+    def _setup_logger(debug: int) -> Optional["PlyLogger"]:
+        if debug:
+            logger = PlyLogger(sys.stderr)
+            logger.info("PLY: PARSE DEBUG START")
+            return logger
+        return None
 
-                if lookahead and lookahead.type != "error":
-                    sym = symstack[-1]
-                    if sym.type == "error":
-                        # Hmmm. Error is on top of stack, we'll just nuke input
-                        # symbol and continue
-                        if tracking:
-                            sym.endlineno = getattr(lookahead, "lineno", sym.lineno)
-                            sym.endlexpos = getattr(lookahead, "lexpos", sym.lexpos)
-                        lookahead = None
-                        continue
+    def _initialize_parser_state(self, lexer: Any, input: Optional[str], tracking: bool) -> ParserState:
+        if input is not None:
+            lexer.input(input)
 
-                    # Create the error symbol for the first time and make it the new lookahead symbol
-                    new_error = YaccSymbol(type="error")
+        self.token = lexer.token
 
-                    if hasattr(lookahead, "lineno"):
-                        new_error.lineno = new_error.endlineno = lookahead.lineno
-                    if hasattr(lookahead, "lexpos"):
-                        new_error.lexpos = new_error.endlexpos = lookahead.lexpos
-                    new_error.value = lookahead
-                    lookaheadstack.append(lookahead)
-                    lookahead = new_error
-                else:
-                    sym = symstack.pop()
-                    if tracking and lookahead:
-                        lookahead.lineno = sym.lineno
-                        lookahead.lexpos = sym.lexpos
-                    statestack.pop()
-                    state = statestack[-1]
+        # The start state is assumed to be (0,$end)
+        return ParserState(
+            statestack=[0],
+            symstack=[YaccSymbol(type="$end")],
+            lookahead=None,
+            lookaheadstack=[],
+            errorcount=0,
+            state=0,
+            errtoken=None,
+            tracking=tracking,
+        )
 
-                continue
+    def _get_next_action(self, state: ParserState, logger: Optional["PlyLogger"]) -> Optional[int]:
+        if default_action := self.fsm.get_default_action(state.state):
+            if logger:
+                logger.debug("Defaulted state %s: Reduce using %d", state.state, -default_action)
+            return default_action
 
-            # If we'r here, something really bad happened
-            raise RuntimeError("yacc: internal parser error!!!\n")
+        if not state.lookahead:
+            state.lookahead = self._get_lookahead_token(state)
+
+        return self.fsm.get_action(state.state, state.lookahead.type)
+
+    def _get_lookahead_token(self, state: ParserState) -> "YaccSymbol":
+        if state.lookaheadstack:
+            token = state.lookaheadstack.pop()
+        else:
+            token = self.token()
+
+        if not token:
+            return YaccSymbol(type="$end")
+        return token
+
+    def _handle_shift(self, state: ParserState, action: int, logger: Optional["PlyLogger"]) -> None:
+        state.statestack.append(action)
+        state.state = action
+
+        if logger:
+            logger.debug("Action : Shift and goto state %s", action)
+
+        if state.lookahead is not None:
+            state.symstack.append(state.lookahead)
+        state.lookahead = None
+
+        if state.errorcount:
+            state.errorcount -= 1
+
+    def _handle_reduce(
+        self, state: ParserState, action: int, pslice: "YaccProduction", logger: Optional["PlyLogger"]
+    ) -> None:
+        p = self.fsm.expect_production(-action)
+        sym = YaccSymbol(type=p.name, value=None)
+
+        if p.len:
+            self._handle_production_with_length(state, p, sym, pslice, logger)
+        else:
+            self._handle_empty_production(state, p, sym, pslice, logger)
+
+    def _handle_production_with_length(
+        self,
+        state: ParserState,
+        p: Production,
+        sym: "YaccSymbol",
+        pslice: "YaccProduction",
+        logger: Optional["PlyLogger"],
+    ) -> None:
+        if logger:
+            logger.info(
+                "Action : Reduce rule [%s] with %s and goto state %d",
+                p.str,
+                "[" + ",".join([format_stack_entry(_v.value) for _v in state.symstack[-p.len :]]) + "]",
+                self.fsm.expect_goto(state.statestack[-1 - p.len], p.name),
+            )
+        targ = state.symstack[-p.len - 1 :]
+        targ[0] = sym
+
+        if state.tracking:
+            self._update_tracking_info(sym, targ)
+
+        pslice.slice = targ
+        self.state = state.state
+        getattr(self.module, p.func)(pslice)
+
+        # todo: mark 1 - del before calling function above?
+        del state.symstack[-p.len :]
+        del state.statestack[-p.len :]
+
+        if logger:
+            logger.info("Result : %s", format_result(pslice[0]))
+
+        state.symstack.append(sym)
+        goto_state = self.fsm.expect_goto(state.statestack[-1], p.name)
+        state.statestack.append(goto_state)
+        state.state = goto_state
+
+    def _handle_empty_production(
+        self,
+        state: ParserState,
+        p: Any,
+        sym: "YaccSymbol",
+        pslice: "YaccProduction",
+        logger: Optional["PlyLogger"],
+    ) -> None:
+        if logger:
+            logger.info(
+                "Action : Reduce rule [%s] with %s and goto state %d",
+                p.str,
+                [],
+                self.fsm.expect_goto(state.statestack[-1], p.name),
+            )
+        if state.tracking:
+            sym.lineno = pslice.lexer.lineno
+            sym.lexpos = pslice.lexer.lexpos
+
+        pslice.slice = [sym]
+        self.state = state.state
+        getattr(self.module, p.func)(pslice)
+
+        if logger:
+            logger.info("Result : %s", format_result(pslice[0]))
+
+        state.symstack.append(sym)
+        goto_state = self.fsm.expect_goto(state.statestack[-1], p.name)
+        state.statestack.append(goto_state)
+        state.state = goto_state
+
+    def _handle_syntax_error(self, state: ParserState, pslice: "YaccProduction") -> None:
+        if state.lookahead:
+            state.lookaheadstack.append(state.lookahead)
+        state.statestack.pop()
+        state.state = state.statestack[-1]
+        sym = YaccSymbol(type="error", value="error")
+        state.lookahead = sym
+        state.errorcount = error_count
+        self.errorok = False
+
+    def _handle_accept(self, state: ParserState, logger: Optional["PlyLogger"]) -> Any:
+        result = getattr(state.symstack[-1], "value", None)
+        if logger:
+            logger.info("Done   : Returning %s", format_result(result))
+            logger.info("PLY: PARSE DEBUG END")
+        return result
+
+    def _handle_error(self, state: ParserState, lexer: Any, logger: Optional["PlyLogger"]) -> bool:
+        if logger:
+            self._log_error_info(logger, state)
+
+        # We have some kind of parsing error here.  To handle
+        # this, we are going to push the current token onto
+        # the tokenstack and replace it with an 'error' token.
+        # If there are any synchronization rules, they may
+        # catch it.
+        #
+        # In addition to pushing the error token, we call call
+        # the user defined p_error() function if this is the
+        # first syntax error.  This function is only called if
+        # errorcount == 0.
+        if state.errorcount == 0 or self.errorok:
+            return self._handle_first_error(state, lexer)
+
+        state.errorcount = error_count
+        return self._handle_error_recovery(state)
+
+    def _handle_first_error(self, state: ParserState, lexer: Any) -> bool:
+        state.errorcount = error_count
+        self.errorok = False
+
+        if state.lookahead and state.lookahead.type == "$end":
+            state.errtoken = None
+        else:
+            state.errtoken = state.lookahead
+
+        if self.errorfunc:
+            self.state = state.state
+            tok = self.errorfunc(state.errtoken)
+            if self.errorok:
+                state.lookahead = tok
+                state.errtoken = None
+                return True
+        else:
+            self._print_error_message(state.errtoken)
+            return False
+
+        return True
+
+    def _handle_error_recovery(self, state: ParserState) -> bool:
+        # case 1:  the statestack only has 1 entry on it.  If we're in this state, the
+        # entire parse has been rolled back and we're completely hosed.   The token is
+        # discarded and we just keep going.
+        if len(state.statestack) <= 1 and state.lookahead and state.lookahead.type != "$end":
+            state.lookahead = None
+            state.errtoken = None
+            state.state = 0
+            state.lookaheadstack.clear()
+            return True
+
+        # case 2: the statestack has a couple of entries on it, but we're
+        # at the end of the file. nuke the top entry and generate an error token
+
+        if state.lookahead and state.lookahead.type == "$end":
+            return False
+
+        if state.lookahead and state.lookahead.type != "error":
+            return self._handle_error_token(state)
+        else:
+            return self._handle_error_stack(state)
+
+    def _handle_error_token(self, state: ParserState) -> bool:
+        sym = state.symstack[-1]
+        if sym.type == "error":
+            # Hmmm. Error is on top of stack, we'll just nuke input
+            # symbol and continue
+            if state.tracking:
+                sym.endlineno = getattr(state.lookahead, "lineno", sym.lineno)
+                sym.endlexpos = getattr(state.lookahead, "lexpos", sym.lexpos)
+            state.lookahead = None
+            return True
+
+        new_error = YaccSymbol(type="error")
+        if hasattr(state.lookahead, "lineno"):
+            new_error.lineno = new_error.endlineno = state.lookahead.lineno
+        if hasattr(state.lookahead, "lexpos"):
+            new_error.lexpos = new_error.endlexpos = state.lookahead.lexpos
+        new_error.value = state.lookahead
+        state.lookaheadstack.append(state.lookahead)
+        state.lookahead = new_error
+        return True
+
+    def _handle_error_stack(self, state: ParserState) -> bool:
+        sym = state.symstack.pop()
+        if state.tracking and state.lookahead:
+            state.lookahead.lineno = sym.lineno
+            state.lookahead.lexpos = sym.lexpos
+        state.statestack.pop()
+        state.state = state.statestack[-1]
+        return True
+
+    def _update_tracking_info(self, sym: "YaccSymbol", targ: list["YaccSymbol"]) -> None:
+        t1 = targ[1]
+        sym.lineno = t1.lineno
+        sym.lexpos = t1.lexpos
+        t1 = targ[-1]
+        sym.endlineno = getattr(t1, "endlineno", t1.lineno)
+        sym.endlexpos = getattr(t1, "endlexpos", t1.lexpos)
+
+    def _log_error_info(self, logger: "PlyLogger", state: ParserState) -> None:
+        logger.error(
+            "Error  : %s",
+            (
+                "{} . {}".format(
+                    " ".join([xx.type for xx in state.symstack][1:]),
+                    str(state.lookahead),
+                )
+            ).lstrip(),
+        )
+
+    def _print_error_message(self, errtoken: Optional["YaccSymbol"]) -> None:
+        if errtoken:
+            lineno = getattr(errtoken, "lineno", 0)
+            if lineno:
+                sys.stderr.write(f"yacc: Syntax error at line {lineno}, token={errtoken.type}\n")
+            else:
+                sys.stderr.write(f"yacc: Syntax error, token={errtoken.type}")
+        else:
+            sys.stderr.write("yacc: Parse error in input. EOF\n")
 
 
 def load_parser(parser_table: Path | str, module: ParserProtocol) -> LRParser:
