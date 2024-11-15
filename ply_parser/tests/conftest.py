@@ -1,6 +1,9 @@
+import maturin_import_hook
 import pytest
 
 from tests.test_ast_parsing import dump_diff
+
+maturin_import_hook.install()
 
 
 @pytest.fixture(scope="session")
@@ -106,7 +109,7 @@ def check_xonsh(check_xonsh_ast):
 @pytest.fixture
 def eval_code(parser):
     def factory(inp, mode="eval", **loc_vars):
-        obs = parser.parse(inp, debug_level=1)
+        obs = parser.parse(inp, debug_level=0)
         bytecode = compile(obs, "<test-xonsh-ast>", mode)
         return eval(bytecode, loc_vars)
 
