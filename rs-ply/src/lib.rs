@@ -1,9 +1,8 @@
 mod data;
+mod lrparser;
+mod yacc_types;
 
 use pyo3::prelude::*;
-use std::io::BufRead;
-use serde::{Deserialize};
-
 
 /// A Python module implemented in Rust.
 #[pymodule]

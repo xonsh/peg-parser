@@ -6,11 +6,11 @@ use std::io::BufRead;
 
 #[pyclass(get_all, frozen)]
 #[derive(Debug, Clone, Deserialize)]
-struct Production {
-    name: String,
-    str: String,
-    func: String,
-    len: u8,
+pub struct Production {
+    pub name: String,
+    pub str: String,
+    pub func: String,
+    pub len: u8,
 }
 
 type MiniProduction = (String, u8, String, Option<String>);
@@ -53,7 +53,7 @@ where
 #[pymethods]
 impl StateMachine {
     #[new]
-    fn new_from_file(file_path: &str) -> PyResult<Self> {
+    pub fn new_from_file(file_path: &str) -> PyResult<Self> {
         // deserialize from JSONL file
         let file = std::fs::File::open(file_path)?;
         let mut reader = std::io::BufReader::new(file).lines();
