@@ -3,6 +3,7 @@ line-length = 110
 extend-exclude = [
     "tests/xonsh-data",
     "tests/data",
+    "ply_parser/tests/data",
     "pegen",
     "benchmarks",
     "tasks/bench_utils.py",
@@ -18,17 +19,17 @@ extend-select = [
     "I",
     "UP",
     "C90", # mccaabe complexity
-    "N", # pep8 naming
+    "N",   # pep8 naming
     "YTT", # flake8-2020 sys.version
     #    "ANN", # flake8 annotations
-    "A", # flake8-builtins
-    "C4", # flake8-comprehensions
-    "FA", # flake8-future-annotations
-    "PIE", # flake8-pie
-    "PT", # pytest
-    "SIM", # simplify
-    "TCH", # type checking
-    "PL", # pylint
+    "A",    # flake8-builtins
+    "C4",   # flake8-comprehensions
+    "FA",   # flake8-future-annotations
+    "PIE",  # flake8-pie
+    "PT",   # pytest
+    "SIM",  # simplify
+    "TCH",  # type checking
+    "PL",   # pylint
     "PERF", # performance
     #    "FURB", # modernize
     "RUF", # ruff
@@ -38,21 +39,21 @@ extend-safe-fixes = ["FA", "TCH", "PT"]
 # ruff ignore file "xonsh_parser/ply/yacc.py"
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = [
-    "ANN", # requiring annotations
-    "PL", # pylint
-    "PT023", # [*] Use `@pytest.mark.xfail()` over `@pytest.mark.xfail`
-    "PT001", # [*] Use `@pytest.mark.parametrize` instead of `@pytest.mark.parametrize`
-    "PT006", # need tuple
-    "PT007", # Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+    "ANN",    # requiring annotations
+    "PL",     # pylint
+    "PT023",  # [*] Use `@pytest.mark.xfail()` over `@pytest.mark.xfail`
+    "PT001",  # [*] Use `@pytest.mark.parametrize` instead of `@pytest.mark.parametrize`
+    "PT006",  # need tuple
+    "PT007",  # Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
     "RUF001", # similar chars
-    "E402", # module level import not at top of file
+    "E402",   # module level import not at top of file
 ]
 "peg_parser/parser.py" = [
-    "A", # flake8-builtins
-    "C90", # mccaabe complexity
-    "PLR0", # Too many arguments
+    "A",      # flake8-builtins
+    "C90",    # mccaabe complexity
+    "PLR0",   # Too many arguments
     "RUF005", # concatenation
-    "F841", # [*] Local variable `strstart` is assigned to but never used
+    "F841",   # [*] Local variable `strstart` is assigned to but never used
 ]
 "tests/test_subproc_macros.py" = ["PT014"]
 "tasks/generator.py" = ["N802", "PLR0913", "PLR2004", "C901"]
@@ -69,7 +70,7 @@ extend-safe-fixes = ["FA", "TCH", "PT"]
     "F821", # Undefined name `strstart`
     "F841", # [*] Local variable `strstart` is assigned to but never used
     "B904", # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
-    "PLR", # pylint
+    "PLR",  # pylint
     "C901", # too complex
     "N818", # exception naming
 ]
@@ -78,19 +79,19 @@ extend-safe-fixes = ["FA", "TCH", "PT"]
 ]
 "ply_parser/*.py" = [
     "PLR0913", # too many arguments
-    "N8", # pep8 naming
-    "UP", # pyupgrade
-    "PLR", # pylint
-    "C901", # too complex
-    "SIM", # simplification
-    "PIE", # flake8-pie
+    "N8",      # pep8 naming
+    "UP",      # pyupgrade
+    "PLR",     # pylint
+    "C901",    # too complex
+    "SIM",     # simplification
+    "PIE",     # flake8-pie
     "RUF",
-    "PERF", # performance
+    "PERF",    # performance
     "E721",
     "E741",
-    "C408", # Unnecessary `dict` call (rewrite as a literal)
+    "C408",    # Unnecessary `dict` call (rewrite as a literal)
     "A001",
-    "A002"
+    "A002",
 ]
 "ply_parser/tests/*.py" = [
     "C4",
@@ -98,31 +99,29 @@ extend-safe-fixes = ["FA", "TCH", "PT"]
     "B017",
     "F821",
     "B021",
-    "A002", # builtin shadowing
-    "B007", # Loop control variable `rule` not used within loop body
+    "A002",  # builtin shadowing
+    "B007",  # Loop control variable `rule` not used within loop body
 ]
 "ply_parser/ply/*.py" = [
     "B007", # Loop control variable `rule` not used within loop body
-    "PLW", # pylint warning
+    "PLW",  # pylint warning
     "B904",
     "E741", # Ambiguous variable name: `l`
     "E731",
     "A0",
     "C419",
-    "C408"
+    "C408",
 ]
 "ply_parser/parsers/*.py" = [
-    "C419", # unnecessary comprehension
-    "E741", # Ambiguous variable name: `l`
-    "C408", # Unnecessary `dict` call (rewrite as a literal)
+    "C419",    # unnecessary comprehension
+    "E741",    # Ambiguous variable name: `l`
+    "C408",    # Unnecessary `dict` call (rewrite as a literal)
     "C416",
     "A001",
     "A002",
     "PLW2901",
 ]
-"ply_parser/xast.py" = [
-    "F401"
-]
+"ply_parser/xast.py" = ["F401"]
 [tool.pytest.ini_options]
 log_file = "pytest.log"
 log_file_level = "DEBUG"
@@ -131,10 +130,7 @@ log_file_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(line
 #addopts = "--benchmark-skip"
 
 [tool.uv.workspace]
-members = [
-    "xonsh_tokenizer",
-    "rs-ply",
-]
+members = ["xonsh_tokenizer", "rs-ply"]
 [tool.uv.sources]
 xonsh_tokenizer = { workspace = true }
 rs-ply = { workspace = true }
@@ -150,6 +146,8 @@ test = [
     "xonsh>=0.12.0",
     "tree-sitter-python @ git+https://github.com/tree-sitter/tree-sitter-python",
     "maturin-import-hook>=0.1.0",
+    "syrupy",
+    "pyyaml>=6.0.2",
 ]
 dev = [
     "flask>=3.0.3",
@@ -225,6 +223,6 @@ local_partial_types = true
 warn_unreachable = false
 disable_error_code = [
     "func-returns-value", # 61
-    "arg-type", # 331 errors
+    "arg-type",           # 331 errors
 ]
 #strict = false
