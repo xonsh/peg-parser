@@ -1,84 +1,164 @@
-bg:
-  - "$(emacs ugggh &)"
-  - "$(emacs ugggh&)"
-  - $(emacs ugggh &)
-  - $(emacs ugggh&)
-
-combinators:
-  - "$(ls | grep wakka)"
-  - "$(ls | grep wakka | grep jawaka)"
-  - "![ls me] and ![grep wakka]"
-  - "![ls] and ![grep wakka] and ![grep jawaka]"
-  - "![ls] && ![grep wakka]"
-  - "![ls] && ![grep wakka] && ![grep jawaka]"
-  - "![ls] or ![grep wakka]"
-  - "![ls] or ![grep wakka] or ![grep jawaka]"
-  - "![ls] || ![grep wakka]"
-  - "![ls] || ![grep wakka] || ![grep jawaka]"
-
 env:
-  - "$WAKKA"
-  - ${None or $JAWAKA}
+- inp: $WAKKA
+  exp: __xonsh__.env['WAKKA']
+- inp: ${None or $JAWAKA}
+  exp: __xonsh__.env[None or __xonsh__.env['JAWAKA']]
 
+captured:
+- inp: $(cmd sub-cmd --opt)
+  exp: __xonsh__.subproc_captured_stdout(['cmd', 'sub-cmd', '--opt'])
+- inp: $[cmd sub-cmd --opt]
+  exp: __xonsh__.subproc_uncaptured(['cmd', 'sub-cmd', '--opt'])
+- inp: $[git commit -am "wakka"]
+  exp: __xonsh__.subproc_uncaptured(['git', 'commit', '-am', 'wakka'])
+- inp: $[git commit -am "wakka jawaka"]
+  exp: __xonsh__.subproc_uncaptured(['git', 'commit', '-am', 'wakka jawaka'])
+- inp: $[ls "wakka jawaka baraka"]
+  exp: __xonsh__.subproc_uncaptured(['ls', 'wakka jawaka baraka'])
+uncaptured:
+- inp: '![cmd sub-cmd --opt]'
+  exp: __xonsh__.subproc_captured_hiddenobject(['cmd', 'sub-cmd', '--opt'])
+- inp: '!(cmd sub-cmd --opt)'
+  exp: __xonsh__.subproc_captured_object(['cmd', 'sub-cmd', '--opt'])
+- inp: '![git commit -am "wakka"]'
+  exp: __xonsh__.subproc_captured_hiddenobject(['git', 'commit', '-am', 'wakka'])
+- inp: '![git commit -am "wakka jawaka"]'
+  exp: __xonsh__.subproc_captured_hiddenobject(['git', 'commit', '-am', 'wakka jawaka'])
+- inp: '![ls "wakka jawaka baraka"]'
+  exp: __xonsh__.subproc_captured_hiddenobject(['ls', 'wakka jawaka baraka'])
+- inp: '![echo ,]'
+  exp: __xonsh__.subproc_captured_hiddenobject(['echo', ','])
+- inp: '![echo 1,2]'
+  exp: __xonsh__.subproc_captured_hiddenobject(['echo', '1,2'])
+- inp: "!(echo '$foo')"
+  exp: __xonsh__.subproc_captured_object(['echo', '$foo'])
+- inp: "!(echo r'$foo')"
+  exp: __xonsh__.subproc_captured_object(['echo', '$foo'])
+combinators:
+- inp: $(ls | grep wakka)
+  exp: __xonsh__.subproc_captured_stdout(['ls'], '|', ['grep', 'wakka'])
+- inp: $(ls | grep wakka | grep jawaka)
+  exp: __xonsh__.subproc_captured_stdout(['ls'], '|', ['grep', 'wakka'], '|', ['grep',
+    'jawaka'])
+- inp: '![ls me] and ![grep wakka]'
+  exp: __xonsh__.subproc_captured_hiddenobject(['ls', 'me']) and __xonsh__.subproc_captured_hiddenobject(['grep',
+    'wakka'])
+- inp: '![ls] and ![grep wakka] and ![grep jawaka]'
+  exp: __xonsh__.subproc_captured_hiddenobject(['ls']) and __xonsh__.subproc_captured_hiddenobject(['grep',
+    'wakka']) and __xonsh__.subproc_captured_hiddenobject(['grep', 'jawaka'])
+- inp: '![ls] && ![grep wakka]'
+  exp: __xonsh__.subproc_captured_hiddenobject(['ls']) and __xonsh__.subproc_captured_hiddenobject(['grep',
+    'wakka'])
+- inp: '![ls] && ![grep wakka] && ![grep jawaka]'
+  exp: __xonsh__.subproc_captured_hiddenobject(['ls']) and __xonsh__.subproc_captured_hiddenobject(['grep',
+    'wakka']) and __xonsh__.subproc_captured_hiddenobject(['grep', 'jawaka'])
+- inp: '![ls] or ![grep wakka]'
+  exp: __xonsh__.subproc_captured_hiddenobject(['ls']) or __xonsh__.subproc_captured_hiddenobject(['grep',
+    'wakka'])
+- inp: '![ls] or ![grep wakka] or ![grep jawaka]'
+  exp: __xonsh__.subproc_captured_hiddenobject(['ls']) or __xonsh__.subproc_captured_hiddenobject(['grep',
+    'wakka']) or __xonsh__.subproc_captured_hiddenobject(['grep', 'jawaka'])
+- inp: '![ls] || ![grep wakka]'
+  exp: __xonsh__.subproc_captured_hiddenobject(['ls']) or __xonsh__.subproc_captured_hiddenobject(['grep',
+    'wakka'])
+- inp: '![ls] || ![grep wakka] || ![grep jawaka]'
+  exp: __xonsh__.subproc_captured_hiddenobject(['ls']) or __xonsh__.subproc_captured_hiddenobject(['grep',
+    'wakka']) or __xonsh__.subproc_captured_hiddenobject(['grep', 'jawaka'])
+bg:
+- inp: $(emacs ugggh &)
+  exp: __xonsh__.subproc_captured_stdout(['emacs', 'ugggh'], '&')
+- inp: $(emacs ugggh&)
+  exp: __xonsh__.subproc_captured_stdout(['emacs', 'ugggh'], '&')
+- inp: $(emacs ugggh &)
+  exp: __xonsh__.subproc_captured_stdout(['emacs', 'ugggh'], '&')
+- inp: $(emacs ugggh&)
+  exp: __xonsh__.subproc_captured_stdout(['emacs', 'ugggh'], '&')
 globs:
-  - "`hello`"
-  - "$(ls `#[Ff]+i*LE` -l)"
-  - "$(ls r`[Ff]+i*LE` -l)"
-  - "$(ls r`#[Ff]+i*LE` -l)"
-  - "$(ls g`[Ff]+i*LE` -l)"
-  - "$(ls g`#[Ff]+i*LE` -l)"
-  - "$(ls @foo`[Ff]+i*LE` -l)"
-  - "print(@foo`.*`)"
-  - "$(ls @foo`#[Ff]+i*LE` -l)"
-  - "print(`#.*`)"
-  - "$(ls `[Ff]+i*LE` -l)"
+- inp: '`hello`'
+  exp: __xonsh__.pathsearch(__xonsh__.regexsearch, 'hello', True, False)
+- inp: $(ls `#[Ff]+i*LE` -l)
+  exp: __xonsh__.subproc_captured_stdout(['ls'] + __xonsh__.pathsearch(__xonsh__.regexsearch,
+    '#[Ff]+i*LE', False, False) + ['-l'])
+- inp: $(ls r`[Ff]+i*LE` -l)
+  exp: __xonsh__.subproc_captured_stdout(['ls'] + __xonsh__.pathsearch(__xonsh__.regexsearch,
+    '[Ff]+i*LE', False, False) + ['-l'])
+- inp: $(ls r`#[Ff]+i*LE` -l)
+  exp: __xonsh__.subproc_captured_stdout(['ls'] + __xonsh__.pathsearch(__xonsh__.regexsearch,
+    '#[Ff]+i*LE', False, False) + ['-l'])
+- inp: $(ls g`[Ff]+i*LE` -l)
+  exp: __xonsh__.subproc_captured_stdout(['ls'] + __xonsh__.pathsearch(__xonsh__.globsearch,
+    '[Ff]+i*LE', False, False) + ['-l'])
+- inp: $(ls g`#[Ff]+i*LE` -l)
+  exp: __xonsh__.subproc_captured_stdout(['ls'] + __xonsh__.pathsearch(__xonsh__.globsearch,
+    '#[Ff]+i*LE', False, False) + ['-l'])
+- inp: $(ls @foo`[Ff]+i*LE` -l)
+  exp: __xonsh__.subproc_captured_stdout(['ls'] + __xonsh__.pathsearch(foo, '[Ff]+i*LE',
+    False, False) + ['-l'])
+- inp: print(@foo`.*`)
+  exp: print(__xonsh__.pathsearch(foo, '.*', True, False))
+- inp: $(ls @foo`#[Ff]+i*LE` -l)
+  exp: __xonsh__.subproc_captured_stdout(['ls'] + __xonsh__.pathsearch(foo, '#[Ff]+i*LE',
+    False, False) + ['-l'])
+- inp: print(`#.*`)
+  exp: print(__xonsh__.pathsearch(__xonsh__.regexsearch, '#.*', True, False))
+- inp: $(ls `[Ff]+i*LE` -l)
 
+  exp: __xonsh__.subproc_captured_stdout(['ls'] + __xonsh__.pathsearch(__xonsh__.regexsearch,
+    '[Ff]+i*LE', False, False) + ['-l'])
 help:
-  - "range?"
-  - "range?.index?"
-  - "range??"
+- inp: range?
+  exp: __xonsh__.help(range)
+- inp: range?.index?
+  exp: __xonsh__.help(__xonsh__.help(range).index)
+- inp: range??
+  exp: __xonsh__.superhelp(range)
 
 path-literals:
-  - p"/foo"
-  - pr"/foo"
-  - rp"/foo"
-  - pR"/foo"
-  - Rp"/foo"
-  - pf"/foo"
-  - fp"/foo"
-  - pF"/foo"
-  - Fp"/foo"
-  - pf"/foo{1+1}"
-  - fp"/foo{1+1}"
-  - pF"/foo{1+1}"
-  - Fp"/foo{1+1}"
+- inp: p"/foo"
+  exp: __xonsh__.path_literal('/foo')
+- inp: pr"/foo"
+  exp: __xonsh__.path_literal('/foo')
+- inp: rp"/foo"
+  exp: __xonsh__.path_literal('/foo')
+- inp: pR"/foo"
+  exp: __xonsh__.path_literal('/foo')
+- inp: Rp"/foo"
+  exp: __xonsh__.path_literal('/foo')
+- inp: pf"/foo"
+  exp: __xonsh__.path_literal(f'/foo')
+- inp: fp"/foo"
+  exp: __xonsh__.path_literal(f'/foo')
+- inp: pF"/foo"
+  exp: __xonsh__.path_literal(f'/foo')
+- inp: Fp"/foo"
+  exp: __xonsh__.path_literal(f'/foo')
+- inp: pf"/foo{1+1}"
+  exp: __xonsh__.path_literal(f'/foo{1 + 1}')
+- inp: fp"/foo{1+1}"
+  exp: __xonsh__.path_literal(f'/foo{1 + 1}')
+- inp: pF"/foo{1+1}"
+  exp: __xonsh__.path_literal(f'/foo{1 + 1}')
+- inp: Fp"/foo{1+1}"
+  exp: __xonsh__.path_literal(f'/foo{1 + 1}')
 
-proc-injection:
-  - "$[@$(which python)]"
-  - "$[ls @$(dirname @$(which python))]"
-  - "![a@$(echo 1 2)b]"
+#proc-injection:
+#- inp: $[@$(which python)]
+#- inp: $[ls @$(dirname @$(which python))]
+#- inp: '![a@$(echo 1 2)b]'
 
 redirects:
-  - "!(ls >> x.py)"
-  - "!(ls | grep wakka > x.py)"
-  - "!(ls | grep wakka >> x.py)"
-  - "$(ls > x.py)"
-  - "$(ls >> x.py)"
-  - "$(ls | grep wakka > x.py)"
-  - "$(ls | grep wakka >> x.py)"
+- inp: '!(ls >> x.py)'
+  exp: __xonsh__.subproc_captured_object(['ls', ('>>', 'x.py')])
+- inp: '!(ls | grep wakka > x.py)'
+  exp: __xonsh__.subproc_captured_object(['ls'], '|', ['grep', 'wakka', ('>', 'x.py')])
+- inp: '!(ls | grep wakka >> x.py)'
+  exp: __xonsh__.subproc_captured_object(['ls'], '|', ['grep', 'wakka', ('>>', 'x.py')])
+- inp: $(ls > x.py)
+  exp: __xonsh__.subproc_captured_stdout(['ls', ('>', 'x.py')])
+- inp: $(ls >> x.py)
+  exp: __xonsh__.subproc_captured_stdout(['ls', ('>>', 'x.py')])
+- inp: $(ls | grep wakka > x.py)
+  exp: __xonsh__.subproc_captured_stdout(['ls'], '|', ['grep', 'wakka', ('>', 'x.py')])
+- inp: $(ls | grep wakka >> x.py)
 
-subproc:
-  - "$(cmd sub-cmd --opt)"
-  - "$[cmd sub-cmd --opt]"
-  - "![cmd sub-cmd --opt]"
-  - "!(cmd sub-cmd --opt)"
-  - '![git commit -am "wakka"]'
-  - '![git commit -am "wakka jawaka"]'
-  - '![ls "wakka jawaka baraka"]'
-  - '$[git commit -am "wakka"]'
-  - '$[git commit -am "wakka jawaka"]'
-  - '$[ls "wakka jawaka baraka"]'
-  - "![echo ,]"
-  - "![echo 1,2]"
-  - "!(echo '$foo')"
-  - "!(echo r'$foo')"
+  exp: __xonsh__.subproc_captured_stdout(['ls'], '|', ['grep', 'wakka', ('>>', 'x.py')])

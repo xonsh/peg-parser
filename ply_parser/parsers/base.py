@@ -3237,7 +3237,7 @@ class BaseParser:
         if hasattr(p[1], "is_raw") and p[1].is_raw:
             p0 = p[1]
         else:
-            p0 = xonsh_call("__xonsh__.expand_path", args=[p[1]], lineno=self.lineno, col=self.col)
+            p0 = p[1]
         p0._cliarg_action = "append"
         p[0] = p0
 
@@ -3259,7 +3259,7 @@ class BaseParser:
             p0._cliarg_action = "extend"
         else:
             # literal str argument
-            p0 = xonsh_call("__xonsh__.expand_path", args=[p1], lineno=p1.lineno, col=p1.col_offset)
+            p0 = p1
             p0._cliarg_action = "append"
         p[0] = p0
 

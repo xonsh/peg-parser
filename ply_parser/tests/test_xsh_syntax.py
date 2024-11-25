@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+from .yaml_snaps import yaml_line_items
+
 
 def get_cases(path: Path, splitter="# "):
     inp = []
@@ -34,21 +36,9 @@ def glob_data_param(pattern: str):
             yield pytest.param(inp, exp, id=f"{path.name}-{idx}")
 
 
-def yaml_line_items(*names: str):
-    for name in names:
-        path = Path(__file__).parent.joinpath("data").joinpath(f"{name}.yml")
-        import yaml
-
-        with path.open("r") as file:
-            data = yaml.safe_load(file)
-        for case, lines in data.items():
-            for idx, inp in enumerate(lines):
-                yield pytest.param(inp, id=f"{path.name}-{case}-{idx}")
-
-
-@pytest.mark.parametrize("inp", yaml_line_items("exprs", "stmts"))
-def test_line_items(inp, unparse, snapshot):
-    assert unparse(inp) == snapshot
+@pytest.mark.parametrize(("inp", "snapped"), yaml_line_items("exprs", "stmts"), indirect=["snapped"])
+def test_line_items(inp, unparse, snapped):
+    snapped.matches(unparse(inp))
 
 
 @pytest.mark.parametrize(("inp", "exp"), glob_data_param("fstring_py312.py"))
