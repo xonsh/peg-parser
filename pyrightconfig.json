@@ -1,0 +1,12 @@
+{
+  "include": ["peg_parser/", "pegen/", "ply_parser/", "tasks/", "tests/"],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "src/experimental",
+    "src/typestubs",
+    ".local",
+    ".venv",
+    "tests/data"
+  ]
+}
