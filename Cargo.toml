@@ -1,6 +1,9 @@
 [workspace]
 resolver = "2"
-members = [
-    "xonsh_tokenizer",
-    "rs-ply",
-]
+members = ["xonsh_tokenizer", "rs-ply"]
+
+[workspace.dependencies]
+pyo3 = { version = "0.23.*", features = [
+    "extension-module",
+    "experimental-inspect",
+] }

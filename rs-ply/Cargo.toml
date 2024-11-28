@@ -9,7 +9,7 @@ name = "rs_ply"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.22.0"
+pyo3 = { workspace = true }
 serde_json = "*"
 serde = { version = "1.0.215", features = ["derive"] }
 log = "*"
