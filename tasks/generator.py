@@ -284,7 +284,7 @@ def main(output_file=None, grammar_file=None):
     grammar_file = grammar_file or Path(__file__).with_name("xonsh.gram")
     grammar, *_ = build_parser(str(grammar_file))
     with output_file.open("w") as file:
-        gen = XonshParserGenerator(grammar, file)
+        gen = XonshParserGenerator(grammar, file, memoize_all=True)
         gen.generate(str(grammar_file))
     return gen
 
