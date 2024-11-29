@@ -106,9 +106,9 @@ def memoize(method: F) -> F:
     """Memoize a symbol method."""
     method_name = method.__name__
 
-    def memoize_wrapper(self: P, *args: str | Token) -> Any:
+    def memoize_wrapper(self: P) -> Any:
         mark = self._mark()
-        key = mark, method_name, args
+        key = mark, method_name
         # Fast path: cache hit, and not verbose.
         if key in self._cache and not self._verbose:
             tree, endmark = self._cache[key]
@@ -117,13 +117,12 @@ def memoize(method: F) -> F:
         # Slow path: no cache hit, or verbose.
         verbose, argsr, fill = self._verbose, "", ""
         if verbose:
-            argsr = ",".join(repr(arg) for arg in args)
             fill = "  " * self._level
         if key not in self._cache:
             if verbose:
                 print(f"{fill}{method_name}({argsr}) ... (looking at {self.showpeek()})")
                 self._level += 1
-            tree = method(self, *args)
+            tree = method(self)
             if verbose:
                 self._level -= 1
                 print(f"{fill}... {method_name}({argsr}) -> {tree!s:.200}")
@@ -146,7 +145,7 @@ def memoize_left_rec(method: Callable[[P], T | None]) -> Callable[[P], T | None]
 
     def memoize_left_rec_wrapper(self: P) -> T | Any | None:
         mark = self._mark()
-        key = mark, method_name, ()
+        key = mark, method_name
         # Fast path: cache hit, and not verbose.
         if key in self._cache and not self._verbose:
             tree, endmark = self._cache[key]
@@ -273,7 +272,7 @@ class Parser:
         self._tokenizer = tokenizer
         self._verbose = verbose
         self._level = 0
-        self._cache: dict[tuple[Mark, str, tuple[Any, ...]], tuple[Any, Mark]] = {}
+        self._cache: dict[tuple[Mark, str], tuple[Any, Mark]] = {}
 
         # Integer tracking wether we are in a left recursive rule or not. Can be useful
         # for error reporting.

@@ -51,7 +51,18 @@ def main():
     print(f"ast: {ast}", type(ast))
 
 
+def parse_large_file():
+    from pathlib import Path
+
+    from peg_parser.parser import XonshParser
+
+    file = Path(__file__).parent.parent / "peg_parser" / "parser.py"
+    parser = XonshParser
+    parser.parse_file(file)
+
+
 if __name__ == "__main__":
-    main()
+    # main()
     # sm()
-    print_memstats()
+    # print_memstats()
+    parse_large_file()
