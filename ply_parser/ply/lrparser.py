@@ -148,6 +148,7 @@ class ParserProtocol(Protocol):
 
 @dataclass
 class ParserState:
+    fsm: StateMachine
     statestack: list[int]  # Stack of parsing states
     symstack: list["YaccSymbol"]  # Stack of grammar symbols
     lookahead: Optional["YaccSymbol"]  # Current lookahead symbol
@@ -311,7 +312,7 @@ class LRParser:
                     try:
                         self._handle_reduce(parser_state, action, pslice, logger)
                     except SyntaxError:
-                        self._handle_syntax_error(parser_state, pslice)
+                        self._handle_syntax_error(parser_state)
                     continue
                 elif action == 0:
                     return parser_state._handle_accept(logger)
@@ -336,6 +337,7 @@ class LRParser:
 
         # The start state is assumed to be (0,$end)
         return ParserState(
+            fsm=self.fsm,
             statestack=[0],
             symstack=[YaccSymbol(type="$end")],
             lookahead=None,
@@ -446,7 +448,7 @@ class LRParser:
         state.statestack.append(goto_state)
         state.state = goto_state
 
-    def _handle_syntax_error(self, state: ParserState, pslice: "YaccProduction") -> None:
+    def _handle_syntax_error(self, state: ParserState) -> None:
         if state.lookahead:
             state.lookaheadstack.append(state.lookahead)
         state.statestack.pop()
