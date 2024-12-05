@@ -190,3 +190,7 @@ proc-py:
 procs:
   - inp: "$(echo $WAKKA/place p@(a)q)"
     exp: __xonsh__.subproc_captured_stdout(['echo', '$WAKKA/place'] + __xonsh__.list_of_list_of_strs_outer_product(('p', __xonsh__.list_of_strs_or_callables(a), 'q')))
+
+prefixes:
+  - inp: "![echo $WAKKA/place]"
+    exp: __xonsh__.subproc_captured_hiddenobject(['echo', '$WAKKA/place'])
