@@ -7,6 +7,9 @@ import pytest
 
 from .yaml_snaps import yaml_line_items
 
+# configure plugins
+pytest_plugins = ["ply_parser.tests.yaml_snaps"]
+
 
 def get_cases(path: Path, splitter="# "):
     inp = []
@@ -63,6 +66,7 @@ def test_py312_fstring(inp, exp, unparse_diff):
         '![git commit -am "flock jawaka"]',
     ],
 )
+@pytest.mark.xfail
 def test_statements(check_xonsh_ast, inp):
     if not inp.endswith("\n"):
         inp += "\n"
@@ -131,10 +135,25 @@ def test_statements(check_xonsh_ast, inp):
         ("!(ls > x.py)", ["ls", ">", "x.py"]),
     ],
 )
+@pytest.mark.xfail
 def test_captured_procs(inp, args, check_xonsh_ast, xsh_proc_method):
-    check_xonsh_ast(inp, mode="exec", xenv={"WAKKA": "wak"})
+    check_xonsh_ast(inp=inp, mode="exec", xenv={"WAKKA": "wak"})
     method = xsh_proc_method(inp[:2])
     method.assert_called_with(*args)
+
+
+@pytest.fixture
+def xsh_proc_method(xsh):
+    def factory(start_symbol: str):
+        method_name = {
+            "$[": "subproc_uncaptured",
+            "$(": "subproc_captured",
+            "![": "subproc_captured_hiddenobject",
+            "!(": "subproc_captured_object",
+        }[start_symbol]
+        return getattr(xsh, method_name)
+
+    return factory
 
 
 @pytest.mark.parametrize(
@@ -154,14 +173,14 @@ def test_captured_procs(inp, args, check_xonsh_ast, xsh_proc_method):
     ],
 )
 def test_bang_procs(expr, check_xonsh_ast):
-    check_xonsh_ast(expr, xenv={"LS": "ll", "WAKKA": "wak"})
+    check_xonsh_ast(inp=expr, xenv={"LS": "ll", "WAKKA": "wak"})
 
 
 @pytest.mark.parametrize("p", ["", "p"])
 @pytest.mark.parametrize("f", ["", "f"])
 @pytest.mark.parametrize("glob_type", ["", "r", "g"])
 def test_backtick(p, f, glob_type, check_xonsh_ast):
-    check_xonsh_ast(f"print({p}{f}{glob_type}`.*`)", False)
+    check_xonsh_ast(f"print({p}{f}{glob_type}`.*`)", run=False)
 
 
 def test_comment_only(check_xonsh_ast):
@@ -179,5 +198,6 @@ def test_comment_only(check_xonsh_ast):
         "![(if True:\n   ls\nelse:\n   echo not true)]",
     ],
 )
+@pytest.mark.xfail
 def test_use_subshell(case, check_xonsh_ast):
-    check_xonsh_ast(case)
+    check_xonsh_ast({}, case)

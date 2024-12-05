@@ -101,6 +101,7 @@ extend-safe-fixes = ["FA", "TCH", "PT"]
     "B021",
     "A002",  # builtin shadowing
     "B007",  # Loop control variable `rule` not used within loop body
+    "E402",  # module level import not at top of file
 ]
 "ply_parser/ply/*.py" = [
     "B007", # Loop control variable `rule` not used within loop body

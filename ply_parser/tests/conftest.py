@@ -1,9 +1,10 @@
-import maturin_import_hook
+# fmt: off
+import maturin_import_hook; maturin_import_hook.install()  # noqa
+# fmt: on
+
 import pytest
 
 from tests.test_ast_parsing import dump_diff
-
-maturin_import_hook.install()
 
 
 @pytest.fixture(scope="session")
@@ -75,7 +76,7 @@ def check_stmts(check_ast):
 def check_xonsh_ast(xsh, parser):
     def factory(
         xenv,
-        inp,
+        inp="",
         run=True,
         mode="eval",
         debug_level=0,
@@ -83,8 +84,11 @@ def check_xonsh_ast(xsh, parser):
         globals=None,
         locals=None,
     ):
-        xsh.env.update(xenv)
-        obs = parser.parse(inp, debug_level=debug_level)
+        if isinstance(xenv, dict):
+            xsh.env.update(xenv)
+        elif not inp:
+            inp = xenv
+        obs = parser.parse(inp, debug_level=debug_level, mode=mode)
         if obs is None:
             return  # comment only
         bytecode = compile(obs, "<test-xonsh-ast>", mode)
