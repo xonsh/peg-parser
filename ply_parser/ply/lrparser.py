@@ -168,6 +168,90 @@ class ParserState:
             ).lstrip(),
         )
 
+    def _handle_shift(state, action: int, logger: Optional["PlyLogger"]) -> None:
+        state.statestack.append(action)
+        state.state = action
+
+        if logger:
+            logger.debug("Action : Shift and goto state %s", action)
+
+        if state.lookahead is not None:
+            state.symstack.append(state.lookahead)
+        state.lookahead = None
+
+        if state.errorcount:
+            state.errorcount -= 1
+
+    def _handle_accept(state, logger: Optional["PlyLogger"]) -> Any:
+        result = getattr(state.symstack[-1], "value", None)
+        if logger:
+            logger.info("Done   : Returning %s", format_result(result))
+            logger.info("PLY: PARSE DEBUG END")
+        return result
+
+    def _log_error_info(state, logger: "PlyLogger") -> None:
+        logger.error(
+            "Error  : %s",
+            (
+                "{} . {}".format(
+                    " ".join([xx.type for xx in state.symstack][1:]),
+                    str(state.lookahead),
+                )
+            ).lstrip(),
+        )
+
+    def _handle_error_stack(state) -> bool:
+        sym = state.symstack.pop()
+        if state.tracking and state.lookahead:
+            state.lookahead.lineno = sym.lineno
+            state.lookahead.lexpos = sym.lexpos
+        state.statestack.pop()
+        state.state = state.statestack[-1]
+        return True
+
+    def _handle_error_token(state) -> bool:
+        sym = state.symstack[-1]
+        if sym.type == "error":
+            # Hmmm. Error is on top of stack, we'll just nuke input
+            # symbol and continue
+            if state.tracking:
+                sym.endlineno = getattr(state.lookahead, "lineno", sym.lineno)
+                sym.endlexpos = getattr(state.lookahead, "lexpos", sym.lexpos)
+            state.lookahead = None
+            return True
+
+        new_error = YaccSymbol(type="error")
+        if hasattr(state.lookahead, "lineno"):
+            new_error.lineno = new_error.endlineno = state.lookahead.lineno
+        if hasattr(state.lookahead, "lexpos"):
+            new_error.lexpos = new_error.endlexpos = state.lookahead.lexpos
+        new_error.value = state.lookahead
+        state.lookaheadstack.append(state.lookahead)
+        state.lookahead = new_error
+        return True
+
+    def _handle_error_recovery(state) -> bool:
+        # case 1:  the statestack only has 1 entry on it.  If we're in this state, the
+        # entire parse has been rolled back and we're completely hosed.   The token is
+        # discarded and we just keep going.
+        if len(state.statestack) <= 1 and state.lookahead and state.lookahead.type != "$end":
+            state.lookahead = None
+            state.errtoken = None
+            state.state = 0
+            state.lookaheadstack.clear()
+            return True
+
+        # case 2: the statestack has a couple of entries on it, but we're
+        # at the end of the file. nuke the top entry and generate an error token
+
+        if state.lookahead and state.lookahead.type == "$end":
+            return False
+
+        if state.lookahead and state.lookahead.type != "error":
+            return state._handle_error_token()
+        else:
+            return state._handle_error_stack()
+
 
 class LRParser:
     """The LR Parsing engine.  This is the core of the PLY parser generator."""
@@ -220,7 +304,7 @@ class LRParser:
 
             if action is not None:
                 if action > 0:
-                    self._handle_shift(parser_state, action, logger)
+                    parser_state._handle_shift(action, logger)
                     continue
                 elif action < 0:
                     # reduce a symbol on the stack, emit a production
@@ -230,7 +314,7 @@ class LRParser:
                         self._handle_syntax_error(parser_state, pslice)
                     continue
                 elif action == 0:
-                    return self._handle_accept(parser_state, logger)
+                    return parser_state._handle_accept(logger)
 
             # Handle error case when action is None
             if not self._handle_error(parser_state, lexer, logger):
@@ -282,20 +366,6 @@ class LRParser:
         if not token:
             return YaccSymbol(type="$end")
         return token
-
-    def _handle_shift(self, state: ParserState, action: int, logger: Optional["PlyLogger"]) -> None:
-        state.statestack.append(action)
-        state.state = action
-
-        if logger:
-            logger.debug("Action : Shift and goto state %s", action)
-
-        if state.lookahead is not None:
-            state.symstack.append(state.lookahead)
-        state.lookahead = None
-
-        if state.errorcount:
-            state.errorcount -= 1
 
     def _handle_reduce(
         self, state: ParserState, action: int, pslice: "YaccProduction", logger: Optional["PlyLogger"]
@@ -386,16 +456,9 @@ class LRParser:
         state.errorcount = error_count
         self.errorok = False
 
-    def _handle_accept(self, state: ParserState, logger: Optional["PlyLogger"]) -> Any:
-        result = getattr(state.symstack[-1], "value", None)
-        if logger:
-            logger.info("Done   : Returning %s", format_result(result))
-            logger.info("PLY: PARSE DEBUG END")
-        return result
-
     def _handle_error(self, state: ParserState, lexer: Any, logger: Optional["PlyLogger"]) -> bool:
         if logger:
-            self._log_error_info(logger, state)
+            state._log_error_info(logger)
 
         # We have some kind of parsing error here.  To handle
         # this, we are going to push the current token onto
@@ -411,7 +474,7 @@ class LRParser:
             return self._handle_first_error(state, lexer)
 
         state.errorcount = error_count
-        return self._handle_error_recovery(state)
+        return state._handle_error_recovery()
 
     def _handle_first_error(self, state: ParserState, lexer: Any) -> bool:
         state.errorcount = error_count
@@ -435,59 +498,8 @@ class LRParser:
 
         return True
 
-    def _handle_error_recovery(self, state: ParserState) -> bool:
-        # case 1:  the statestack only has 1 entry on it.  If we're in this state, the
-        # entire parse has been rolled back and we're completely hosed.   The token is
-        # discarded and we just keep going.
-        if len(state.statestack) <= 1 and state.lookahead and state.lookahead.type != "$end":
-            state.lookahead = None
-            state.errtoken = None
-            state.state = 0
-            state.lookaheadstack.clear()
-            return True
-
-        # case 2: the statestack has a couple of entries on it, but we're
-        # at the end of the file. nuke the top entry and generate an error token
-
-        if state.lookahead and state.lookahead.type == "$end":
-            return False
-
-        if state.lookahead and state.lookahead.type != "error":
-            return self._handle_error_token(state)
-        else:
-            return self._handle_error_stack(state)
-
-    def _handle_error_token(self, state: ParserState) -> bool:
-        sym = state.symstack[-1]
-        if sym.type == "error":
-            # Hmmm. Error is on top of stack, we'll just nuke input
-            # symbol and continue
-            if state.tracking:
-                sym.endlineno = getattr(state.lookahead, "lineno", sym.lineno)
-                sym.endlexpos = getattr(state.lookahead, "lexpos", sym.lexpos)
-            state.lookahead = None
-            return True
-
-        new_error = YaccSymbol(type="error")
-        if hasattr(state.lookahead, "lineno"):
-            new_error.lineno = new_error.endlineno = state.lookahead.lineno
-        if hasattr(state.lookahead, "lexpos"):
-            new_error.lexpos = new_error.endlexpos = state.lookahead.lexpos
-        new_error.value = state.lookahead
-        state.lookaheadstack.append(state.lookahead)
-        state.lookahead = new_error
-        return True
-
-    def _handle_error_stack(self, state: ParserState) -> bool:
-        sym = state.symstack.pop()
-        if state.tracking and state.lookahead:
-            state.lookahead.lineno = sym.lineno
-            state.lookahead.lexpos = sym.lexpos
-        state.statestack.pop()
-        state.state = state.statestack[-1]
-        return True
-
-    def _update_tracking_info(self, sym: "YaccSymbol", targ: list["YaccSymbol"]) -> None:
+    @staticmethod
+    def _update_tracking_info(sym: "YaccSymbol", targ: list["YaccSymbol"]) -> None:
         t1 = targ[1]
         sym.lineno = t1.lineno
         sym.lexpos = t1.lexpos
@@ -495,18 +507,8 @@ class LRParser:
         sym.endlineno = getattr(t1, "endlineno", t1.lineno)
         sym.endlexpos = getattr(t1, "endlexpos", t1.lexpos)
 
-    def _log_error_info(self, logger: "PlyLogger", state: ParserState) -> None:
-        logger.error(
-            "Error  : %s",
-            (
-                "{} . {}".format(
-                    " ".join([xx.type for xx in state.symstack][1:]),
-                    str(state.lookahead),
-                )
-            ).lstrip(),
-        )
-
-    def _print_error_message(self, errtoken: Optional["YaccSymbol"]) -> None:
+    @staticmethod
+    def _print_error_message(errtoken: Optional["YaccSymbol"]) -> None:
         if errtoken:
             lineno = getattr(errtoken, "lineno", 0)
             if lineno:
