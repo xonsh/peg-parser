@@ -242,8 +242,8 @@ def xonsh_call(name: str, *args: Node, **locs: int) -> ast.Call:
         func=load_attribute_chain(name, **locs),
         args=list(args),  # type: ignore
         keywords=[],
-        starargs=None,
-        kwargs=None,
+        # starargs=None,
+        # kwargs=None,
         **locs,
     )
 

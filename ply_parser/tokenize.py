@@ -26,9 +26,9 @@ import typing as tp
 from token import (
     AMPER,
     AMPEREQUAL,
-    ASYNC,
+    # ASYNC,
     AT,
-    AWAIT,
+    # AWAIT,
     CIRCUMFLEX,
     CIRCUMFLEXEQUAL,
     COLON,
@@ -84,6 +84,9 @@ from token import (
 )
 
 from .lazyasd import LazyObject
+
+ASYNC = NAME
+AWAIT = NAME
 
 cookie_re = LazyObject(
     lambda: re.compile(r"^[ \t\f]*#.*coding[:=][ \t]*([-\w.]+)", re.ASCII),

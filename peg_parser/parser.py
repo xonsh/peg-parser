@@ -1683,8 +1683,8 @@ class XonshParser(Parser):
             and (self.expect("}"))
         ):
             return ast.MatchMapping(
-                keys=[k for (k, _) in items],
-                patterns=[p for (_, p) in items],
+                keys=[k for k, _ in items],
+                patterns=[p for _, p in items],
                 rest=rest,
                 **self.span(_lnum, _col),
             )
@@ -1696,8 +1696,8 @@ class XonshParser(Parser):
             and (self.expect("}"))
         ):
             return ast.MatchMapping(
-                keys=[k for (k, _) in items],
-                patterns=[p for (_, p) in items],
+                keys=[k for k, _ in items],
+                patterns=[p for _, p in items],
                 rest=None,
                 **self.span(_lnum, _col),
             )
@@ -1762,8 +1762,8 @@ class XonshParser(Parser):
             return ast.MatchClass(
                 cls=cls,
                 patterns=[],
-                kwd_attrs=[k for (k, _) in keywords],
-                kwd_patterns=[p for (_, p) in keywords],
+                kwd_attrs=[k for k, _ in keywords],
+                kwd_patterns=[p for _, p in keywords],
                 **self.span(_lnum, _col),
             )
         self._reset(mark)
@@ -1779,8 +1779,8 @@ class XonshParser(Parser):
             return ast.MatchClass(
                 cls=cls,
                 patterns=patterns,
-                kwd_attrs=[k for (k, _) in keywords],
-                kwd_patterns=[p for (_, p) in keywords],
+                kwd_attrs=[k for k, _ in keywords],
+                kwd_patterns=[p for _, p in keywords],
                 **self.span(_lnum, _col),
             )
         self._reset(mark)
@@ -4552,10 +4552,10 @@ class XonshParser(Parser):
 
     @memoize
     def invalid_for_stmt(self) -> None:
-        # invalid_for_stmt: ASYNC? 'for' star_targets 'in' star_expressions NEWLINE | 'async'? 'for' star_targets 'in' star_expressions ':' NEWLINE !INDENT
+        # invalid_for_stmt: 'async'? 'for' star_targets 'in' star_expressions NEWLINE | 'async'? 'for' star_targets 'in' star_expressions ':' NEWLINE !INDENT
         mark = self._mark()
         if (
-            (self.token("ASYNC"),)
+            (self.expect("async"),)
             and (self.expect("for"))
             and (self.star_targets())
             and (self.expect("in"))

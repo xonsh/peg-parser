@@ -699,7 +699,10 @@ class BaseParser:
     def p_eval_input(self, p):
         """eval_input : testlist newlines_opt"""
         p1 = p[1]
-        p[0] = ast.Expression(body=p1, lineno=p1.lineno, col_offset=p1.col_offset)
+        p[0] = ast.Expression(
+            body=p1,
+            # lineno=p1.lineno, col_offset=p1.col_offset
+        )
 
     def p_func_call(self, p):
         """func_call : LPAREN arglist_opt RPAREN"""
@@ -1290,7 +1293,12 @@ class BaseParser:
         p2 = p[2]
         for targ in p2:
             del_ctx(targ)
-        p0 = ast.Delete(targets=p2, ctx=ast.Del(), lineno=p1.lineno, col_offset=p1.lexpos)
+        p0 = ast.Delete(
+            targets=p2,
+            # ctx=ast.Del(),
+            lineno=p1.lineno,
+            col_offset=p1.lexpos,
+        )
         p[0] = p0
 
     def p_pass_stmt(self, p):
@@ -2028,7 +2036,9 @@ class BaseParser:
                 | minus_tok term
         """
         p1 = p[1]
-        op = self._term_binops[p1.value](lineno=p1.lineno, col_offset=p1.lexpos)
+        op = self._term_binops[p1.value](
+            # lineno=p1.lineno, col_offset=p1.lexpos
+        )
         p[0] = [op, p[2]]
 
     def p_term(self, p):
@@ -2063,7 +2073,12 @@ class BaseParser:
                 f"operation {p1!r} not supported",
                 self.currloc(lineno=p.lineno, column=p.lexpos),
             )
-        p[0] = [op(lineno=p1.lineno, col_offset=p1.lexpos), p[2]]
+        p[0] = [
+            op(
+                # lineno=p1.lineno, col_offset=p1.lexpos
+            ),
+            p[2],
+        ]
 
     _factor_ops = {"+": ast.UAdd, "-": ast.USub, "~": ast.Invert}
 
@@ -2236,7 +2251,7 @@ class BaseParser:
             p0 = ast.Dict(
                 keys=[],
                 values=[],
-                ctx=ast.Load(),
+                # ctx=ast.Load(),
                 lineno=self.lineno,
                 col_offset=self.col,
             )
@@ -2402,8 +2417,13 @@ class BaseParser:
         else:
             s = ast.literal_eval(p1.value)
             # is_bytes = "b" in prefix
-            is_raw = "r" in prefix
-            p[0] = ast.const(s, lineno=p1.lineno, col_offset=p1.lexpos, is_raw=is_raw)
+            # is_raw = "r" in prefix
+            p[0] = ast.const(
+                s,
+                lineno=p1.lineno,
+                col_offset=p1.lexpos,
+                #  is_raw=is_raw
+            )
 
     def p_string_literal_list(self, p):
         """
@@ -2765,7 +2785,13 @@ class BaseParser:
             keys.append(k)
             vals.append(v)
         lineno, col = lopen_loc(p1)
-        p[0] = ast.Dict(keys=keys, values=vals, ctx=ast.Load(), lineno=lineno, col_offset=col)
+        p[0] = ast.Dict(
+            keys=keys,
+            values=vals,
+            # ctx=ast.Load(),
+            lineno=lineno,
+            col_offset=col,
+        )
 
     def p_dictorsetmaker_i4(self, p):
         """dictorsetmaker : item comma_item_list comma_opt"""
@@ -2776,14 +2802,26 @@ class BaseParser:
             keys.append(k)
             vals.append(v)
         lineno, col = lopen_loc(p1[0] or p1[1])
-        p[0] = ast.Dict(keys=keys, values=vals, ctx=ast.Load(), lineno=lineno, col_offset=col)
+        p[0] = ast.Dict(
+            keys=keys,
+            values=vals,
+            # ctx=ast.Load(),
+            lineno=lineno,
+            col_offset=col,
+        )
 
     def p_dictorsetmaker_t4_dict(self, p):
         """dictorsetmaker : test COLON testlist"""
         keys = [p[1]]
         vals = self._list_or_elts_if_not_real_tuple(p[3])
         lineno, col = lopen_loc(p[1])
-        p[0] = ast.Dict(keys=keys, values=vals, ctx=ast.Load(), lineno=lineno, col_offset=col)
+        p[0] = ast.Dict(
+            keys=keys,
+            values=vals,
+            # ctx=ast.Load(),
+            lineno=lineno,
+            col_offset=col,
+        )
 
     def p_dictorsetmaker_item_comma(self, p):
         """dictorsetmaker : item comma_opt"""
@@ -2791,21 +2829,42 @@ class BaseParser:
         keys = [p1[0]]
         vals = [p1[1]]
         lineno, col = lopen_loc(p1[0] or p1[1])
-        p[0] = ast.Dict(keys=keys, values=vals, ctx=ast.Load(), lineno=lineno, col_offset=col)
+        p[0] = ast.Dict(
+            keys=keys,
+            values=vals,
+            # ctx=ast.Load(),
+            lineno=lineno,
+            col_offset=col,
+        )
 
     def p_dictorsetmaker_t4_set(self, p):
         """dictorsetmaker : test_or_star_expr comma_test_or_star_expr_list comma_opt"""
-        p[0] = ast.Set(elts=[p[1]] + p[2], ctx=ast.Load(), lineno=self.lineno, col_offset=self.col)
+        p[0] = ast.Set(
+            elts=[p[1]] + p[2],
+            #    ctx=ast.Load(),
+            lineno=self.lineno,
+            col_offset=self.col,
+        )
 
     def p_dictorsetmaker_test_comma(self, p):
         """dictorsetmaker : test_or_star_expr comma_opt"""
         elts = self._list_or_elts_if_not_real_tuple(p[1])
-        p[0] = ast.Set(elts=elts, ctx=ast.Load(), lineno=self.lineno, col_offset=self.col)
+        p[0] = ast.Set(
+            elts=elts,
+            #    ctx=ast.Load(),
+            lineno=self.lineno,
+            col_offset=self.col,
+        )
 
     def p_dictorsetmaker_testlist(self, p):
         """dictorsetmaker : testlist"""
         elts = self._list_or_elts_if_not_real_tuple(p[1])
-        p[0] = ast.Set(elts=elts, ctx=ast.Load(), lineno=self.lineno, col_offset=self.col)
+        p[0] = ast.Set(
+            elts=elts,
+            #    ctx=ast.Load(),
+            lineno=self.lineno,
+            col_offset=self.col,
+        )
 
     def p_dictorsetmaker_comp(self, p):
         """
@@ -2859,7 +2918,7 @@ class BaseParser:
         else:
             targ = ensure_has_elts(targs)
         store_ctx(targ)
-        comp = ast.comprehension(target=targ, iter=it, ifs=[])
+        comp = ast.comprehension(target=targ, iter=it, ifs=[], is_async=0)
         comps = [comp]
         p0 = {"comps": comps}
         if p5 is not None:

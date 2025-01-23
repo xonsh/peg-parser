@@ -77,7 +77,11 @@ class Parser(ThreeNineParser):
         loc = self.get_line_cols(p, 1)
         match list(p):
             case [_, _, pattern, _, suite]:
-                p[0] = ast.match_case(pattern=pattern, body=suite, **loc)
+                p[0] = ast.match_case(
+                    pattern=pattern,
+                    body=suite,
+                    # **loc
+                )
             case [_, _, pattern, _, guard, _, suite]:
                 p[0] = ast.match_case(pattern=pattern, body=suite, guard=guard, **loc)
             case _:

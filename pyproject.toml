@@ -160,13 +160,14 @@ dev = [
     "rs-ply",
     "pip",
     "psutil",
+    "maturin>=1.8.1",
 ]
 docs = ["mkdocs-material", "mkdocstrings[python]"]
 profile = [
     "asv>=0.5.1",
     "virtualenv>=20.21.0",
     "pympler>=1.0.1",
-    "guppy3>=3.1.2",
+    # "guppy3>=3.1.2",
     "memray",
     "pytest-memray",
 ]

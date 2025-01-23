@@ -289,8 +289,8 @@ def xonsh_call(name, args, lineno=None, col=None):
         func=load_attribute_chain(name, lineno=lineno, col=col),
         args=args,
         keywords=[],
-        starargs=None,
-        kwargs=None,
+        # starargs=None,
+        # kwargs=None,
         lineno=lineno,
         col_offset=col,
     )
