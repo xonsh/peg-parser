@@ -1,8 +1,9 @@
-> [!Note]
+> [!WARNING]
+> The development to use `pegen for Xonsh` is halted mostly because of the following reasons.
 > - The development activity on [pegen](https://github.com/we-like-parsers/pegen) has slowed down. Recent Python versions have significant grammar changes; If pegen provides the Python specific changes, then it can be reused without much maintenance burden. Other option is to copy grammar from [CPython](https://github.com/python/cpython/blob/main/Tools/peg_generator/) repo itself and transpile the `C` code to Python
-> - I have heavily modified the original Python generator to reduce the amount of code generated. Even though the memory usage has been reduced for small files, the performance wasn't upto the mark. So I've decided to focus on reusing Ruff's parser. Bu reusing it, we will have lesser maintenance.
+> - I have heavily modified the original [Python generator](https://github.com/xonsh/peg-parser/tree/main/pegen) to reduce the amount of code generated. Even though the memory usage has been reduced for small files, the performance wasn't upto the mark. So I've decided to focus on [reusing Ruff's parser](https://github.com/jnoortheen/xonsh-rd-parser/).
 > 
-> <cite>— Noortheen Raja</cite>
+> <cite>—- Noortheen Raja J</cite>
 
 # xonsh-parser
 
