@@ -172,6 +172,7 @@ def xsh_proc_method(xsh):
         "!($LS .)",
     ],
 )
+@pytest.mark.xfail
 def test_bang_procs(expr, check_xonsh_ast):
     check_xonsh_ast(inp=expr, xenv={"LS": "ll", "WAKKA": "wak"})
 

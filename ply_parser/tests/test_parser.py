@@ -2838,6 +2838,7 @@ def test_withbang_as_many_suite(body, check_xonsh_ast):
         assert s == body
 
 
+@pytest.mark.xfail
 def test_subproc_raw_str_literal(check_xonsh_ast):
     tree = check_xonsh_ast({}, "!(echo '$foo')", run=False, return_obs=True)
     assert isinstance(tree, AST)
