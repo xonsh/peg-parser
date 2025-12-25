@@ -92,20 +92,20 @@ impl StateMachine {
         })
     }
 
-    fn get_default_action(&self, state: u16) -> Option<i16> {
+    pub fn get_default_action(&self, state: u16) -> Option<i16> {
         self.defaults.get(&state).copied()
     }
 
-    fn get_action(&self, state: usize, sym: &str) -> Option<i16> {
+    pub fn get_action(&self, state: usize, sym: &str) -> Option<i16> {
         let symbols = self.actions.get(state).unwrap();
         let action = symbols.get(sym);
         action.map(|x| *x)
     }
-    fn expect_production(&self, index: usize) -> Production {
+    pub fn expect_production(&self, index: usize) -> Production {
         let prod = self.productions.get(index).unwrap();
         prod.clone()
     }
-    fn expect_goto(&self, state: usize, sym: &str) -> PyResult<u16> {
+    pub fn expect_goto(&self, state: usize, sym: &str) -> PyResult<u16> {
         let gotos = self
             .gotos
             .get(state)

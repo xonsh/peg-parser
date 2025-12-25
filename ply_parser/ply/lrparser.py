@@ -28,6 +28,15 @@ from .common import PlyLogger, format_result, format_stack_entry
 error_count: Final = 3  # Number of symbols that must be shifted to leave recovery mode
 
 
+try:
+    from rs_ply import LRParser as RustLRParser
+    from rs_ply import StateMachine as RustStateMachine
+
+    HAS_RS_PLY = True
+except ImportError:
+    HAS_RS_PLY = False
+
+
 @dataclass(slots=True)
 class LexToken:
     """keep for backward compatibility and name distinction"""
@@ -573,9 +582,16 @@ class StateMachine:
         return self.gotos[state][sym]
 
 
-def load_parser(parser_table: Path | str, module: ParserProtocol) -> LRParser:
+def load_parser(parser_table: Path | str, module: ParserProtocol) -> Union[LRParser, "RustLRParser"]:
     if isinstance(parser_table, Path):
         parser_table = str(parser_table)
+
+    if HAS_RS_PLY and parser_table.endswith(".jsonl"):
+        try:
+            fsm = RustStateMachine.new_from_file(parser_table)
+            return RustLRParser(fsm, module, errorf=getattr(module, "p_error", None))
+        except Exception:
+            pass
 
     fsm = StateMachine(parser_table)
     return LRParser(fsm, errorf=getattr(module, "p_error", None), module=module)
