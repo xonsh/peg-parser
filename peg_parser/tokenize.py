@@ -140,7 +140,6 @@ class TokenInfo(NamedTuple):
     string: str
     start: tuple[int, int]
     end: tuple[int, int]
-    line: str
 
     def __repr__(self) -> str:
         return f"<{self.type.name}>({self.string!r}) at {self.start[0]}"
@@ -326,6 +325,13 @@ class TokenizerState:
         self.pos = 0
         self.max = len(self.line)
 
+    def set_line(self, line: str) -> None:
+        self.last_line = self.line
+        self.line = line
+        self.lnum += 1
+        self.pos = 0
+        self.max = len(self.line)
+
     def __repr__(self) -> str:
         form = f"<TokenizerState: {self.line[: self.pos]}﹝{self.pos}﹞{self.line[self.pos :]}> "
         if self.end_progs:
@@ -342,7 +348,7 @@ class TokenizerState:
         endprog.join(self, end)
         self.pos = end
         epos = (self.lnum, end)
-        return TokenInfo(tok, endprog.text, endprog.start, epos, endprog.contline)
+        return TokenInfo(tok, endprog.text, endprog.start, epos)
 
     def match(self, pattern: str | re.Pattern[str]) -> re.Match[str] | None:
         pattern = _compile(pattern) if isinstance(pattern, str) else pattern
@@ -430,7 +436,6 @@ def next_statement(state: TokenizerState) -> Generator[TokenInfo, None, bool | N
                 comment_token,
                 (state.lnum, state.pos),
                 (state.lnum, state.pos + len(comment_token)),
-                state.line,
             )
             state.pos += len(comment_token)
 
@@ -439,15 +444,12 @@ def next_statement(state: TokenizerState) -> Generator[TokenInfo, None, bool | N
             state.line[state.pos :],
             (state.lnum, state.pos),
             (state.lnum, len(state.line)),
-            state.line,
         )
         return True  # continue
 
     if column > state.indents[-1]:  # count indents or dedents
         state.indents.append(column)
-        yield TokenInfo(
-            Token.INDENT, state.line[: state.pos], (state.lnum, 0), (state.lnum, state.pos), state.line
-        )
+        yield TokenInfo(Token.INDENT, state.line[: state.pos], (state.lnum, 0), (state.lnum, state.pos))
     while column < state.indents[-1]:
         if column not in state.indents:
             raise IndentationError(
@@ -456,7 +458,7 @@ def next_statement(state: TokenizerState) -> Generator[TokenInfo, None, bool | N
             )
         state.indents = state.indents[:-1]
 
-        yield TokenInfo(Token.DEDENT, "", (state.lnum, state.pos), (state.lnum, state.pos), state.line)
+        yield TokenInfo(Token.DEDENT, "", (state.lnum, state.pos), (state.lnum, state.pos))
     return None
 
 
@@ -508,9 +510,7 @@ def next_psuedo_matches(state: TokenizerState) -> TokenInfo | None:
         raise TokenError(f"Bad token: {token!r} at line {state.lnum}", spos)
 
     # Yield Token if Found
-    if token_type:
-        return TokenInfo(token_type, token, spos, epos, state.line)
-    return None
+    return TokenInfo(token_type, token, spos, epos)
 
 
 def next_end_tokens(state: TokenizerState) -> Iterator[TokenInfo]:
@@ -521,11 +521,10 @@ def next_end_tokens(state: TokenizerState) -> Iterator[TokenInfo]:
             "",
             (state.lnum - 1, len(state.last_line)),
             (state.lnum - 1, len(state.last_line) + 1),
-            "",
         )
     for _ in state.indents[1:]:  # pop remaining indent levels
-        yield TokenInfo(Token.DEDENT, "", (state.lnum, 0), (state.lnum, 0), "")
-    yield TokenInfo(Token.ENDMARKER, "", (state.lnum, 0), (state.lnum, 0), "")
+        yield TokenInfo(Token.DEDENT, "", (state.lnum, 0), (state.lnum, 0))
+    yield TokenInfo(Token.ENDMARKER, "", (state.lnum, 0), (state.lnum, 0))
 
 
 def handle_fstring_progs(state: TokenizerState, endprog: EndProg) -> Iterator[TokenInfo]:
@@ -542,7 +541,6 @@ def handle_fstring_progs(state: TokenizerState, endprog: EndProg) -> Iterator[To
             endprog.quote,
             start=(state.lnum, state.pos),
             end=(state.lnum, end),
-            line=state.line,
         )
         state.pop_mode()
     else:  # "{" or "}"
@@ -555,7 +553,6 @@ def handle_fstring_progs(state: TokenizerState, endprog: EndProg) -> Iterator[To
                 "{",
                 start=(state.lnum, state.pos),
                 end=(state.lnum, end),
-                line=state.line,
             )
             state.parenlev += 1
             state.add_prog(end, end, mode=ModeInBraces(state.parenlev))
@@ -565,7 +562,6 @@ def handle_fstring_progs(state: TokenizerState, endprog: EndProg) -> Iterator[To
                 "}",
                 start=(state.lnum, state.pos),
                 end=(state.lnum, end),
-                line=state.line,
             )
             state.parenlev -= 1
             state.pop_mode()  # in-colon
@@ -607,43 +603,41 @@ def handle_end_progs(state: TokenizerState) -> Iterator[TokenInfo]:
     #     raise TokenError(f"Invalid string quotes at {state.pos} in {state.line}", (state.lnum, state.pos))
 
 
+def tokenize_line(state: TokenizerState, line: str) -> Iterator[TokenInfo]:
+    state.set_line(line)
+    if state.end_progs:
+        yield from handle_end_progs(state)
+    elif state.parenlev == 0 and not state.continued:  # new statement
+        loop_action = yield from next_statement(state)
+        if loop_action is True or loop_action is False:
+            return
+    else:  # continued statement
+        state.continued = False
+
+    while state.pos < state.max:
+        pos = state.pos
+        yield from handle_end_progs(state)
+        if token := next_psuedo_matches(state):
+            yield token
+        elif pos == state.pos:
+            yield TokenInfo(
+                Token.ERRORTOKEN,
+                state.line[state.pos],
+                (state.lnum, state.pos),
+                (state.lnum, state.pos + 1),
+            )
+            state.pos += 1
+            pos = state.pos
+
+
 def _tokenize(readline: Callable[[], str]) -> Iterator[TokenInfo]:
     state = TokenizerState()
 
     while True:  # loop over lines in stream
-        state.move_next_line(readline)
-
-        if state.end_progs:
-            yield from handle_end_progs(state)
-
-        elif state.parenlev == 0 and not state.continued:  # new statement
-            loop_action = yield from next_statement(state)
-            if loop_action is True:
-                continue
-            elif loop_action is False:
-                break
-            # None has no effect
-
-        else:  # continued statement
-            if not state.line:
-                raise TokenError("EOF in multi-line statement", (state.lnum, 0))
-            state.continued = False
-
-        pos = state.pos
-        while state.pos < state.max:
-            yield from handle_end_progs(state)
-            if token := next_psuedo_matches(state):
-                yield token
-            elif pos == state.pos:
-                yield TokenInfo(
-                    Token.ERRORTOKEN,
-                    state.line[state.pos],
-                    (state.lnum, state.pos),
-                    (state.lnum, state.pos + 1),
-                    state.line,
-                )
-                state.pos += 1
-                pos = state.pos
+        line = readline()
+        if not line:
+            break
+        yield from tokenize_line(state, line)
 
     yield from next_end_tokens(state)
 

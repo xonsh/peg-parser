@@ -29,8 +29,7 @@ def _get_tokens(inp):
     from peg_parser import tokenize
     from peg_parser.tokenizer import Tokenizer
 
-    gen = tokenize.generate_tokens(io.StringIO(inp).readline)
-    tokenizer = Tokenizer(gen)
+    tokenizer = Tokenizer(io.StringIO(inp).readline)
     tokens = []
     while True:
         tok = tokenizer.getnext()

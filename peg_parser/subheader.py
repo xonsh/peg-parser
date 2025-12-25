@@ -6,7 +6,7 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, ParamSpec, Protocol, TypedDict, TypeVar, cast
 
-from peg_parser.tokenize import Token, TokenInfo, generate_tokens
+from peg_parser.tokenize import Token, TokenInfo
 from peg_parser.tokenizer import Mark, Tokenizer
 
 if TYPE_CHECKING:
@@ -426,7 +426,8 @@ class Parser:
     def raise_indentation_error(self, msg: str) -> None:
         """Raise an indentation error."""
         last_token = self._tokenizer.diagnose()
-        args = (self.filename, last_token.start[0], last_token.start[1] + 1, last_token.line)
+        line = self._tokenizer.get_lines([last_token.start[0]])[0]
+        args = (self.filename, last_token.start[0], last_token.start[1] + 1, line)
         args += (last_token.end[0], last_token.end[1] + 1)  # type: ignore
         raise IndentationError(msg, args)
 
@@ -848,7 +849,7 @@ class Parser:
             end = end or tok.end
 
         if line_from_token:
-            line = tok.line
+            line = self._tokenizer.get_lines([tok.start[0]])[0]
         else:
             # End is used only to get the proper text
             line = "\\n".join(self._tokenizer.get_lines(list(range(start[0], end[0] + 1))))
@@ -958,8 +959,7 @@ class Parser:
     ) -> ast.Module | Node | None:
         """Parse a file or string."""
         with open(path) as f:
-            tok_stream = generate_tokens(f.readline)
-            tokenizer = Tokenizer(tok_stream, verbose=verbose, path=str(path))
+            tokenizer = Tokenizer(f.readline, verbose=verbose, path=str(path))
             parser = cls(
                 tokenizer,
                 verbose=verbose,
@@ -979,7 +979,6 @@ class Parser:
         """Parse a string."""
         import io
 
-        tok_stream = generate_tokens(io.StringIO(source).readline)
-        tokenizer = Tokenizer(tok_stream, verbose=verbose)
+        tokenizer = Tokenizer(io.StringIO(source).readline, verbose=verbose)
         parser = cls(tokenizer, verbose=verbose, py_version=py_version)
         return parser.parse(mode if mode == "eval" else "file")

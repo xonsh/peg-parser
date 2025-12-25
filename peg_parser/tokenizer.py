@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Final, NewType
 
-from .tokenize import Token, TokenInfo
-
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
+from .tokenize import Token, TokenInfo, TokenizerState, next_end_tokens, tokenize_line
 
 Mark = NewType("Mark", int)
 
@@ -19,8 +18,14 @@ class Tokenizer:
 
     _tokens: list[TokenInfo]
 
-    def __init__(self, tokengen: Iterator[TokenInfo], *, path: str = "", verbose: bool = False):
-        self._tokengen = tokengen
+    def __init__(
+        self,
+        readline: Callable[[], str],
+        *,
+        path: str = "",
+        verbose: bool = False,
+    ):
+        self._readline = readline
         self._tokens = []
         self._index = Mark(0)
         self._verbose = verbose
@@ -30,6 +35,11 @@ class Tokenizer:
         self._call_macro = False
         self._with_macro = False
         self._proc_macro = False
+
+        self._tokenizer_state = TokenizerState()
+        self._line_tokengen: Iterator[TokenInfo] | None = None
+        self._eof = False
+
         self._end_parens: Final = {
             ")": "(",
             "]": "[",
@@ -41,29 +51,58 @@ class Tokenizer:
     def getnext(self) -> TokenInfo:
         """Return the next token and updates the index."""
         cached = self._index != len(self._tokens)
-        tok = self.peek()
+        try:
+            tok = self.peek()
+        except StopIteration:
+            return self._tokens[-1]
         self._index = Mark(self._index + Mark(1))
         if self._verbose:
             self.report(cached, False)
         return tok
 
-    def peek(self) -> TokenInfo:
-        """Return the next token *without* updating the index."""
-        while self._index == len(self._tokens):
-            if self._with_macro:
-                tok = self.consume_with_macro_params()
-            elif self._call_macro:
-                tok = self.consume_macro_params()
-            elif self._stack:
-                tok = self._stack.pop()
-            else:
-                tok = next(self._tokengen)
-            if self.is_blank(tok):
+    def _fetch(self) -> TokenInfo:
+        while True:
+            if self._line_tokengen:
+                try:
+                    tok = next(self._line_tokengen)
+                    return tok
+                except StopIteration:
+                    self._line_tokengen = None
+
+            if self._eof:
+                raise StopIteration
+
+            line = self._readline()
+            if not line:
+                self._eof = True
+                self._tokenizer_state.set_line("")
+                self._line_tokengen = next_end_tokens(self._tokenizer_state)
                 continue
 
-            self._tokens.append(tok)
-            if not self._path and tok.start[0] not in self._lines:
-                self._lines[tok.start[0]] = tok.line
+            self._lines[len(self._lines) + 1] = line
+            self._line_tokengen = tokenize_line(self._tokenizer_state, line)
+
+    def peek(self) -> TokenInfo:
+        """Return the next token *without* updating the index."""
+        try:
+            while self._index == len(self._tokens):
+                if self._with_macro:
+                    tok = self.consume_with_macro_params()
+                elif self._call_macro:
+                    tok = self.consume_macro_params()
+                elif self._stack:
+                    tok = self._stack.pop()
+                else:
+                    tok = self._fetch()
+                if self.is_blank(tok):
+                    continue
+
+                self._tokens.append(tok)
+        except StopIteration:
+            pass
+
+        if self._index >= len(self._tokens):
+            raise StopIteration
         return self._tokens[self._index]
 
     def is_blank(self, tok: TokenInfo) -> bool:
@@ -82,9 +121,8 @@ class Tokenizer:
         paren_level: list[str] = []
         # join strings while handling whitespace
         string = ""
-        line = ""
         while True:
-            tok = next(self._tokengen)
+            tok = self._fetch()
             if tok.type == Token.OP and tok.string[-1] in "([{":  # push paren level
                 paren_level.append(tok.string[-1])
             if paren_level:
@@ -104,7 +142,7 @@ class Tokenizer:
             end = tok.end
             if start is None:
                 start = tok.start
-                line = tok.line
+                # line = tok.line
                 string = tok.string
             else:
                 string += tok.string
@@ -116,8 +154,8 @@ class Tokenizer:
         assert start is not None
         assert end is not None
         if not string.strip():
-            return TokenInfo(Token.WS, string, start, end, line)
-        return TokenInfo(Token.MACRO_PARAM, string, start, end, line)
+            return TokenInfo(Token.WS, string, start, end)
+        return TokenInfo(Token.MACRO_PARAM, string, start, end)
 
     def consume_with_macro_params(self) -> TokenInfo:  # noqa: C901
         """loop until we get INDENT-DEDENT or NL"""
@@ -126,17 +164,22 @@ class Tokenizer:
         indent = 0
         lines = {}
         start = end = self._tokens[-1].end
-        for idx, tok in enumerate(self._tokengen):
-            if (idx == 0) and tok.type == Token.NEWLINE:
+        tok_idx = 0
+        while True:
+            tok = self._fetch()
+            if (tok_idx == 0) and tok.type == Token.NEWLINE:
+                tok_idx += 1
                 continue
             elif tok.type == Token.INDENT:
-                if (not is_indented) and (idx == 1):
+                if (not is_indented) and tok_idx in {0, 1}:
                     is_indented = True
+                    tok_idx += 1
                     continue
                 indent += 1
             elif tok.type == Token.DEDENT:
                 if indent:
                     indent -= 1
+                    tok_idx += 1
                     continue
                 else:
                     self._with_macro = False
@@ -146,18 +189,21 @@ class Tokenizer:
                     break
                 elif not tok.string:
                     # empty new line added by the tokenizer
+                    tok_idx += 1
                     continue
+            tok_idx += 1
 
             # update captured lines
             if tok.start[0] not in lines:
-                lines[tok.start[0]] = tok.line if is_indented else tok.line[tok.start[1] :]
+                line = self.get_lines([tok.start[0]])[0]
+                lines[tok.start[0]] = line if is_indented else line[tok.start[1] :]
 
         string = "".join(lines.values())
         if is_indented:
             import textwrap
 
             string = textwrap.dedent(string)
-        return TokenInfo(Token.MACRO_PARAM, string, start, end, string)
+        return TokenInfo(Token.MACRO_PARAM, string, start, end)
 
     def diagnose(self) -> TokenInfo:
         if not self._tokens:
@@ -191,7 +237,7 @@ class Tokenizer:
                         if seen == n:
                             break
 
-        return [lines[n] for n in line_numbers]
+        return [lines.get(n, "") for n in line_numbers]
 
     def mark(self) -> Mark:
         return self._index
