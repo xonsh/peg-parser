@@ -563,7 +563,7 @@ class Parser:
         consolidated: list[Any] = []  # ast.Constant | ast.FormattedValue
         for pv in values:
             if consolidated and isinstance(consolidated[-1], ast.Constant) and isinstance(pv, ast.Constant):
-                consolidated[-1].value += pv.value  # type: ignore[unreachable]
+                consolidated[-1].value += pv.value  # type: ignore
                 consolidated[-1].end_lineno = pv.end_lineno
                 consolidated[-1].end_col_offset = pv.end_col_offset
             else:
