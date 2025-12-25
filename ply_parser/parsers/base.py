@@ -2036,9 +2036,9 @@ class BaseParser:
                 | minus_tok term
         """
         p1 = p[1]
-        op = self._term_binops[p1.value](
-            # lineno=p1.lineno, col_offset=p1.lexpos
-        )
+        op = self._term_binops[p1.value]()
+        op.lineno = p1.lineno
+        op.col_offset = p1.lexpos
         p[0] = [op, p[2]]
 
     def p_term(self, p):
@@ -2073,12 +2073,13 @@ class BaseParser:
                 f"operation {p1!r} not supported",
                 self.currloc(lineno=p.lineno, column=p.lexpos),
             )
-        p[0] = [
-            op(
-                # lineno=p1.lineno, col_offset=p1.lexpos
-            ),
+        p0 = [
+            op(),
             p[2],
         ]
+        p0[0].lineno = p1.lineno
+        p0[0].col_offset = p1.lexpos
+        p[0] = p0
 
     _factor_ops = {"+": ast.UAdd, "-": ast.USub, "~": ast.Invert}
 
