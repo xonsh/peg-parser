@@ -587,11 +587,8 @@ def load_parser(parser_table: Path | str, module: ParserProtocol) -> Union[LRPar
         parser_table = str(parser_table)
 
     if HAS_RS_PLY and parser_table.endswith(".jsonl"):
-        try:
-            fsm = RustStateMachine.new_from_file(parser_table)
-            return RustLRParser(fsm, module, errorf=getattr(module, "p_error", None))
-        except Exception:
-            pass
+        fsm = RustStateMachine.new_from_file(parser_table)
+        return RustLRParser(fsm, module, errorf=getattr(module, "p_error", None))
 
     fsm = StateMachine(parser_table)
     return LRParser(fsm, errorf=getattr(module, "p_error", None), module=module)

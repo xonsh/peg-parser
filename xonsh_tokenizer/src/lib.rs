@@ -40,17 +40,18 @@ impl PyTokInfo {
         ))
     }
 
-    fn __getattr__<'py>(slf: PyRef<'py, Self>, py: Python<'py>, name: &str) -> PyResult<PyObject> {
+    fn __getattr__<'py>(slf: PyRef<'py, Self>, py: Python<'py>, name: &str) -> PyResult<Py<PyAny>> {
         let obj = match name {
             "type" => format!("{:?}", slf.inner.typ)
                 .to_shouty_snake_case()
-                .into_py(py),
-            "start" => slf.inner.start.clone().into_py(py),
-            "end" => slf.inner.end.clone().into_py(py),
-            "span" => slf.inner.span.clone().into_py(py),
+                .into_pyobject(py)?
+                .into_any(),
+            "start" => slf.inner.start.clone().into_pyobject(py)?.into_any(),
+            "end" => slf.inner.end.clone().into_pyobject(py)?.into_any(),
+            "span" => slf.inner.span.clone().into_pyobject(py)?.into_any(),
             _ => return Err(PyTypeError::new_err(format!("Unknown attribute: {}", name))),
         };
-        Ok(obj)
+        Ok(obj.into())
     }
 
     fn is_exact_type(&self, typ: &str) -> bool {

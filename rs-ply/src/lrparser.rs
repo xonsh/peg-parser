@@ -8,8 +8,8 @@ use pyo3::prelude::*;
 #[derive(Debug)]
 pub struct LRParser {
     pub fsm: Py<StateMachine>,
-    pub errorf: Option<PyObject>,
-    pub module: PyObject,
+    pub errorf: Option<Py<PyAny>>,
+    pub module: Py<PyAny>,
     pub errorok: bool,
     pub state: u16,
 }
@@ -18,7 +18,7 @@ pub struct LRParser {
 impl LRParser {
     #[new]
     #[pyo3(signature = (fsm, module, errorf=None))]
-    fn new(fsm: Py<StateMachine>, module: PyObject, errorf: Option<PyObject>) -> Self {
+    fn new(fsm: Py<StateMachine>, module: Py<PyAny>, errorf: Option<Py<PyAny>>) -> Self {
         LRParser {
             fsm,
             errorf,
@@ -36,7 +36,7 @@ impl LRParser {
         lexer: Option<Bound<'py, PyAny>>,
         debug: u8,
         tracking: bool,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let lexer = lexer
             .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyValueError, _>("Lexer is required"))?;
 
@@ -105,7 +105,7 @@ impl LRParser {
                             lookahead = Some(end_sym);
                         } else {
                             let r#type: String = tok.getattr("type")?.extract()?;
-                            let value: PyObject = tok.getattr("value")?.extract()?;
+                            let value: Py<PyAny> = tok.getattr("value")?.extract()?;
                             let lineno: Option<usize> =
                                 tok.getattr("lineno").ok().and_then(|a| a.extract().ok());
                             let lexpos: Option<usize> =

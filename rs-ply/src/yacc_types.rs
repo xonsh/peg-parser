@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 #[derive(Debug)]
 pub struct YaccSymbol {
     pub r#type: String,
-    pub value: Option<PyObject>,
+    pub value: Option<Py<PyAny>>,
     pub lineno: Option<usize>,
     pub lexpos: Option<usize>,
     pub endlineno: Option<usize>,
@@ -20,7 +20,7 @@ impl YaccSymbol {
     #[pyo3(signature = (r#type, value=None, lineno=None, lexpos=None, endlineno=None, endlexpos=None))]
     pub fn new(
         r#type: String,
-        value: Option<PyObject>,
+        value: Option<Py<PyAny>>,
         lineno: Option<usize>,
         lexpos: Option<usize>,
         endlineno: Option<usize>,
@@ -48,9 +48,9 @@ impl YaccSymbol {
 #[pyclass(get_all, set_all)]
 pub struct YaccProduction {
     // The lexer that produced the token stream
-    pub lexer: PyObject,
+    pub lexer: Py<PyAny>,
     // The parser that is running this production
-    pub parser: PyObject,
+    pub parser: Py<PyAny>,
     // The slice of the input stream that is covered by this production
     pub slice: Vec<Py<YaccSymbol>>,
     pub stack: Vec<Py<YaccSymbol>>,
@@ -59,7 +59,7 @@ pub struct YaccProduction {
 #[pymethods]
 impl YaccProduction {
     #[new]
-    pub fn new(lexer: PyObject, parser: PyObject) -> Self {
+    pub fn new(lexer: Py<PyAny>, parser: Py<PyAny>) -> Self {
         YaccProduction {
             lexer,
             parser,
@@ -68,7 +68,7 @@ impl YaccProduction {
         }
     }
 
-    fn __getitem__<'py>(&self, py: Python<'py>, n: Bound<'py, PyAny>) -> PyResult<PyObject> {
+    fn __getitem__<'py>(&self, py: Python<'py>, n: Bound<'py, PyAny>) -> PyResult<Py<PyAny>> {
         if let Ok(index) = n.extract::<isize>() {
             let sym_py = if index >= 0 {
                 self.slice.get(index as usize).ok_or_else(|| {
@@ -94,7 +94,7 @@ impl YaccProduction {
                 .unwrap_or_else(|| py.None()));
         }
 
-        if let Ok(sl) = n.downcast::<pyo3::types::PySlice>() {
+        if let Ok(sl) = n.cast::<pyo3::types::PySlice>() {
             let indices = sl.indices(self.slice.len() as isize)?;
             let mut result = Vec::new();
             let mut cur = indices.start;
@@ -111,7 +111,7 @@ impl YaccProduction {
                 );
                 cur += indices.step;
             }
-            return Ok(result.into_py(py));
+            return Ok(result.into_pyobject(py)?.unbind());
         }
 
         Err(pyo3::exceptions::PyTypeError::new_err(
@@ -123,7 +123,7 @@ impl YaccProduction {
         &mut self,
         py: Python<'py>,
         index: usize,
-        value: Option<PyObject>,
+        value: Option<Py<PyAny>>,
     ) -> PyResult<()> {
         let sym_py = self.slice.get_mut(index).ok_or_else(|| {
             PyIndexError::new_err(format!("Index out of range in production slice: {}", index))
