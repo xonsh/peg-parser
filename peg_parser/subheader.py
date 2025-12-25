@@ -448,7 +448,7 @@ class Parser:
             name = EXPR_NAME_MAPPING[node_t]
         except KeyError as e:
             raise ValueError(
-                f"unexpected expression in assignment {type(node).__name__} " f"(line {node.lineno})."
+                f"unexpected expression in assignment {type(node).__name__} (line {node.lineno})."
             ) from e
         return name
 

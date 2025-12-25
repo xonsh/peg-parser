@@ -209,7 +209,7 @@ class Execer:
     def _print_debug_wrapping(self, line, sbpline, last_error_line, last_error_col, maxcol=None):
         """print some debugging info if asked for."""
         if self.debug_level >= 1:
-            msg = "{0}:{1}:{2}{3} - {4}\n" "{0}:{1}:{2}{3} + {5}"
+            msg = "{0}:{1}:{2}{3} - {4}\n{0}:{1}:{2}{3} + {5}"
             mstr = "" if maxcol is None else ":" + str(maxcol)
             msg = msg.format(self.filename, last_error_line, last_error_col, mstr, line, sbpline)
             print(msg, file=sys.stderr)

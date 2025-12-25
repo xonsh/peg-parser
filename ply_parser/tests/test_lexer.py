@@ -245,7 +245,7 @@ def test_not_really_or_pre_post():
 
 
 def test_subproc_line_cont_space():
-    inp = "![echo --option1 value1 \\\n" "     --option2 value2 \\\n" "     --optionZ valueZ]"
+    inp = "![echo --option1 value1 \\\n     --option2 value2 \\\n     --optionZ valueZ]"
     exp = [
         ("BANG_LBRACKET", "![", 0),
         ("NAME", "echo", 2),
@@ -273,7 +273,7 @@ def test_subproc_line_cont_space():
 
 
 def test_subproc_line_cont_nospace():
-    inp = "![echo --option1 value1\\\n" "     --option2 value2\\\n" "     --optionZ valueZ]"
+    inp = "![echo --option1 value1\\\n     --option2 value2\\\n     --optionZ valueZ]"
     exp = [
         ("BANG_LBRACKET", "![", 0),
         ("NAME", "echo", 2),

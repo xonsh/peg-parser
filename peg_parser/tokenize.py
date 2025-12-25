@@ -327,7 +327,7 @@ class TokenizerState:
         self.max = len(self.line)
 
     def __repr__(self) -> str:
-        form = f"<TokenizerState: {self.line[:self.pos]}﹝{self.pos}﹞{self.line[self.pos:]}> "
+        form = f"<TokenizerState: {self.line[: self.pos]}﹝{self.pos}﹞{self.line[self.pos :]}> "
         if self.end_progs:
             form += f"({self.end_progs[-1].mode})"
         return form

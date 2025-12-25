@@ -1555,7 +1555,7 @@ def test_if_switch(check_stmts):
 
 
 def test_if_switch_elif1_else(check_stmts):
-    check_stmts("x = 42\nif x == 1:\n  pass\n" "elif x == 2:\n  pass\nelse:\n  pass")
+    check_stmts("x = 42\nif x == 1:\n  pass\nelif x == 2:\n  pass\nelse:\n  pass")
 
 
 def test_if_switch_elif2_else(check_stmts):
@@ -1593,7 +1593,7 @@ def test_for_idx(check_stmts):
 
 
 def test_for_zip_idx(check_stmts):
-    check_stmts('x = [42]\nfor x[0], y in zip(range(6), "123456"):\n' "  pass")
+    check_stmts('x = [42]\nfor x[0], y in zip(range(6), "123456"):\n  pass')
 
 
 def test_for_attr(check_stmts):
@@ -1662,7 +1662,7 @@ def test_try_except_t_u_as_e(check_stmts):
 
 def test_try_except_t_except_u(check_stmts):
     check_stmts(
-        "try:\n  pass\nexcept TypeError:\n  pass\n" "except SyntaxError as f:\n  pass",
+        "try:\n  pass\nexcept TypeError:\n  pass\nexcept SyntaxError as f:\n  pass",
         False,
     )
 
@@ -1676,7 +1676,7 @@ def test_try_except_finally(check_stmts):
 
 
 def test_try_except_else_finally(check_stmts):
-    check_stmts("try:\n  pass\nexcept:\n  pass\nelse:\n  pass" "\nfinally:  pass", False)
+    check_stmts("try:\n  pass\nexcept:\n  pass\nelse:\n  pass\nfinally:  pass", False)
 
 
 def test_try_finally(check_stmts):
@@ -1925,7 +1925,7 @@ def test_decorator_dot_dot_call_args(check_stmts):
 
 
 def test_broken_prompt_func(check_stmts):
-    code = "def prompt():\n" "    return '{user}'.format(\n" "       user='me')\n"
+    code = "def prompt():\n    return '{user}'.format(\n       user='me')\n"
     check_stmts(code, False)
 
 
@@ -1941,7 +1941,7 @@ def test_class_with_methods(check_stmts):
 
 
 def test_nested_functions(check_stmts):
-    code = "def test(x):\n" "    def test2(y):\n" "        return y+x\n" "    return test2\n"
+    code = "def test(x):\n    def test2(y):\n        return y+x\n    return test2\n"
     check_stmts(code, False)
 
 
@@ -2083,7 +2083,7 @@ def test_bare_tuple_in_atparens(check_xonsh_ast):
 def test_nested_madness(check_xonsh_ast):
     check_xonsh_ast(
         {},
-        "$(@$(which echo) ls " "| @(lambda a, s=None: $(@(s.strip()) @(a[1]))) foo -la baz)",
+        "$(@$(which echo) ls | @(lambda a, s=None: $(@(s.strip()) @(a[1]))) foo -la baz)",
         False,
     )
 
@@ -2308,7 +2308,7 @@ def test_bang_git_quotes_space(check_xonsh_ast):
 def test_bang_git_two_quotes_space(check_xonsh):
     check_xonsh(
         {},
-        '![git commit -am "wakka jawaka"]\n' '![git commit -am "flock jawaka"]\n',
+        '![git commit -am "wakka jawaka"]\n![git commit -am "flock jawaka"]\n',
         False,
     )
 
@@ -2316,7 +2316,7 @@ def test_bang_git_two_quotes_space(check_xonsh):
 def test_bang_git_two_quotes_space_space(check_xonsh):
     check_xonsh(
         {},
-        '![git commit -am "wakka jawaka" ]\n' '![git commit -am "flock jawaka milwaka" ]\n',
+        '![git commit -am "wakka jawaka" ]\n![git commit -am "flock jawaka milwaka" ]\n',
         False,
     )
 
@@ -2400,7 +2400,7 @@ def test_git_quotes_space(check_xonsh_ast):
 def test_git_two_quotes_space(check_xonsh):
     check_xonsh(
         {},
-        '$[git commit -am "wakka jawaka"]\n' '$[git commit -am "flock jawaka"]\n',
+        '$[git commit -am "wakka jawaka"]\n$[git commit -am "flock jawaka"]\n',
         False,
     )
 
@@ -2408,7 +2408,7 @@ def test_git_two_quotes_space(check_xonsh):
 def test_git_two_quotes_space_space(check_xonsh):
     check_xonsh(
         {},
-        '$[git commit -am "wakka jawaka" ]\n' '$[git commit -am "flock jawaka milwaka" ]\n',
+        '$[git commit -am "wakka jawaka" ]\n$[git commit -am "flock jawaka milwaka" ]\n',
         False,
     )
 
@@ -2712,7 +2712,7 @@ WITH_BANG_RAWSUITES = [
     "pass\n",
     "x = 42\ny = 12\n",
     'export PATH="yo:momma"\necho $PATH\n',
-    ("with q as t:\n" "    v = 10\n" "\n"),
+    ("with q as t:\n    v = 10\n\n"),
     (
         "with q as t:\n"
         "    v = 10\n"
