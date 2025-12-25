@@ -604,7 +604,8 @@ class Parser:
             prefix, text = text[:idx].lower(), text[idx:]
             if "p" in prefix:
                 prefix = prefix.replace("p", "", 1)
-                return token._replace(string=prefix + text)
+                token.string = prefix + text
+                return token
         return None
 
     def extract_import_level(self, tokens: list[TokenInfo]) -> int:

@@ -1,6 +1,4 @@
-from typing import NamedTuple
-
-class TokenInfo(NamedTuple):
+class TokenInfo:
     type: str
     string: str
     start: tuple[int, int]

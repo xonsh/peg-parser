@@ -35,7 +35,7 @@ import io
 import itertools as _itertools
 import re
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any, Final, NamedTuple
+from typing import TYPE_CHECKING, Any, Final
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterator
@@ -135,11 +135,14 @@ class Token(Enum):
     WS = auto()
 
 
-class TokenInfo(NamedTuple):
-    type: Token
-    string: str
-    start: tuple[int, int]
-    end: tuple[int, int]
+class TokenInfo:
+    __slots__ = ("end", "start", "string", "type")
+
+    def __init__(self, type: Token, string: str, start: tuple[int, int], end: tuple[int, int]):
+        self.type = type
+        self.string = string
+        self.start = start
+        self.end = end
 
     def __repr__(self) -> str:
         return f"<{self.type.name}>({self.string!r}) at {self.start[0]}"
@@ -281,19 +284,25 @@ class TokenError(Exception):
     pass
 
 
-class ModeMiddle(NamedTuple):
-    # in the string portion of an f-string (outside braces)
-    parenlevel: int
+class ModeMiddle:
+    __slots__ = ("parenlevel",)
+
+    def __init__(self, parenlevel: int):
+        self.parenlevel = parenlevel
 
 
-class ModeInBraces(NamedTuple):
-    parenlevel: int
+class ModeInBraces:
+    __slots__ = ("parenlevel",)
+
+    def __init__(self, parenlevel: int):
+        self.parenlevel = parenlevel
 
 
-class ModeInColon(NamedTuple):
-    """in the format specifier ({:*})"""
+class ModeInColon:
+    __slots__ = ("parenlevel",)
 
-    parenlevel: int
+    def __init__(self, parenlevel: int):
+        self.parenlevel = parenlevel
 
 
 Mode = ModeMiddle | ModeInBraces | ModeInColon
