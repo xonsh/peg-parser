@@ -7,10 +7,10 @@ pub(crate) struct EndProg {
     pub(crate) text: String,
     pub(crate) contline: String,
     pub(crate) start: (usize, usize),
+    pub(crate) start_offset: usize,
     pub(crate) quote: String,
     pub(crate) mode: Mode,
 }
-
 
 impl EndProg {
     pub fn new(
@@ -18,6 +18,7 @@ impl EndProg {
         text: String,
         contline: String,
         start: (usize, usize),
+        start_offset: usize,
         quote: String,
         mode: Mode,
     ) -> Self {
@@ -26,6 +27,7 @@ impl EndProg {
             text,
             contline,
             start,
+            start_offset,
             quote,
             mode,
         }
@@ -40,8 +42,9 @@ impl EndProg {
         self.contline += &line.text;
     }
 
-    pub(super) fn reset(&mut self, end: (usize, usize)) {
+    pub(super) fn reset(&mut self, end: (usize, usize), offset: usize) {
         self.start = end;
+        self.start_offset = offset;
         self.text.clear();
         self.contline.clear();
     }

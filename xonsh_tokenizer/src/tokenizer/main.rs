@@ -80,7 +80,7 @@ mod tests {
     fn handle_test_case(lines: &str, expected: &Vec<&str>) -> Result<(), String> {
         let result = tokenize_string(lines)
             .map(|x| x.unwrap())
-            .map(|x| format!("{:?}({}){}", x.typ, x.string, x.start.1))
+            .map(|x| format!("{:?}({}){}", x.typ, x.get_string(lines), x.start.1))
             .collect::<Vec<_>>();
         assert_eq!(&result, expected);
         Ok(())

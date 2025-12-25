@@ -8,21 +8,23 @@ pub(crate) struct LineState {
     pub(crate) num: usize, // line number
     pub(crate) pos: usize, // current position in line
     pub(crate) max: usize, // max position in line
+    pub(crate) base_offset: usize,
 }
 
 impl Default for LineState {
     fn default() -> Self {
-        Self::new("", 0)
+        Self::new("", 0, 0)
     }
 }
 
 impl LineState {
-    pub(crate) fn new(line: &str, num: usize) -> Self {
+    pub(crate) fn new(line: &str, num: usize, base_offset: usize) -> Self {
         Self {
             text: line.to_string(),
             num,
             pos: 0,
             max: line.len(),
+            base_offset,
         }
     }
 
@@ -33,13 +35,13 @@ impl LineState {
         start: T,
         end: T,
     ) -> TokInfo {
-        let end = end.into().unwrap_or(self.pos + string.len());
+        let start_idx = start.into().unwrap_or(self.pos);
+        let end_idx = end.into().unwrap_or(self.pos + string.len());
         TokInfo::new(
             tok,
-            string.to_string(),
-            (self.num, start.into().unwrap_or(self.pos)),
-            (self.num, end),
-            self.text.to_string().clone(),
+            (self.base_offset + start_idx, self.base_offset + end_idx),
+            (self.num, start_idx),
+            (self.num, end_idx),
         )
     }
 

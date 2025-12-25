@@ -1,13 +1,13 @@
-pub mod tokenizer;
 mod regex;
+pub mod tokenizer;
 
 use crate::regex::consts::OPERATORS;
+use crate::tokenizer::main::{tokenize_file as tok_file, tokenize_string};
+use crate::tokenizer::tok::{TokInfo, Token};
 use heck::ToShoutySnakeCase;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use std::collections::HashMap;
-use crate::tokenizer::tok::{TokInfo, Token};
-use crate::tokenizer::main::{tokenize_string, tokenize_file as tok_file};
 
 #[pyclass(frozen, module = "xonsh_tokenizer", name = "TokenInfo")]
 #[derive(Clone)]
@@ -20,22 +20,24 @@ impl PyTokInfo {
     #[new]
     fn __init__(
         typ: &str,
-        string: &str,
+        span: (usize, usize),
         start: (usize, usize),
         end: (usize, usize),
-        line: &str,
     ) -> PyResult<Self> {
         let tok = match typ {
             "WS" => Token::WS,
             "MACRO_PARAM" => Token::MacroParam,
             _ => panic!("Unknown token type: {}", typ),
         };
-        let inner = TokInfo::new(tok, string.to_string(), start, end, line.to_string());
+        let inner = TokInfo::new(tok, span, start, end);
         Ok(Self { inner })
     }
 
     fn __repr__<'a>(&'a self) -> PyResult<String> {
-        Ok(format!("Tok<{:?}:'{}'>", self.inner.typ, self.inner.string))
+        Ok(format!(
+            "Tok<{:?}:{}-{}>",
+            self.inner.typ, self.inner.span.0, self.inner.span.1
+        ))
     }
 
     fn __getattr__<'py>(slf: PyRef<'py, Self>, py: Python<'py>, name: &str) -> PyResult<PyObject> {
@@ -43,10 +45,9 @@ impl PyTokInfo {
             "type" => format!("{:?}", slf.inner.typ)
                 .to_shouty_snake_case()
                 .into_py(py),
-            "string" => slf.inner.string.clone().into_py(py),
             "start" => slf.inner.start.clone().into_py(py),
             "end" => slf.inner.end.clone().into_py(py),
-            "line" => slf.inner.line.clone().into_py(py),
+            "span" => slf.inner.span.clone().into_py(py),
             _ => return Err(PyTypeError::new_err(format!("Unknown attribute: {}", name))),
         };
         Ok(obj)
@@ -76,6 +77,10 @@ impl PyTokInfo {
         map.extend(self.loc_start());
         map.extend(self.loc_end());
         map
+    }
+
+    fn get_string<'a>(&self, src: &'a str) -> &'a str {
+        &src[self.inner.span.0..self.inner.span.1]
     }
 }
 

@@ -25,26 +25,27 @@ pub enum Token {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TokInfo {
     pub typ: Token,
-    pub string: String,
+    pub span: (usize, usize),
     pub start: (usize, usize),
     pub end: (usize, usize),
-    pub line: String,
 }
 
 impl TokInfo {
     pub fn new(
         typ: Token,
-        string: String,
+        span: (usize, usize),
         start: (usize, usize),
         end: (usize, usize),
-        line: String,
     ) -> Self {
         Self {
             typ,
-            string,
+            span,
             start,
             end,
-            line,
         }
+    }
+
+    pub fn get_string<'a>(&self, source: &'a str) -> &'a str {
+        &source[self.span.0..self.span.1]
     }
 }

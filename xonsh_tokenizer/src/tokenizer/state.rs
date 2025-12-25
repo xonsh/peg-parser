@@ -28,6 +28,7 @@ pub(crate) struct State {
     pub(crate) indents: Vec<usize>,
     pub(crate) line: LineState,
     pub(crate) end_progs: Vec<EndProg>,
+    pub(crate) offset: usize,
 }
 
 impl Default for State {
@@ -38,6 +39,7 @@ impl Default for State {
             indents: vec![0],
             line: LineState::default(),
             end_progs: vec![],
+            offset: 0,
         }
     }
 }
@@ -52,7 +54,7 @@ impl State {
         return false;
     }
     fn set_line(&mut self, line: String) {
-        self.line = LineState::new(line.as_str(), self.line.num + 1);
+        self.line = LineState::new(line.as_str(), self.line.num + 1, self.offset);
     }
 
     fn add_prog(&mut self, start: usize, end: usize, pattern: &str, quote: &str, mode: Mode) {
@@ -61,6 +63,7 @@ impl State {
             self.line.text[start..end].to_string(),
             self.line.text.to_string(),
             (self.line.num, start),
+            self.offset + start,
             quote.to_string(),
             mode,
         ));
@@ -74,7 +77,8 @@ impl State {
 
     fn reset_prog(&mut self, end: (usize, usize)) {
         if let Some(last_prog) = self.end_progs.last_mut() {
-            last_prog.reset(end)
+            let offset = self.offset + end.1;
+            last_prog.reset(end, offset)
         }
     }
 
@@ -83,12 +87,16 @@ impl State {
         endprog.join(&self.line, end);
         self.line.pos = end;
         let epos = (self.line.num, end);
+        let start = endprog.start;
+        // todo: check this logic
+        let start_offset = endprog.start_offset;
+        let end_offset = self.offset + end;
+
         return TokInfo {
             typ,
-            string: endprog.text.clone(),
-            start: endprog.start.clone(),
+            span: (start_offset, end_offset),
+            start,
             end: epos,
-            line: endprog.contline.clone(),
         };
     }
 
@@ -164,10 +172,9 @@ impl State {
                 pos = self.line.pos + 1;
                 results.push(TokInfo {
                     typ: Token::ErrorToken,
-                    string: self.line.text[self.line.pos..pos].to_string(),
+                    span: (self.offset + self.line.pos, self.offset + pos),
                     start: (self.line.num, self.line.pos),
                     end: (self.line.num, pos),
-                    line: self.line.text.to_string(),
                 });
                 self.line.pos = pos;
             }
@@ -203,6 +210,7 @@ impl State {
             self.continued = false;
         }
         let res = self.collect_until()?; // store in a variable to debug
+        self.offset += self.line.text.len();
         results.extend(res);
         Ok(results)
     }
@@ -267,7 +275,12 @@ impl State {
         self.line.pos = m.end;
 
         if let Some(token_type) = token_type {
-            let tok = TokInfo::new(token_type, m.text, spos, epos, self.line.text.clone());
+            let tok = TokInfo::new(
+                token_type,
+                (self.offset + m.start, self.offset + m.end),
+                spos,
+                epos,
+            );
             return Ok(Some(tok));
         }
         return Ok(None);
@@ -280,27 +293,24 @@ impl State {
         {
             let token = TokInfo {
                 typ: Token::NEWLINE,
-                string: "".to_string(),
+                span: (self.offset, self.offset),
                 start: (self.line.num, self.line.text.len()),
                 end: (self.line.num, self.line.text.len() + 1),
-                line: "".to_string(),
             };
             tokens.push(token);
         }
         tokens.extend(self.indents[1..].iter().map(|_| TokInfo {
             typ: Token::DEDENT,
-            string: "".to_string(),
+            span: (self.offset, self.offset),
             start: (self.line.num + 1, 0),
             end: (self.line.num + 1, 0),
-            line: "".to_string(),
         }));
 
         tokens.push(TokInfo {
             typ: Token::ENDMARKER,
-            string: "".to_string(),
+            span: (self.offset, self.offset),
             start: (self.line.num + 1, 0),
             end: (self.line.num + 1, 0),
-            line: "".to_string(),
         });
         return tokens;
     }
@@ -312,16 +322,14 @@ impl State {
             if m.name == "End" {
                 // quote match
                 let middle_end = m.end - endprog.quote.len();
-                let endquote = endprog.quote.to_string();
                 if middle_end > self.line.pos || !endprog.text.is_empty() {
                     results.push(self.prog_token(middle_end, Token::FstringMiddle));
                 }
                 results.push(TokInfo {
                     typ: Token::FstringEnd,
-                    string: endquote, // Copy the quote string
+                    span: (self.offset + self.line.pos, self.offset + m.end), // todo: verify
                     start: (self.line.num, self.line.pos),
                     end: (self.line.num, m.end),
-                    line: self.line.text.clone(),
                 });
                 self.pop_prog();
             } else {
@@ -335,10 +343,9 @@ impl State {
                     "LBrace" => {
                         results.push(TokInfo {
                             typ: Token::OP,
-                            string: "{".to_string(),
+                            span: (self.offset + self.line.pos, self.offset + m.end),
                             start: (self.line.num, self.line.pos),
                             end: (self.line.num, m.end),
-                            line: self.line.text.to_string(),
                         });
                         self.parenlev += 1;
                         self.add_prog(m.end, m.end, "", "", Mode::InBraces(self.parenlev));
@@ -346,10 +353,9 @@ impl State {
                     "RBrace" => {
                         results.push(TokInfo {
                             typ: Token::OP,
-                            string: "}".to_string(),
+                            span: (self.offset + self.line.pos, self.offset + m.end),
                             start: (self.line.num, self.line.pos),
                             end: (self.line.num, m.end),
-                            line: self.line.text.to_string(),
                         });
                         self.parenlev -= 1;
                         self.pop_prog(); // in-colon
