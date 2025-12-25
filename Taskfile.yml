@@ -2,7 +2,7 @@ version: "3"
 tasks:
   pull_grammar:
     cmds:
-      #      - curl -L https://github.com/python/cpython/raw/main/Grammar/python.gram > tasks/python.gram
+      - curl -L https://github.com/python/cpython/raw/main/Grammar/python.gram > tasks/cpython.gram
       - curl -L https://github.com/we-like-parsers/pegen/raw/main/data/python.gram > tasks/python.gram
   generate-meta:
     cmds:
