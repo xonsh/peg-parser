@@ -435,7 +435,7 @@ class BaseParser:
     @classmethod
     def default_table_name(cls) -> Path:
         format = "v1"
-        filename = f"{cls.__module__.rsplit('.')[-1]}.{cls.__name__}.table.{format}.jsonl"
+        filename = f"{cls.__module__.rsplit('.')[-1]}.{cls.__name__}.table.{format}.pickle"
         return Path(__file__).parent / filename
 
     def reset(self):

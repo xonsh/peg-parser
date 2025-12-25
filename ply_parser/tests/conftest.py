@@ -12,7 +12,7 @@ def parser_table():
     """make sure that default parser table is available for the whole test session"""
     from ply_parser.parser import write_parser_table
 
-    return write_parser_table(yacc_debug=True)
+    return write_parser_table(yacc_debug=False)
 
 
 @pytest.fixture(scope="session")

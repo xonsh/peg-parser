@@ -18,13 +18,10 @@ from typing import (
     Any,
     Callable,
     Final,
-    NamedTuple,
     Optional,
     Protocol,
     Union,
 )
-
-from rs_ply import StateMachine
 
 from .common import PlyLogger, format_result, format_stack_entry
 
@@ -135,11 +132,12 @@ class YaccProduction:
 CallBack = Callable[[YaccProduction], None]
 
 
-class Production(NamedTuple):
+@dataclass(slots=True, frozen=True)
+class Production:
     name: str
-    str: str
-    callable: CallBack
     len: int
+    str: str
+    func: str
 
 
 class ParserProtocol(Protocol):
@@ -148,7 +146,7 @@ class ParserProtocol(Protocol):
 
 @dataclass
 class ParserState:
-    fsm: StateMachine
+    fsm: "StateMachine"
     statestack: list[int]  # Stack of parsing states
     symstack: list["YaccSymbol"]  # Stack of grammar symbols
     lookahead: Optional["YaccSymbol"]  # Current lookahead symbol
@@ -259,7 +257,7 @@ class LRParser:
 
     def __init__(
         self,
-        fsm: StateMachine,
+        fsm: "StateMachine",
         errorf: Callable[[YaccSymbol | None], None] | None,
         module: ParserProtocol,
     ) -> None:
@@ -521,9 +519,63 @@ class LRParser:
             sys.stderr.write("yacc: Parse error in input. EOF\n")
 
 
+class StateMachine:
+    __slots__ = ("productions", "actions", "gotos", "defaults")
+
+    def __init__(self, table_path: str):
+        path = Path(table_path)
+        if path.suffix == ".pickle":
+            self._load_pickle(path)
+        else:
+            self._load_jsonl(path)
+        self._precompute_defaults()
+
+    def _load_pickle(self, path: Path):
+        import pickle
+
+        with open(path, "rb") as f:
+            productions, actions, gotos = pickle.load(f)
+        self._init_data(productions, actions, gotos)
+
+    def _load_jsonl(self, path: Path):
+        import json
+
+        with open(path) as f:
+            lines = f.readlines()
+        productions = json.loads(lines[0])
+        actions = json.loads(lines[1])
+        gotos = json.loads(lines[2])
+        self._init_data(productions, actions, gotos)
+
+    def _init_data(self, productions, actions, gotos):
+        self.productions = [Production(name=p[0], len=p[1], str=p[2], func=p[3]) for p in productions]
+        self.actions = actions
+        self.gotos = gotos
+
+    def _precompute_defaults(self):
+        self.defaults = {}
+        for state, act in enumerate(self.actions):
+            if len(act) == 1:
+                first = next(iter(act.values()))
+                if first < 0:
+                    self.defaults[state] = first
+
+    def get_default_action(self, state: int) -> Optional[int]:
+        return self.defaults.get(state)
+
+    def get_action(self, state: int, sym: str) -> Optional[int]:
+        return self.actions[state].get(sym)
+
+    def expect_production(self, index: int) -> Production:
+        return self.productions[index]
+
+    def expect_goto(self, state: int, sym: str) -> int:
+        return self.gotos[state][sym]
+
+
 def load_parser(parser_table: Path | str, module: ParserProtocol) -> LRParser:
     if isinstance(parser_table, Path):
         parser_table = str(parser_table)
 
-    state = StateMachine(parser_table)
-    return LRParser(state, errorf=getattr(module, "p_error", None), module=module)
+    fsm = StateMachine(parser_table)
+    return LRParser(fsm, errorf=getattr(module, "p_error", None), module=module)
