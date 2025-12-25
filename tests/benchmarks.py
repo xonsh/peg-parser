@@ -33,13 +33,13 @@ class PegenParser(BaseParser):
 class RuffParser(BaseParser):
     def __init__(self):
         try:
-            import xonsh_rd_parser as parser
+            from xonsh_rd_parser import Parser
         except ImportError:
             pytest.skip("xonsh_rd_parser not installed")
-        self.parser = parser
+        self.parser = Parser
 
     def parse_string(self, src_txt):
-        return self.parser.parse_string(src_txt)
+        return self.parser(src_txt).parse()
 
     def parse_file(self, file):
         return self.parser.parse_file(str(file))

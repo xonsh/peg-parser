@@ -33,7 +33,7 @@
 
 ```sh
 # install development deps
-pip install -e ".[dev,test,docs]"
+uv sync
 ```
   
 - We use [pre-commit](https://pre-commit.com/) for linting the code.
