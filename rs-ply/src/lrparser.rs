@@ -51,7 +51,7 @@ impl LRParser {
 
     fn parse<'py>(
         slf: &Bound<'py, Self>,
-        py: Python<'py>,
+        _py: Python<'py>,
         input: &str,
         lexer: PyObject,
         debug: bool,
@@ -60,7 +60,7 @@ impl LRParser {
         if debug {
             info!("PLY: PARSE DEBUG START");
         }
-        let parser_state = slf
+        let _parser_state = slf
             .borrow()
             ._initialize_parser_state(lexer, input, tracking);
         // Production object passed to grammar rules
@@ -81,7 +81,7 @@ impl LRParser {
         // }
         todo!()
     }
-    fn _initialize_parser_state(&self, lexer: PyObject, input: &str, tracking: bool) -> () {
+    fn _initialize_parser_state(&self, _lexer: PyObject, _input: &str, _tracking: bool) -> () {
         todo!()
     }
 }

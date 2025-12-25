@@ -1,4 +1,3 @@
-use crate::data::Production;
 use pyo3::exceptions::PyIndexError;
 use pyo3::prelude::*;
 
@@ -114,7 +113,7 @@ impl YaccProduction {
             .unwrap_or(startpos);
         Ok((startpos, endpos))
     }
-    fn error<'py>(&self, py: Python<'py>) -> PyResult<()> {
+    fn error<'py>(&self, _py: Python<'py>) -> PyResult<()> {
         Err(pyo3::exceptions::PySyntaxError::new_err("syntax error"))
     }
 
