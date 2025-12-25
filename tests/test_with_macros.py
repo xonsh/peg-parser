@@ -63,7 +63,7 @@ def test_withbang_as_single_suite(body, run):
 @pytest.mark.parametrize("body", WITH_BANG_RAWSUITES)
 def test_withbang_single_suite_trailing(body, run):
     code = "with! x:\n{}\nprint(x)\n".format(textwrap.indent(body, "    "))
-    method, tree = run(code)
+    method, _tree = run(code)
     method.assert_called_once_with("x", body + "\n", ANY, ANY)
 
 
@@ -78,7 +78,7 @@ WITH_BANG_RAWSIMPLE = [
 @pytest.mark.parametrize("body", WITH_BANG_RAWSIMPLE)
 def test_withbang_single_simple(body, run):
     code = f"with! x: {body}\n"
-    method, tree = run(code)
+    method, _tree = run(code)
     method.assert_called_once_with("x", " " + body + "\n", ANY, ANY)
 
 
@@ -95,7 +95,7 @@ def test_withbang_single_simple_opt(body, run):
 def test_withbang_as_many_suite(body, run):
     code = "with! x as a, y as b, z as c:\n{}"
     code = code.format(textwrap.indent(body, "    "))
-    method, tree = run(code)
+    _method, tree = run(code)
     assert isinstance(tree, AST)
     wither = tree.body[0]
     assert isinstance(wither, With)

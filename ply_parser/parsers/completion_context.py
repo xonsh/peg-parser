@@ -775,7 +775,7 @@ class CompletionContextParser:
             return self.expand_command_span(obj, new_span)
         elif isinstance(obj.value, list):
             # obj is multiple commands
-            return self.expand_commands_span(cast(Commands, obj), new_span)
+            return self.expand_commands_span(cast("Commands", obj), new_span)
         elif isinstance(obj.value, PythonContext):
             return self.try_expand_python_context(obj, new_span)  # type: ignore
         return None
@@ -802,7 +802,7 @@ class CompletionContextParser:
                     # this command has a last argument that we should try to expand
                     assert isinstance(command.expansion_obj, Spanned)
                     assert isinstance(command.expansion_obj.value, CommandArg)
-                    last_arg = cast(Spanned[CommandArg], command.expansion_obj)
+                    last_arg = cast("Spanned[CommandArg]", command.expansion_obj)
 
                     expanded_arg = self.try_expand_right(last_arg, new_span.stop)
                     if expanded_arg is not None:
@@ -883,7 +883,7 @@ class CompletionContextParser:
             return Spanned(string_literal, new_span, cursor_context)
         elif isinstance(arg.expansion_obj, Spanned):
             assert self.is_command_or_commands(arg.expansion_obj) or self.is_python(arg.expansion_obj)
-            sub_expr = cast(ArgContext, arg.expansion_obj)
+            sub_expr = cast("ArgContext", arg.expansion_obj)
 
             # this arg is a subcommand or multiple subcommands, e.g. `$(a && b)`
             expanded_obj: Optional[ArgContext] = self.try_expand_span(sub_expr, new_span)  # type: ignore
@@ -911,7 +911,7 @@ class CompletionContextParser:
         if python_context.expansion_obj is not None:
             # the last command is expandable
             # if it were an `ExpansionOperation`, `try_expand` would caught it instead
-            expandable = cast(ExpandableObject, python_context.expansion_obj)
+            expandable = cast("ExpandableObject", python_context.expansion_obj)
             expanded_command: Optional[ExpandableObject] = self.try_expand_right(expandable, new_span.stop)  # type: ignore
 
             if expanded_command is not None and expanded_command.cursor_context is not None:

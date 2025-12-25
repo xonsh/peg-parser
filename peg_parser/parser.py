@@ -2949,7 +2949,7 @@ class XonshParser(Parser):
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect(":")) and (spec := self.repeated(self.fstring_format_spec),):
             return ast.JoinedStr(
-                values=spec if spec and (len(spec) > 1 or cast(ast.Constant, spec[0]).value) else [],
+                values=spec if spec and (len(spec) > 1 or cast("ast.Constant", spec[0]).value) else [],
                 **self.span(_lnum, _col),
             )
         self._reset(mark)

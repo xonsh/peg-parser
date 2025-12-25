@@ -38,7 +38,7 @@ class XonshCallMakerVisitor(PythonCallMakerVisitor):
         self.soft_keywords: set[str] = set()
 
     def lookahead_call_helper(self, node: Item, nested=True) -> tuple[str, str]:
-        name, call = self.visit(node.node if nested else node)
+        _name, call = self.visit(node.node if nested else node)
         head, tail = call.split("(", 1)
         assert tail[-1] == ")"
         tail = tail[:-1]

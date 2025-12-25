@@ -99,7 +99,7 @@ def logger(method: F) -> F:
         return tree
 
     logger_wrapper.__wrapped__ = method  # type: ignore
-    return cast(F, logger_wrapper)
+    return cast("F", logger_wrapper)
 
 
 def memoize(method: F) -> F:
@@ -136,7 +136,7 @@ def memoize(method: F) -> F:
         return tree
 
     memoize_wrapper.__wrapped__ = method  # type: ignore
-    return cast(F, memoize_wrapper)
+    return cast("F", memoize_wrapper)
 
 
 def memoize_left_rec(method: Callable[[P], T | None]) -> Callable[[P], T | None]:
@@ -494,13 +494,13 @@ class Parser:
         value = ast.literal_eval(number.string)
         if not isinstance(value, float | int):
             self.raise_syntax_error_known_location("real number required in complex literal", number)
-        return cast(float | int, value)
+        return cast("float | int", value)
 
     def ensure_imaginary(self, number: TokenInfo) -> complex:
         value = ast.literal_eval(number.string)
         if not isinstance(value, complex):
             self.raise_syntax_error_known_location("imaginary number required in complex literal", number)
-        return cast(complex, value)
+        return cast("complex", value)
 
     def check_fstring_conversion(self, name: TokenInfo) -> int:
         s = name.string

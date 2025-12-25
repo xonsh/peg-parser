@@ -216,5 +216,5 @@ class Tokenizer:
             print(f"{fill} (Bof)")
         else:
             tok = self._tokens[self._index - 1]
-            short = "%-25.25s" % f"{tok.start[0]}.{tok.start[1]}: {tok.type!r}:{tok.string!r}"
+            short = "%-25.25s" % f"{tok.start[0]}.{tok.start[1]}: {tok.type!r}:{tok.string!r}"  # noqa
             print(f"{fill} {short}")

@@ -532,7 +532,7 @@ def handle_fstring_progs(state: TokenizerState, endprog: EndProg) -> Iterator[To
     endmatch = state.match(endprog.pattern)
     if (not endmatch) or (not endmatch.lastgroup):
         return None
-    start, end = endmatch.span(endmatch.lastgroup)
+    _start, end = endmatch.span(endmatch.lastgroup)
     if endmatch.lastgroup == "End":  # quote match
         middle_end = end - len(endprog.quote)
         if (middle_end > state.pos) or endprog.text:
