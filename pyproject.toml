@@ -152,6 +152,7 @@ test = [
     "ruamel.yaml",
 ]
 dev = [
+    {include-group = "test"},
     "flask>=3.0.3",
     "flask-wtf>=1.2.1",
     "ipython>=8.18.1",
