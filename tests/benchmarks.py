@@ -30,6 +30,22 @@ class PegenParser(BaseParser):
         return self.parser.parse_file(file)
 
 
+class PegenV0Parser(BaseParser):
+    """Python parser generated from pegen project.
+    Compare it to see if we made any improvements with our pegen iterations"""
+
+    def __init__(self):
+        import pegen.py_parser as Parser
+
+        self.parser = Parser
+
+    def parse_string(self, src_txt):
+        return self.parser.parse_string(src_txt, mode="exec")
+
+    def parse_file(self, file):
+        return self.parser.parse_file(file)
+
+
 class RuffParser(BaseParser):
     def __init__(self):
         try:
@@ -48,7 +64,7 @@ class RuffParser(BaseParser):
 class PlyParser(BaseParser):
     def __init__(self):
         try:
-            from xonsh.parser import Parser
+            from xonsh.parsers.v310 import Parser
         except ImportError:
             pytest.skip("xonsh not installed")
         self.parser = Parser()
