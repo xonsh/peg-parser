@@ -70,6 +70,7 @@ ignore = [
 ]
 "*/tokenize.py" = [
     "A001", # Variable `any` is shadowing a Python builtin
+    "A002",
     "F405", #
     "F821", # Undefined name `strstart`
     "F841", # [*] Local variable `strstart` is assigned to but never used

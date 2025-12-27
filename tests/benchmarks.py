@@ -35,9 +35,9 @@ class PegenV0Parser(BaseParser):
     Compare it to see if we made any improvements with our pegen iterations"""
 
     def __init__(self):
-        import pegen.py_parser as Parser
+        import pegen.py_parser as parser
 
-        self.parser = Parser
+        self.parser = parser
 
     def parse_string(self, src_txt):
         return self.parser.parse_string(src_txt, mode="exec")
