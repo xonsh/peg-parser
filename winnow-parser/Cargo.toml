@@ -9,5 +9,5 @@ name = "winnow_parser"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.21.1"
-winnow = "0.6.13"
+pyo3 = { workspace = true }
+winnow = "^0.7.0"

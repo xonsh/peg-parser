@@ -1,15 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["xonsh_tokenizer", "rs-ply"]
 
+members = ["xonsh_tokenizer", "rs-ply",
+    "winnow-parser",
+]
 [workspace.dependencies]
 pyo3 = { version = "0.27.*", features = [
     "extension-module",
     "experimental-inspect",
 ] }
-
-[workspace]
-
-members = [
-    "winnow-parser",
-]
