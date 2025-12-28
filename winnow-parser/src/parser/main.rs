@@ -3,14 +3,17 @@ use winnow::error::ErrMode;
 use winnow::prelude::*;
 use winnow::token::take_while;
 
+#[allow(dead_code)]
 fn parse_prefix<'s>(input: &mut &'s str) -> ModalResult<&'s str> {
     "0x".parse_next(input)
 }
 
+#[allow(dead_code)]
 fn parse_digits<'s>(input: &mut &'s str) -> ModalResult<&'s str> {
     take_while(1.., (('0'..='9'), ('A'..='F'), ('a'..='f'))).parse_next(input)
 }
 
+#[allow(dead_code)]
 pub fn parser<'s>(input: &mut &'s str) -> ModalResult<char> {
     let c = input
         .chars()
