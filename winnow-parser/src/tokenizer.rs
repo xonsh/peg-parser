@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 use winnow::ascii::{digit1, hex_digit1, line_ending};
-use winnow::combinator::{alt, fail, opt, repeat};
+use winnow::combinator::{alt, dispatch, opt, peek, repeat};
 use winnow::error::ErrMode;
 use winnow::prelude::*;
 use winnow::stream::Stateful;
@@ -100,7 +100,7 @@ impl TokInfo {
     }
 }
 
-// ... existing digit helpers ...
+// ... helper parsers ...
 pub fn oct_digit1_w<'s>(input: &mut Stream<'s>) -> ModalResult<&'s str> {
     (
         take_while(1.., '0'..='7'),
@@ -150,7 +150,6 @@ pub fn parse_name<'s>(input: &mut Stream<'s>) -> ModalResult<&'s str> {
         .parse_next(input);
 
     if res.is_ok() {
-        // Name token means we are no longer at start of line
         input.state.at_beginning_of_line = false;
     }
     res
@@ -191,9 +190,8 @@ pub fn parse_op<'s>(input: &mut Stream<'s>) -> ModalResult<&'s str> {
     ))
     .parse_next(input)?;
 
-    // Update state based on the operator
     let state = &mut input.state;
-    state.at_beginning_of_line = false; // operator clears BOL
+    state.at_beginning_of_line = false;
 
     if op == "(" || op == "[" || op == "{" {
         state.paren_level += 1;
@@ -290,18 +288,14 @@ pub fn parse_search_path<'s>(input: &mut Stream<'s>) -> ModalResult<&'s str> {
     res
 }
 
-// --- New Specialized Parsers ---
-
 pub fn parse_indentation<'s>(input: &mut Stream<'s>) -> ModalResult<Token> {
     if !input.state.at_beginning_of_line {
         return Err(ErrMode::Backtrack(winnow::error::ContextError::new()));
     }
 
-    input.state.at_beginning_of_line = false; // standard case, unless empty line
+    input.state.at_beginning_of_line = false;
     let last_indent = *input.state.indents.last().unwrap();
 
-    // Speculatively consume WS
-    // We need to clone to check if line is empty without consuming
     let mut check_empty = input.clone();
     let ws_res: Result<&str, ErrMode<winnow::error::ContextError>> = parse_ws(&mut check_empty);
     let (indent_len, new_input) = match ws_res {
@@ -309,7 +303,6 @@ pub fn parse_indentation<'s>(input: &mut Stream<'s>) -> ModalResult<Token> {
         Err(_) => (0, input.clone()),
     };
 
-    // Check if line is empty (contains only comment or newline)
     let mut check_content = new_input.clone();
     let le_res: Result<&str, ErrMode<winnow::error::ContextError>> =
         line_ending.parse_next(&mut check_content);
@@ -320,7 +313,7 @@ pub fn parse_indentation<'s>(input: &mut Stream<'s>) -> ModalResult<Token> {
         let consumed_len = input.input.len() - new_input.input.len();
         if consumed_len > 0 {
             input.input = &input.input[consumed_len..];
-            input.state.at_beginning_of_line = true; // Still at beginning
+            input.state.at_beginning_of_line = true;
             return Ok(Token::WS);
         } else {
             input.state.at_beginning_of_line = true;
@@ -328,7 +321,6 @@ pub fn parse_indentation<'s>(input: &mut Stream<'s>) -> ModalResult<Token> {
         }
     }
 
-    // Not an empty line, check indentation levels
     if input.state.paren_level > 0 || !input.state.fstring_stack.is_empty() {
         let consumed_len = input.input.len() - new_input.input.len();
         if consumed_len > 0 {
@@ -348,7 +340,6 @@ pub fn parse_indentation<'s>(input: &mut Stream<'s>) -> ModalResult<Token> {
         input.state.at_beginning_of_line = true;
         Ok(Token::DEDENT)
     } else {
-        // Equal indentation
         let consumed_len = input.input.len() - new_input.input.len();
         if consumed_len > 0 {
             input.input = &input.input[consumed_len..];
@@ -396,11 +387,9 @@ pub fn parse_fstring_content<'s>(input: &mut Stream<'s>) -> ModalResult<Token> {
         state_mut.brace_level = 1;
         state_mut.in_format_spec = false;
         input.state.paren_level += 1;
-        // In f-string, { is OP
         return Ok(Token::OP);
     }
 
-    // Parse content
     let mut temp_input = input.clone();
     let mut len = 0;
     while !temp_input.is_empty() {
@@ -457,7 +446,7 @@ pub fn parse_fstring_start<'s>(input: &mut Stream<'s>) -> ModalResult<Token> {
     if ql > 0 {
         let quote = &check.input[..ql];
         let quote_str = quote.to_string();
-        input.input = &check.input[ql..]; // Advance past prefix and quote
+        input.input = &check.input[ql..];
 
         input.state.fstring_stack.push(FStringState {
             quote: quote_str,
@@ -560,7 +549,6 @@ impl<'s> Tokenizer<'s> {
                 ));
             }
 
-            // Handle line continuation manually as it's a pre-processor step roughly
             if self.input.starts_with('\\') {
                 let mut check = self.input.clone();
                 let _: Result<char, ErrMode<winnow::error::ContextError>> =
@@ -586,27 +574,92 @@ impl<'s> Tokenizer<'s> {
             let start_coords = (self.line, self.col);
             let old_input = self.input.clone();
 
-            // Unified Dispatch
-            let result: Result<Token, ErrMode<winnow::error::ContextError>> = alt((
-                parse_indentation,
-                parse_fstring_content,
-                // WS
-                parse_ws.map(|_| Token::WS),
-                // Comment
-                parse_comment.map(|_| Token::Comment),
-                // Line Ending
-                parse_line_ending_token,
-                // Main Tokens
-                parse_fstring_start,
-                parse_search_path.map(|_| Token::SEARCH_PATH),
-                parse_full_string.map(|_| Token::STRING),
-                parse_number.map(|_| Token::NUMBER),
-                parse_name.map(|_| Token::NAME),
-                parse_op.map(|_| Token::OP),
-                // Error token fallthrough (any char)
-                any.map(|_| Token::ErrorToken),
-            ))
-            .parse_next(&mut self.input);
+            // Refactored Dispatch Logic
+
+            // Priority 1: Indentation (State Check)
+            let result: Result<Token, ErrMode<winnow::error::ContextError>> =
+                if self.input.state.at_beginning_of_line {
+                    let initial_input = self.input.clone();
+                    let _res = parse_indentation(&mut self.input);
+                    if _res.is_ok() {
+                        _res
+                    } else {
+                        self.input = initial_input; // Restore state (including at_beginning_of_line)
+
+                        dispatch! { peek(any);
+                            ' ' | '\t' | '\x0c' => parse_ws.map(|_| Token::WS),
+                            '#' => parse_comment.map(|_| Token::Comment),
+                            '\n' | '\r' => parse_line_ending_token,
+                            '0'..='9' => parse_number.map(|_| Token::NUMBER),
+                            'a'..='z' | 'A'..='Z' | '_' => alt((
+                                parse_fstring_start,
+                                // identifiers can start search path?
+                                parse_search_path.map(|_| Token::SEARCH_PATH),
+                                parse_full_string.map(|_| Token::STRING),
+                                parse_name.map(|_| Token::NAME)
+                            )),
+                            '\'' | '"' => alt((
+                                 parse_fstring_start,
+                                 parse_full_string.map(|_| Token::STRING)
+                            )),
+                            '`' => parse_search_path.map(|_| Token::SEARCH_PATH),
+                            '@' => alt((
+                                parse_search_path.map(|_| Token::SEARCH_PATH),
+                                parse_op.map(|_| Token::OP)
+                            )),
+                            '.' => alt((
+                                parse_number.map(|_| Token::NUMBER),
+                                parse_op.map(|_| Token::OP)
+                            )),
+                            _ => alt((
+                                parse_op.map(|_| Token::OP),
+                                any.map(|_| Token::ErrorToken)
+                            ))
+                        }
+                        .parse_next(&mut self.input)
+                    }
+                } else if !self.input.state.fstring_stack.is_empty()
+                    && self
+                        .input
+                        .state
+                        .fstring_stack
+                        .last()
+                        .map(|s| s.brace_level == 0)
+                        .unwrap_or(false)
+                {
+                    parse_fstring_content(&mut self.input)
+                } else {
+                    dispatch! { peek(any);
+                        ' ' | '\t' | '\x0c' => parse_ws.map(|_| Token::WS),
+                        '#' => parse_comment.map(|_| Token::Comment),
+                        '\n' | '\r' => parse_line_ending_token,
+                        '0'..='9' => parse_number.map(|_| Token::NUMBER),
+                        'a'..='z' | 'A'..='Z' | '_' => alt((
+                            parse_fstring_start,
+                            parse_search_path.map(|_| Token::SEARCH_PATH),
+                            parse_full_string.map(|_| Token::STRING),
+                            parse_name.map(|_| Token::NAME)
+                        )),
+                        '\'' | '"' => alt((
+                             parse_fstring_start,
+                             parse_full_string.map(|_| Token::STRING)
+                        )),
+                        '`' => parse_search_path.map(|_| Token::SEARCH_PATH),
+                        '@' => alt((
+                            parse_search_path.map(|_| Token::SEARCH_PATH),
+                            parse_op.map(|_| Token::OP)
+                        )),
+                        '.' => alt((
+                            parse_number.map(|_| Token::NUMBER),
+                            parse_op.map(|_| Token::OP)
+                        )),
+                        _ => alt((
+                            parse_op.map(|_| Token::OP),
+                            any.map(|_| Token::ErrorToken)
+                        ))
+                    }
+                    .parse_next(&mut self.input)
+                };
 
             let consumed_len = old_input.input.len() - self.input.input.len();
             let consumed = &old_input.input[..consumed_len];
@@ -626,10 +679,6 @@ impl<'s> Tokenizer<'s> {
                     ));
                 }
                 Err(_) => {
-                    // Should be caught by any -> ErrorToken, but strictly:
-                    // Force advance if somehow stuck?
-                    // But any guarantees advance.
-                    // Logic error if we get here with start_offset == offset?
                     return Some(TokInfo::new(
                         Token::ErrorToken,
                         (start_offset, self.offset),
