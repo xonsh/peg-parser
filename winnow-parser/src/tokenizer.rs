@@ -23,13 +23,19 @@ pub enum Token {
     FSTRING_START,
     FSTRING_MIDDLE,
     FSTRING_END,
-    ErrorToken,
-    Comment,
+    ERRORTOKEN,
+    COMMENT,
     NL,
+    AWAIT,
+    ASYNC,
+    TYPE_IGNORE,
+    TYPE_COMMENT,
+    SOFT_KEYWORD,
+    ENCODING,
     // xonsh specific tokens
     SEARCH_PATH,
     WS,
-    MacroParam,
+    MACRO_PARAM,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,6 +51,7 @@ pub struct LexerState {
     pub fstring_stack: Vec<FStringState>,
     pub paren_level: usize,
     pub at_beginning_of_line: bool,
+    pub has_content: bool,
 }
 
 impl Default for LexerState {
@@ -54,6 +61,7 @@ impl Default for LexerState {
             fstring_stack: Vec::new(),
             paren_level: 0,
             at_beginning_of_line: true,
+            has_content: false,
         }
     }
 }
@@ -100,6 +108,33 @@ impl TokInfo {
         s[self.span.0..self.span.1].to_string()
     }
 
+    #[allow(deprecated)]
+    pub fn is_exact_type(&self, _py: Python<'_>, typ: String) -> bool {
+        self.typ == Token::OP && Python::with_gil(|py| self.string(py) == typ)
+    }
+
+    pub fn loc_start(&self) -> std::collections::HashMap<&'static str, usize> {
+        let mut map = std::collections::HashMap::new();
+        map.insert("lineno", self.start.0);
+        map.insert("col_offset", self.start.1);
+        map
+    }
+
+    pub fn loc_end(&self) -> std::collections::HashMap<&'static str, usize> {
+        let mut map = std::collections::HashMap::new();
+        map.insert("end_lineno", self.end.0);
+        map.insert("end_col_offset", self.end.1);
+        map
+    }
+
+    pub fn loc(&self) -> std::collections::HashMap<&'static str, usize> {
+        let mut map = self.loc_start();
+        map.insert("end_lineno", self.end.0);
+        map.insert("end_col_offset", self.end.1);
+        map
+    }
+
+    #[allow(deprecated)]
     fn __repr__(&self) -> String {
         Python::with_gil(|py| {
             let s = self.source.bind(py).to_str().unwrap();
@@ -118,6 +153,7 @@ impl TokInfo {
 
 impl Clone for TokInfo {
     fn clone(&self) -> Self {
+        #[allow(deprecated)]
         Python::with_gil(|py| Self {
             typ: self.typ,
             span: self.span,
@@ -233,7 +269,7 @@ pub fn parse_op<'s>(input: &mut Stream<'s>) -> ModalResult<&'s str> {
     let state = &mut input.state;
     state.at_beginning_of_line = false;
 
-    if op == "(" || op == "[" || op == "{" {
+    if op.ends_with('(') || op.ends_with('[') || op.ends_with('{') {
         state.paren_level += 1;
     } else if op == ")" || op == "]" || op == "}" {
         state.paren_level = state.paren_level.saturating_sub(1);
@@ -242,7 +278,7 @@ pub fn parse_op<'s>(input: &mut Stream<'s>) -> ModalResult<&'s str> {
     let fs_len = state.fstring_stack.len();
     if let Some(f_state) = state.fstring_stack.last_mut() {
         if f_state.brace_level > 0 {
-            if op == "{" {
+            if op.ends_with('{') {
                 f_state.brace_level += 1;
             } else if op == "}" {
                 f_state.brace_level -= 1;
@@ -261,12 +297,12 @@ pub fn parse_op<'s>(input: &mut Stream<'s>) -> ModalResult<&'s str> {
 
 pub fn parse_string_prefix<'s>(input: &mut Stream<'s>) -> ModalResult<&'s str> {
     alt((
-        alt((
-            "rf", "fr", "rb", "br", "pF", "Fp", "pf", "fp", "pr", "rp", "r", "f", "b", "u", "p",
-        )),
-        alt((
-            "RF", "FR", "RB", "BR", "PF", "FP", "PR", "RP", "R", "F", "B", "U", "P",
-        )),
+        alt([
+            "rf", "fr", "rb", "br", "pf", "fp", "pr", "rp", "RF", "FR", "RB", "BR", "PF", "FP",
+            "PR", "RP", "rF", "Rf", "fR", "Fr", "rB", "Rb", "bR", "Br", "pF", "Pf", "fP", "Fp",
+            "pR", "Rp", "rP", "Pr",
+        ]),
+        alt(["u", "p", "r", "f", "b", "U", "P", "R", "F", "B"]),
         "",
     ))
     .parse_next(input)
@@ -513,11 +549,16 @@ pub fn parse_fstring_start<'s>(input: &mut Stream<'s>) -> ModalResult<Token> {
 pub fn parse_line_ending_token<'s>(input: &mut Stream<'s>) -> ModalResult<Token> {
     let _ = line_ending.parse_next(input)?;
     input.state.at_beginning_of_line = true;
-    if input.state.paren_level > 0 || !input.state.fstring_stack.is_empty() {
-        Ok(Token::NL)
+    let res = if input.state.paren_level > 0
+        || !input.state.fstring_stack.is_empty()
+        || !input.state.has_content
+    {
+        Token::NL
     } else {
-        Ok(Token::NEWLINE)
-    }
+        Token::NEWLINE
+    };
+    input.state.has_content = false;
+    Ok(res)
 }
 
 pub struct Tokenizer<'s> {
@@ -531,11 +572,7 @@ pub struct Tokenizer<'s> {
 }
 
 impl<'s> Tokenizer<'s> {
-    pub fn new(py: Python<'_>, source: Py<PyString>) -> Self {
-        // We need the source as a &str for winnow, but we must be careful with lifetimes.
-        // Since &str is only needed for the duration of tokenization, and we hold the Py<PyString>,
-        // we can safely bound it for 's.
-        let source_str: &'s str = unsafe { std::mem::transmute(source.bind(py).to_str().unwrap()) };
+    pub fn new(_py: Python<'_>, source: Py<PyString>, source_str: &'s str) -> Self {
         Self {
             input: Stateful {
                 input: source_str,
@@ -666,7 +703,7 @@ impl<'s> Tokenizer<'s> {
                                      }
                                 },
                                 ' ' | '\t' | '\x0c' => parse_ws.map(|_| Token::WS),
-                                '#' => parse_comment.map(|_| Token::Comment),
+                                '#' => parse_comment.map(|_| Token::COMMENT),
                                 '\n' | '\r' => parse_line_ending_token,
                                 '0'..='9' => parse_number.map(|_| Token::NUMBER),
                                 'a'..='z' | 'A'..='Z' | '_' => alt((
@@ -691,7 +728,7 @@ impl<'s> Tokenizer<'s> {
                                 )),
                                 _ => alt((
                                     parse_op.map(|_| Token::OP),
-                                    any.map(|_| Token::ErrorToken)
+                                    any.map(|_| Token::ERRORTOKEN)
                                 ))
                             }
                             .parse_next(&mut self.input)
@@ -717,7 +754,7 @@ impl<'s> Tokenizer<'s> {
                              }
                         },
                         ' ' | '\t' | '\x0c' => parse_ws.map(|_| Token::WS),
-                        '#' => parse_comment.map(|_| Token::Comment),
+                        '#' => parse_comment.map(|_| Token::COMMENT),
                         '\n' | '\r' => parse_line_ending_token,
                         '0'..='9' => parse_number.map(|_| Token::NUMBER),
                         'a'..='z' | 'A'..='Z' | '_' => alt((
@@ -741,7 +778,7 @@ impl<'s> Tokenizer<'s> {
                         )),
                         _ => alt((
                             parse_op.map(|_| Token::OP),
-                            any.map(|_| Token::ErrorToken)
+                            any.map(|_| Token::ERRORTOKEN)
                         ))
                     }
                     .parse_next(&mut self.input)
@@ -753,10 +790,23 @@ impl<'s> Tokenizer<'s> {
             self.update_coords(consumed);
 
             match result {
-                Ok(Token::WS) | Ok(Token::NL) => {
-                    continue;
-                }
                 Ok(tok) => {
+                    match tok {
+                        Token::NAME
+                        | Token::NUMBER
+                        | Token::STRING
+                        | Token::OP
+                        | Token::FSTRING_START
+                        | Token::FSTRING_MIDDLE
+                        | Token::SEARCH_PATH
+                        | Token::AWAIT
+                        | Token::ASYNC
+                        | Token::SOFT_KEYWORD
+                        | Token::MACRO_PARAM => {
+                            self.input.state.has_content = true;
+                        }
+                        _ => {}
+                    }
                     return Some(TokInfo::new(
                         tok,
                         (start_offset, self.offset),
@@ -766,8 +816,16 @@ impl<'s> Tokenizer<'s> {
                     ));
                 }
                 Err(_) => {
+                    if self.offset == start_offset && !self.input.is_empty() {
+                        let mut it = self.input.input.chars();
+                        if let Some(c) = it.next() {
+                            let len = c.len_utf8();
+                            self.update_coords(&old_input.input[..len]);
+                            self.input.input = &self.input.input[len..];
+                        }
+                    }
                     return Some(TokInfo::new(
-                        Token::ErrorToken,
+                        Token::ERRORTOKEN,
                         (start_offset, self.offset),
                         start_coords,
                         (self.line, self.col),
@@ -780,7 +838,9 @@ impl<'s> Tokenizer<'s> {
 }
 
 pub fn tokenize(py: Python<'_>, source: Py<PyString>) -> Vec<TokInfo> {
-    let mut t = Tokenizer::new(py, source);
+    let source_bound = source.bind(py);
+    let source_str = source_bound.to_str().unwrap();
+    let mut t = Tokenizer::new(py, source.clone_ref(py), source_str);
     let mut tokens = Vec::new();
     while let Some(tok) = t.next_token() {
         tokens.push(tok);
@@ -791,5 +851,27 @@ pub fn tokenize(py: Python<'_>, source: Py<PyString>) -> Vec<TokInfo> {
 #[pyfunction]
 #[pyo3(name = "tokenize")]
 pub fn tokenize_py(py: Python<'_>, source: Bound<'_, PyString>) -> Vec<TokInfo> {
-    tokenize(py, source.into())
+    let source_str = source.to_str().unwrap();
+    let mut t = Tokenizer::new(py, source.clone().into(), source_str);
+    let mut tokens = Vec::new();
+    while let Some(tok) = t.next_token() {
+        tokens.push(tok);
+    }
+    tokens
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pyo3::Python;
+
+    #[test]
+    fn test_infinite_loop() {
+        Python::with_gil(|py| {
+            let source = "from functools import wraps\n\n\ndef advanced_decorator(f):\n    @wraps(f)\n    def wrapper(*args, **kwargs):\n        print(\"Advanced decorator\")\n        return f(*args, **kwargs)\n\n    return wrapper\n\n\n@advanced_decorator\ndef decorated_function():\n    print(\"Decorated function\")\n";
+            let py_source = pyo3::types::PyString::new(py, source).into();
+            let tokens = tokenize(py, py_source);
+            assert!(tokens.len() > 0);
+        });
+    }
 }

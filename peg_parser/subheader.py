@@ -6,8 +6,9 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, ParamSpec, Protocol, TypedDict, TypeVar, cast
 
-from peg_parser.tokenize import Token, TokenInfo
-from peg_parser.tokenizer import Mark, Tokenizer
+from winnow_parser import Token
+
+from peg_parser.tokenizer import Mark, TokenInfo, Tokenizer
 
 if TYPE_CHECKING:
     # see - https://github.com/python/mypy/blob/master/mypy/typeshed/stdlib/_ast.pyi
@@ -309,7 +310,7 @@ class Parser:
 
     def token(self, typ: str) -> TokenInfo | None:
         tok = self._tokenizer.peek()
-        if tok.type == Token[typ]:
+        if tok.type == getattr(Token, typ):
             return self._tokenizer.getnext()
         return None
 

@@ -30,10 +30,10 @@ def lex_input(inp: str) -> list[TokenInfo]:
     # skip the NEWLINE, ENDMARKER tokens for easier testing
     from winnow_parser import tokenize
 
-    tokens = tokenize(inp)
-    if tokens[-1].type == t.ENDMARKER:
+    tokens = [tok for tok in tokenize(inp) if tok.type not in (t.WS, t.NL)]
+    if tokens and tokens[-1].type == t.ENDMARKER:
         tokens.pop()
-    if tokens[-1].type == t.NEWLINE:
+    if tokens and tokens[-1].type == t.NEWLINE:
         tokens.pop()
     return tokens
 

@@ -135,3 +135,4 @@ prof/
 # pytest-benchmark
 benchmark_*.svg
 .benchmarks/
+*.html

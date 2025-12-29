@@ -3,14 +3,47 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Final, NewType
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
-from .tokenize import Token, TokenInfo, TokenizerState, next_end_tokens, tokenize_line
+    from collections.abc import Callable
+
+from winnow_parser import Token, tokenize
+
+
+class TokenInfo:
+    """A wrapper class that can represent both Rust TokInfo and synthesized tokens."""
+
+    __slots__ = ("end", "start", "string", "type")
+
+    def __init__(self, typ: Token, string: str, start: tuple[int, int], end: tuple[int, int]):
+        self.type = typ
+        self.string = string
+        self.start = start
+        self.end = end
+
+    def is_exact_type(self, typ: str) -> bool:
+        return self.type == Token.OP and self.string == typ
+
+    def loc_start(self):
+        return {"lineno": self.start[0], "col_offset": self.start[1]}
+
+    def loc_end(self):
+        return {"end_lineno": self.end[0], "end_col_offset": self.end[1]}
+
+    def loc(self):
+        res = self.loc_start()
+        res.update(self.loc_end())
+        return res
+
+    def __repr__(self):
+        return (
+            f"TokenInfo(type={self.type!r}, string={self.string!r}, start={self.start!r}, end={self.end!r})"
+        )
+
 
 Mark = NewType("Mark", int)
 
 
-WS_TOKENS = {Token.ENDMARKER, Token.NEWLINE, Token.DEDENT, Token.INDENT}
-SKIP_TOKENS = {Token.WS, Token.COMMENT, Token.NL}
+WS_TOKENS = (Token.ENDMARKER, Token.NEWLINE, Token.DEDENT, Token.INDENT)
+SKIP_TOKENS = (Token.WS, Token.COMMENT, Token.NL)
 
 
 class Tokenizer:
@@ -36,9 +69,18 @@ class Tokenizer:
         self._with_macro = False
         self._proc_macro = False
 
-        self._tokenizer_state = TokenizerState()
-        self._line_tokengen: Iterator[TokenInfo] | None = None
-        self._eof = False
+        self._raw_tokens: list[TokenInfo] = []
+        self._raw_index = 0
+
+        # Read all source and tokenize
+        source = ""
+        while True:
+            line = readline()
+            if not line:
+                break
+            source += line
+            self._lines[len(self._lines) + 1] = line
+        self._raw_tokens = tokenize(source)
 
         self._end_parens: Final = {
             ")": "(",
@@ -61,26 +103,11 @@ class Tokenizer:
         return tok
 
     def _fetch(self) -> TokenInfo:
-        while True:
-            if self._line_tokengen:
-                try:
-                    tok = next(self._line_tokengen)
-                    return tok
-                except StopIteration:
-                    self._line_tokengen = None
-
-            if self._eof:
-                raise StopIteration
-
-            line = self._readline()
-            if not line:
-                self._eof = True
-                self._tokenizer_state.set_line("")
-                self._line_tokengen = next_end_tokens(self._tokenizer_state)
-                continue
-
-            self._lines[len(self._lines) + 1] = line
-            self._line_tokengen = tokenize_line(self._tokenizer_state, line)
+        if self._raw_index >= len(self._raw_tokens):
+            raise StopIteration
+        tok = self._raw_tokens[self._raw_index]
+        self._raw_index += 1
+        return TokenInfo(tok.type, tok.string, tok.start, tok.end)
 
     def peek(self) -> TokenInfo:
         """Return the next token *without* updating the index."""

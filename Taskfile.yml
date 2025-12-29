@@ -126,16 +126,20 @@ tasks:
 
   pytest-bench:
     cmds:
-      #      - cd ~/src/rust/xonsh-rd-parser && maturin develop --release
-      #  --benchmark-histogram
-      - pytest tests/benchmarks.py --benchmark-only --benchmark-autosave {{.CLI_ARGS}} | tee -a pytest-bench.log
+      - pytest tests/benchmarks.py::test_large_file[PegenParser] --benchmark-only --benchmark-autosave {{.CLI_ARGS}}
 
   bench-lexer:
     deps:
       - dev
     cmds:
-      - pytest tests/bench_lexer.py --benchmark-only --benchmark-autosave {{.CLI_ARGS}} | tee -a pytest-bench-lexer.log
+      - pytest tests/bench_lexer.py --benchmark-only --benchmark-autosave {{.CLI_ARGS}}
 
-  pytest-bench-compare:
+  pytest-bench-plot:
+    desc: Generate an SVG histogram of all recorded benchmarks
     cmds:
-      - pytest-bench compare
+      - pytest-benchmark compare .benchmarks/* --histogram history_plot
+
+  pytest-bench-trend:
+    desc: Generate a PNG trend chart of the PegenParser large file benchmark
+    cmds:
+      - uv run python3 plot_benchmarks.py "tests/benchmarks.py::test_large_file[PegenParser]"

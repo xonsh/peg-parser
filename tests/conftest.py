@@ -26,17 +26,9 @@ def build_parser(name: str):
 
 
 def _get_tokens(inp):
-    from peg_parser import tokenize
-    from peg_parser.tokenizer import Tokenizer
+    from winnow_parser import tokenize
 
-    tokenizer = Tokenizer(io.StringIO(inp).readline)
-    tokens = []
-    while True:
-        tok = tokenizer.getnext()
-        tokens.append(tok)
-        if tok.type == tokenize.Token.ENDMARKER:
-            break
-    return tokens
+    return tokenize(inp)
 
 
 @pytest.fixture(scope="session")
