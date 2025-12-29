@@ -4,9 +4,8 @@ import difflib
 from collections.abc import Sequence
 
 import pytest
-
-from peg_parser.tokenize import Token as t  # noqa: N813
-from peg_parser.tokenize import TokenInfo
+from winnow_parser import Token as t
+from winnow_parser import TokInfo as TokenInfo
 
 
 def ensure_tuple(seq) -> str:
@@ -29,9 +28,9 @@ def assert_tokens_equal(expected, obtained):
 
 def lex_input(inp: str) -> list[TokenInfo]:
     # skip the NEWLINE, ENDMARKER tokens for easier testing
-    from .conftest import _get_tokens
+    from winnow_parser import tokenize
 
-    tokens = _get_tokens(inp)
+    tokens = tokenize(inp)
     if tokens[-1].type == t.ENDMARKER:
         tokens.pop()
     if tokens[-1].type == t.NEWLINE:

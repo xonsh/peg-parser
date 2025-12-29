@@ -1,6 +1,6 @@
 use crate::tokenizer::{tokenize, TokInfo, Token};
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PyModule};
+use pyo3::types::{PyList, PyModule, PyString};
 use winnow::combinator::{cut_err, not, opt, peek, repeat, separated};
 use winnow::error::{ContextError, ErrMode};
 use winnow::prelude::*;
@@ -2217,7 +2217,7 @@ fn parse_fstring_replacement_field<'s>(input: &mut TokenStream<'s>) -> ModalResu
         }
     }
 
-    let mut format_spec: PyObject = py.None();
+    let mut format_spec: Py<PyAny> = py.None();
     if let Ok(_) = op(":").parse_next(input) {
         let spec_parts = parse_fstring_middle(input, true)?;
         let spec_list = PyList::new(py, spec_parts).unwrap();
@@ -2351,8 +2351,8 @@ fn parse_atom<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
                     // It's JoinedStr(values=[...])
                     let values_bound = values.bind(py);
                     let values_list = values_bound
-                        .downcast::<PyList>()
-                        .map_err(|_| make_error("Downcast failed".into()))?;
+                        .cast::<PyList>()
+                        .map_err(|_| make_error("Cast failed".into()))?;
 
                     for v in values_list {
                         final_parts.push(v.clone().unbind());
@@ -2496,7 +2496,8 @@ fn parse_dict_or_set_atom<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyA
 // ### Main Entry Point ###
 
 pub fn parse<'s>(py: Python<'s>, source: &'s str) -> PyResult<Py<PyAny>> {
-    let tokens = tokenize(source);
+    let source_py = PyString::new(py, source).into();
+    let tokens = tokenize(py, source_py);
     let input_tokens = tokens.as_slice();
 
     let ast = py.import("ast")?.into();

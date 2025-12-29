@@ -43,12 +43,12 @@ tasks:
       - cd xonsh_tokenizer; maturin develop
 
   profile:
-#    deps:
-#      - profile-tasks
+    #    deps:
+    #      - profile-tasks
     cmds:
       - mkdir -p .local/logs
       - asv run --python=same --show-stderr | tee -a {{.LOG_FILE}}
-#      - asv profile --python=same benchmarks.PeakMemSuite.peakmem_parser_large_file | tee -a {{.LOG_FILE}}
+    #      - asv profile --python=same benchmarks.PeakMemSuite.peakmem_parser_large_file | tee -a {{.LOG_FILE}}
     vars:
       LOG_FILE:
         sh: echo ".local/logs/xonsh-parser-$(date "+%Y%m%d-%H%M%S").$(git rev-parse --short HEAD).log"
@@ -130,9 +130,14 @@ tasks:
 
   pytest-bench:
     cmds:
-#      - cd ~/src/rust/xonsh-rd-parser && maturin develop --release
-#  --benchmark-histogram
+      #      - cd ~/src/rust/xonsh-rd-parser && maturin develop --release
+      #  --benchmark-histogram
       - pytest tests/benchmarks.py --benchmark-only --benchmark-autosave {{.CLI_ARGS}} | tee -a pytest-bench.log
+
+  bench-lexer:
+    cmds:
+      - cd winnow-parser && maturin develop --release
+      - pytest tests/bench_lexer.py --benchmark-only --benchmark-autosave {{.CLI_ARGS}} | tee -a pytest-bench-lexer.log
 
   pytest-bench-compare:
     cmds:

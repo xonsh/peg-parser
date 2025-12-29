@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use std::io::Write;
+use pyo3::types::PyString;
 use winnow::ascii::{digit1, hex_digit1, line_ending};
 use winnow::combinator::{alt, dispatch, opt, peek, repeat};
 
@@ -60,13 +60,19 @@ impl Default for LexerState {
 
 pub type Stream<'s> = Stateful<&'s str, LexerState>;
 
-#[pyclass(get_all)]
-#[derive(Debug, Clone, PartialEq)]
+#[pyclass]
+#[derive(Debug)]
 pub struct TokInfo {
+    #[pyo3(get)]
+    #[pyo3(name = "type")]
     pub typ: Token,
+    #[pyo3(get)]
     pub span: (usize, usize),
+    #[pyo3(get)]
     pub start: (usize, usize),
+    #[pyo3(get)]
     pub end: (usize, usize),
+    pub source: Py<PyString>,
 }
 
 #[pymethods]
@@ -77,28 +83,60 @@ impl TokInfo {
         span: (usize, usize),
         start: (usize, usize),
         end: (usize, usize),
+        source: Py<PyString>,
     ) -> Self {
         Self {
             typ,
             span,
             start,
             end,
+            source,
         }
     }
 
-    pub fn get_string<'a>(&self, source: &'a str) -> &'a str {
-        &source[self.span.0..self.span.1]
+    #[getter]
+    pub fn string(&self, py: Python<'_>) -> String {
+        let s = self.source.bind(py).to_str().unwrap();
+        s[self.span.0..self.span.1].to_string()
     }
 
     fn __repr__(&self) -> String {
-        format!(
-            "TokInfo(typ={:?}, span={:?}, start={:?}, end={:?})",
-            self.typ, self.span, self.start, self.end
-        )
+        Python::with_gil(|py| {
+            let s = self.source.bind(py).to_str().unwrap();
+            let string_val = &s[self.span.0..self.span.1];
+            format!(
+                "TokInfo(type={:?}, string={:?}, start={:?}, end={:?})",
+                self.typ, string_val, self.start, self.end
+            )
+        })
     }
 
     fn __str__(&self) -> String {
         self.__repr__()
+    }
+}
+
+impl Clone for TokInfo {
+    fn clone(&self) -> Self {
+        Python::with_gil(|py| Self {
+            typ: self.typ,
+            span: self.span,
+            start: self.start,
+            end: self.end,
+            source: self.source.clone_ref(py),
+        })
+    }
+}
+
+impl PartialEq for TokInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.typ == other.typ
+            && self.span == other.span
+            && self.start == other.start
+            && self.end == other.end
+            && Python::with_gil(|py| {
+                self.source.bind(py).to_str().unwrap() == other.source.bind(py).to_str().unwrap()
+            })
     }
 }
 
@@ -489,13 +527,18 @@ pub struct Tokenizer<'s> {
     col: usize,
     pending_tokens: std::collections::VecDeque<TokInfo>,
     eof_emitted: bool,
+    source_py: Py<PyString>,
 }
 
 impl<'s> Tokenizer<'s> {
-    pub fn new(source: &'s str) -> Self {
+    pub fn new(py: Python<'_>, source: Py<PyString>) -> Self {
+        // We need the source as a &str for winnow, but we must be careful with lifetimes.
+        // Since &str is only needed for the duration of tokenization, and we hold the Py<PyString>,
+        // we can safely bound it for 's.
+        let source_str: &'s str = unsafe { std::mem::transmute(source.bind(py).to_str().unwrap()) };
         Self {
             input: Stateful {
-                input: source,
+                input: source_str,
                 state: LexerState::default(),
             },
             offset: 0,
@@ -503,7 +546,12 @@ impl<'s> Tokenizer<'s> {
             col: 0,
             pending_tokens: std::collections::VecDeque::new(),
             eof_emitted: false,
+            source_py: source,
         }
+    }
+
+    fn py(&self) -> Python<'_> {
+        unsafe { Python::assume_attached() }
     }
 
     fn update_coords(&mut self, consumed: &str) {
@@ -539,6 +587,7 @@ impl<'s> Tokenizer<'s> {
                         (self.offset, self.offset),
                         (self.line, self.col),
                         (self.line, self.col),
+                        self.source_py.clone_ref(self.py()),
                     ));
                 }
 
@@ -549,6 +598,7 @@ impl<'s> Tokenizer<'s> {
                         (self.offset, self.offset),
                         (self.line, 0),
                         (self.line, 0),
+                        self.source_py.clone_ref(self.py()),
                     ));
                 }
 
@@ -558,6 +608,7 @@ impl<'s> Tokenizer<'s> {
                     (self.offset, self.offset),
                     (self.line, self.col),
                     (self.line, self.col),
+                    self.source_py.clone_ref(self.py()),
                 ));
             }
 
@@ -711,6 +762,7 @@ impl<'s> Tokenizer<'s> {
                         (start_offset, self.offset),
                         start_coords,
                         (self.line, self.col),
+                        self.source_py.clone_ref(self.py()),
                     ));
                 }
                 Err(_) => {
@@ -719,6 +771,7 @@ impl<'s> Tokenizer<'s> {
                         (start_offset, self.offset),
                         start_coords,
                         (self.line, self.col),
+                        self.source_py.clone_ref(self.py()),
                     ));
                 }
             }
@@ -726,8 +779,8 @@ impl<'s> Tokenizer<'s> {
     }
 }
 
-pub fn tokenize<'s>(source: &'s str) -> Vec<TokInfo> {
-    let mut t = Tokenizer::new(source);
+pub fn tokenize(py: Python<'_>, source: Py<PyString>) -> Vec<TokInfo> {
+    let mut t = Tokenizer::new(py, source);
     let mut tokens = Vec::new();
     while let Some(tok) = t.next_token() {
         tokens.push(tok);
@@ -737,6 +790,6 @@ pub fn tokenize<'s>(source: &'s str) -> Vec<TokInfo> {
 
 #[pyfunction]
 #[pyo3(name = "tokenize")]
-pub fn tokenize_py(source: &str) -> Vec<TokInfo> {
-    tokenize(source)
+pub fn tokenize_py(py: Python<'_>, source: Bound<'_, PyString>) -> Vec<TokInfo> {
+    tokenize(py, source.into())
 }
