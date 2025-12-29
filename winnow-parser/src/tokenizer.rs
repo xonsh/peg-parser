@@ -38,6 +38,37 @@ pub enum Token {
     MACRO_PARAM,
 }
 
+#[pymethods]
+impl Token {
+    fn __str__(&self) -> &'static str {
+        match self {
+            Token::ENDMARKER => "ENDMARKER",
+            Token::NAME => "NAME",
+            Token::NUMBER => "NUMBER",
+            Token::STRING => "STRING",
+            Token::NEWLINE => "NEWLINE",
+            Token::INDENT => "INDENT",
+            Token::DEDENT => "DEDENT",
+            Token::OP => "OP",
+            Token::FSTRING_START => "FSTRING_START",
+            Token::FSTRING_MIDDLE => "FSTRING_MIDDLE",
+            Token::FSTRING_END => "FSTRING_END",
+            Token::ERRORTOKEN => "ERRORTOKEN",
+            Token::COMMENT => "COMMENT",
+            Token::NL => "NL",
+            Token::AWAIT => "AWAIT",
+            Token::ASYNC => "ASYNC",
+            Token::TYPE_IGNORE => "TYPE_IGNORE",
+            Token::TYPE_COMMENT => "TYPE_COMMENT",
+            Token::SOFT_KEYWORD => "SOFT_KEYWORD",
+            Token::ENCODING => "ENCODING",
+            Token::SEARCH_PATH => "SEARCH_PATH",
+            Token::WS => "WS",
+            Token::MACRO_PARAM => "MACRO_PARAM",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FStringState {
     pub quote: String,

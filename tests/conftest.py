@@ -10,13 +10,59 @@ import ast
 import contextlib
 import io
 import logging
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
 
 from tests.tools import nodes_equal
 
+if TYPE_CHECKING:
+    from winnow_parser import TokenInfo
+
 log = logging.getLogger(__name__)
+
+
+def _winnow_lex_input(inp: str) -> list[TokenInfo]:
+    # skip the NEWLINE, ENDMARKER tokens for easier testing
+    from winnow_parser import tokenize
+
+    tokens = [tok for tok in tokenize(inp) if str(tok.type) not in ("WS", "NL")]
+    if tokens and "ENDMARKER" in str(tokens[-1].type):
+        tokens.pop()
+    if tokens and "NEWLINE" in str(tokens[-1].type):
+        tokens.pop()
+    return tokens
+
+
+def _py_lex_input(inp: str) -> list[TokenInfo]:
+    from winnow_parser import Token
+
+    from peg_parser.tokenizer import Tokenizer
+
+    tokenizer = Tokenizer(io.StringIO(inp).readline)
+    tokens = []
+    while True:
+        tok = tokenizer.getnext()
+        # Filter WS and NL by string representation to be safe
+        if str(tok.type) in ("WS", "NL"):
+            continue
+        tokens.append(tok)
+        if tok.type == Token.ENDMARKER:
+            break
+    if tokens and str(tokens[-1].type) == "ENDMARKER":
+        tokens.pop()
+    if tokens and str(tokens[-1].type) == "NEWLINE":
+        tokens.pop()
+    return tokens
+
+
+LEXERS = ["rust", "py"]
+
+
+@pytest.fixture(params=LEXERS, name="lexer")
+def _lexer(request):
+    return _winnow_lex_input if request.param == "rust" else _py_lex_input
 
 
 def build_parser(name: str):
