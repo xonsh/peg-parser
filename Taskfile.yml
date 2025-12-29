@@ -41,7 +41,6 @@ tasks:
   dev:
     cmds:
       - cd winnow-parser && maturin develop
-      - cd rs-ply && maturin develop
 
   profile:
     #    deps:
@@ -53,10 +52,6 @@ tasks:
     vars:
       LOG_FILE:
         sh: echo ".local/logs/xonsh-parser-$(date "+%Y%m%d-%H%M%S").$(git rev-parse --short HEAD).log"
-
-  ply-add:
-    cmds:
-      - git subtree add --prefix=ply --squash
 
   pegen-add:
     cmds:
@@ -143,4 +138,4 @@ tasks:
 
   pytest-bench-compare:
     cmds:
-      - pytest-benchmark compare
+      - pytest-bench compare
