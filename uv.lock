@@ -11,7 +11,6 @@ members = [
     "rs-ply",
     "winnow-parser",
     "xonsh-parser",
-    "xonsh-tokenizer",
 ]
 
 [[package]]
@@ -1847,7 +1846,6 @@ dev = [
     { name = "xonsh", version = "0.19.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "xonsh", version = "0.22.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "xonsh-rd-parser" },
-    { name = "xonsh-tokenizer" },
 ]
 docs = [
     { name = "mkdocs-material" },
@@ -1902,7 +1900,6 @@ dev = [
     { name = "winnow-parser", editable = "winnow-parser" },
     { name = "xonsh", specifier = ">=0.12.0" },
     { name = "xonsh-rd-parser", git = "https://github.com/jnoortheen/xonsh-rd-parser" },
-    { name = "xonsh-tokenizer", editable = "xonsh_tokenizer" },
 ]
 docs = [
     { name = "mkdocs-material" },
@@ -1934,10 +1931,6 @@ test = [
 name = "xonsh-rd-parser"
 version = "1.7.0"
 source = { git = "https://github.com/jnoortheen/xonsh-rd-parser#949b728813bf3404cb8f7163fa93b020125dba83" }
-
-[[package]]
-name = "xonsh-tokenizer"
-source = { editable = "xonsh_tokenizer" }
 
 [[package]]
 name = "zipp"

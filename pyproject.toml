@@ -11,7 +11,7 @@ extend-exclude = [
     "ply_parser/tests/line-items",
     "ply_parser/ply/save_table.py",
     "ply_parser/ply/yacc.py",
-    "pegen/py_parser.py"
+    "pegen/py_parser.py",
 ]
 
 [tool.ruff.lint]
@@ -136,11 +136,10 @@ log_file_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(line
 #addopts = "--benchmark-skip"
 
 [tool.uv.workspace]
-members = ["xonsh_tokenizer", "rs-ply", "winnow-parser"]
+members = ["rs-ply", "winnow-parser"]
 [tool.uv.sources]
-xonsh_tokenizer = { workspace = true }
 rs-ply = { workspace = true }
-winnow-parser = {workspace=true}
+winnow-parser = { workspace = true }
 
 [dependency-groups]
 test = [
@@ -158,17 +157,16 @@ test = [
     "ruamel.yaml",
 ]
 dev = [
-    {include-group = "test"},
+    { include-group = "test" },
     "flask>=3.0.3",
     "flask-wtf>=1.2.1",
     "ipython>=8.18.1",
     "setuptools>=69.5.1",
-    "xonsh-tokenizer",
     "rs-ply",
     "pip",
     "psutil",
     "maturin>=1.8.1",
-    "winnow-parser"
+    "winnow-parser",
 ]
 docs = ["mkdocs-material", "mkdocstrings[python]"]
 profile = [
@@ -208,7 +206,12 @@ Source = "https://github.com/jnoortheen/xonsh-parser"
 [tool.mypy]
 # mypy ignore file "xonsh_parser/ply/yacc.py"
 packages = "peg_parser"
-exclude = ['tests', 'pegen\/build.py', 'pegen\/grammar_parser.py', 'pegen\/py_parser.py', ]
+exclude = [
+    'tests',
+    'pegen\/build.py',
+    'pegen\/grammar_parser.py',
+    'pegen\/py_parser.py',
+]
 check_untyped_defs = true
 ignore_missing_imports = true
 follow_imports = 'skip'

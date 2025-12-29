@@ -40,7 +40,8 @@ tasks:
 
   dev:
     cmds:
-      - cd xonsh_tokenizer; maturin develop
+      - cd winnow-parser && maturin develop
+      - cd rs-ply && maturin develop
 
   profile:
     #    deps:
@@ -135,8 +136,9 @@ tasks:
       - pytest tests/benchmarks.py --benchmark-only --benchmark-autosave {{.CLI_ARGS}} | tee -a pytest-bench.log
 
   bench-lexer:
+    deps:
+      - dev
     cmds:
-      - cd winnow-parser && maturin develop --release
       - pytest tests/bench_lexer.py --benchmark-only --benchmark-autosave {{.CLI_ARGS}} | tee -a pytest-bench-lexer.log
 
   pytest-bench-compare:
