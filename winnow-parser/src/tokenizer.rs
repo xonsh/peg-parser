@@ -1,6 +1,8 @@
 use pyo3::prelude::*;
+use std::io::Write;
 use winnow::ascii::{digit1, hex_digit1, line_ending};
 use winnow::combinator::{alt, dispatch, opt, peek, repeat};
+
 use winnow::error::ErrMode;
 use winnow::prelude::*;
 use winnow::stream::Stateful;
@@ -372,7 +374,7 @@ pub fn parse_fstring_content<'s>(input: &mut Stream<'s>) -> ModalResult<Token> {
         return Ok(Token::FSTRING_END);
     }
 
-    if state_in_format_spec && input.starts_with('}') {
+    if state_in_format_spec && input.starts_with("}") && !input.starts_with("}}") {
         input.input = &input.input[1..];
         let state_mut = input.state.fstring_stack.last_mut().unwrap();
         state_mut.in_format_spec = false;
@@ -381,13 +383,15 @@ pub fn parse_fstring_content<'s>(input: &mut Stream<'s>) -> ModalResult<Token> {
         return Ok(Token::OP);
     }
 
-    if !state_in_format_spec && input.starts_with('{') {
-        input.input = &input.input[1..];
-        let state_mut = input.state.fstring_stack.last_mut().unwrap();
-        state_mut.brace_level = 1;
-        state_mut.in_format_spec = false;
-        input.state.paren_level += 1;
-        return Ok(Token::OP);
+    if !state_in_format_spec && input.starts_with("{") {
+        if !input.starts_with("{{") {
+            input.input = &input.input[1..];
+            let state_mut = input.state.fstring_stack.last_mut().unwrap();
+            state_mut.brace_level = 1;
+            state_mut.in_format_spec = false;
+            input.state.paren_level += 1;
+            return Ok(Token::OP);
+        }
     }
 
     let mut temp_input = input.clone();
@@ -395,14 +399,22 @@ pub fn parse_fstring_content<'s>(input: &mut Stream<'s>) -> ModalResult<Token> {
     while !temp_input.is_empty() {
         let curr_quote = &input.state.fstring_stack.last().unwrap().quote;
 
-        if (!state_in_format_spec && temp_input.starts_with('{'))
+        // Handle double braces {{ and }} - they are treated as content
+        if temp_input.starts_with("{{") || temp_input.starts_with("}}") {
+            len += 2;
+            temp_input.input = &temp_input.input[2..];
+            continue;
+        }
+
+        // Break on single braces or closing quote
+        if temp_input.starts_with('{')
+            || temp_input.starts_with('}')
             || temp_input.starts_with(curr_quote)
         {
             break;
         }
-        if state_in_format_spec && temp_input.starts_with('}') {
-            break;
-        }
+        // Break if in format spec & start of nested fields or end
+        // (Handled above by generalized { } break)
 
         if temp_input.starts_with('\\') {
             len += 1;
@@ -574,9 +586,6 @@ impl<'s> Tokenizer<'s> {
             let start_coords = (self.line, self.col);
             let old_input = self.input.clone();
 
-            // Refactored Dispatch Logic
-
-            // Priority 1: Indentation (State Check)
             let result: Result<Token, ErrMode<winnow::error::ContextError>> =
                 if self.input.state.at_beginning_of_line {
                     let initial_input = self.input.clone();
@@ -586,37 +595,56 @@ impl<'s> Tokenizer<'s> {
                     } else {
                         self.input = initial_input; // Restore state (including at_beginning_of_line)
 
-                        dispatch! { peek(any);
-                            ' ' | '\t' | '\x0c' => parse_ws.map(|_| Token::WS),
-                            '#' => parse_comment.map(|_| Token::Comment),
-                            '\n' | '\r' => parse_line_ending_token,
-                            '0'..='9' => parse_number.map(|_| Token::NUMBER),
-                            'a'..='z' | 'A'..='Z' | '_' => alt((
-                                parse_fstring_start,
-                                // identifiers can start search path?
-                                parse_search_path.map(|_| Token::SEARCH_PATH),
-                                parse_full_string.map(|_| Token::STRING),
-                                parse_name.map(|_| Token::NAME)
-                            )),
-                            '\'' | '"' => alt((
-                                 parse_fstring_start,
-                                 parse_full_string.map(|_| Token::STRING)
-                            )),
-                            '`' => parse_search_path.map(|_| Token::SEARCH_PATH),
-                            '@' => alt((
-                                parse_search_path.map(|_| Token::SEARCH_PATH),
-                                parse_op.map(|_| Token::OP)
-                            )),
-                            '.' => alt((
-                                parse_number.map(|_| Token::NUMBER),
-                                parse_op.map(|_| Token::OP)
-                            )),
-                            _ => alt((
-                                parse_op.map(|_| Token::OP),
-                                any.map(|_| Token::ErrorToken)
-                            ))
+                        if !self.input.state.fstring_stack.is_empty()
+                            && self
+                                .input
+                                .state
+                                .fstring_stack
+                                .last()
+                                .map(|s| s.brace_level == 0)
+                                .unwrap_or(false)
+                        {
+                            parse_fstring_content(&mut self.input)
+                        } else {
+                            dispatch! { peek(any);
+                                '{' => |i: &mut Stream<'_>| {
+                                     if !i.state.fstring_stack.is_empty() {
+                                         parse_fstring_content(i)
+                                     } else {
+                                         parse_op.map(|_| Token::OP).parse_next(i)
+                                     }
+                                },
+                                ' ' | '\t' | '\x0c' => parse_ws.map(|_| Token::WS),
+                                '#' => parse_comment.map(|_| Token::Comment),
+                                '\n' | '\r' => parse_line_ending_token,
+                                '0'..='9' => parse_number.map(|_| Token::NUMBER),
+                                'a'..='z' | 'A'..='Z' | '_' => alt((
+                                    parse_fstring_start,
+                                    // identifiers can start search path?
+                                    parse_search_path.map(|_| Token::SEARCH_PATH),
+                                    parse_full_string.map(|_| Token::STRING),
+                                    parse_name.map(|_| Token::NAME)
+                                )),
+                                '\'' | '"' => alt((
+                                     parse_fstring_start,
+                                     parse_full_string.map(|_| Token::STRING)
+                                )),
+                                '`' => parse_search_path.map(|_| Token::SEARCH_PATH),
+                                '@' => alt((
+                                    parse_search_path.map(|_| Token::SEARCH_PATH),
+                                    parse_op.map(|_| Token::OP)
+                                )),
+                                '.' => alt((
+                                    parse_number.map(|_| Token::NUMBER),
+                                    parse_op.map(|_| Token::OP)
+                                )),
+                                _ => alt((
+                                    parse_op.map(|_| Token::OP),
+                                    any.map(|_| Token::ErrorToken)
+                                ))
+                            }
+                            .parse_next(&mut self.input)
                         }
-                        .parse_next(&mut self.input)
                     }
                 } else if !self.input.state.fstring_stack.is_empty()
                     && self
@@ -630,6 +658,13 @@ impl<'s> Tokenizer<'s> {
                     parse_fstring_content(&mut self.input)
                 } else {
                     dispatch! { peek(any);
+                        '{' => |i: &mut Stream<'_>| {
+                             if !i.state.fstring_stack.is_empty() {
+                                 parse_fstring_content(i)
+                             } else {
+                                 parse_op.map(|_| Token::OP).parse_next(i)
+                             }
+                        },
                         ' ' | '\t' | '\x0c' => parse_ws.map(|_| Token::WS),
                         '#' => parse_comment.map(|_| Token::Comment),
                         '\n' | '\r' => parse_line_ending_token,
