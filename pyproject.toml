@@ -162,7 +162,6 @@ dev = [
     "flask-wtf>=1.2.1",
     "ipython>=8.18.1",
     "setuptools>=69.5.1",
-    "rs-ply",
     "pip",
     "psutil",
     "maturin>=1.8.1",

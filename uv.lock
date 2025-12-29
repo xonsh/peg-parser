@@ -8,7 +8,6 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "rs-ply",
     "winnow-parser",
     "xonsh-parser",
 ]
@@ -1436,10 +1435,6 @@ wheels = [
 ]
 
 [[package]]
-name = "rs-ply"
-source = { editable = "rs-ply" }
-
-[[package]]
 name = "ruamel-yaml"
 version = "0.18.17"
 source = { registry = "https://pypi.org/simple" }
@@ -1837,7 +1832,6 @@ dev = [
     { name = "pytest-instafail" },
     { name = "pytest-subtests" },
     { name = "pytest-testmon" },
-    { name = "rs-ply" },
     { name = "ruamel-yaml" },
     { name = "setuptools" },
     { name = "tree-sitter" },
@@ -1892,7 +1886,6 @@ dev = [
     { name = "pytest-instafail", specifier = ">=0.5.0" },
     { name = "pytest-subtests", specifier = ">=0.12.1" },
     { name = "pytest-testmon", specifier = ">=2.1.1" },
-    { name = "rs-ply", editable = "rs-ply" },
     { name = "ruamel-yaml" },
     { name = "setuptools", specifier = ">=69.5.1" },
     { name = "tree-sitter" },

@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ply_parser.tests.tools import nodes_equal
+from tests.tools import nodes_equal
 
 log = logging.getLogger(__name__)
 
