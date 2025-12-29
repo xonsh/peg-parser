@@ -40,7 +40,8 @@ pub enum Token {
 
 #[pymethods]
 impl Token {
-    fn __str__(&self) -> &'static str {
+    #[getter]
+    fn name(&self) -> &'static str {
         match self {
             Token::ENDMARKER => "ENDMARKER",
             Token::NAME => "NAME",

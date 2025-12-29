@@ -126,7 +126,7 @@ tasks:
 
   pytest-bench:
     cmds:
-      - pytest tests/benchmarks.py::test_large_file[PegenParser] --benchmark-only --benchmark-autosave {{.CLI_ARGS}}
+      - pytest tests/benchmarks.py --benchmark-only --benchmark-autosave {{.CLI_ARGS}}
 
   bench-lexer:
     deps:

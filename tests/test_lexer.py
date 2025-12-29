@@ -11,7 +11,8 @@ def ensure_tuple(seq) -> str:
         seq = (seq.type, seq.string, seq.start[1])
     if isinstance(seq, Sequence):
         typ, *rest = seq
-        seq = (str(typ), *rest)
+        typ_name = getattr(typ, "name", str(typ))
+        seq = (typ_name, *rest)
     return repr(tuple(seq))
 
 

@@ -5,45 +5,27 @@ from typing import TYPE_CHECKING, Final, NewType
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-from winnow_parser import Token, tokenize
-
-
-class TokenInfo:
-    """A wrapper class that can represent both Rust TokInfo and synthesized tokens."""
-
-    __slots__ = ("end", "start", "string", "type")
-
-    def __init__(self, typ: Token, string: str, start: tuple[int, int], end: tuple[int, int]):
-        self.type = typ
-        self.string = string
-        self.start = start
-        self.end = end
-
-    def is_exact_type(self, typ: str) -> bool:
-        return self.type == Token.OP and self.string == typ
-
-    def loc_start(self):
-        return {"lineno": self.start[0], "col_offset": self.start[1]}
-
-    def loc_end(self):
-        return {"end_lineno": self.end[0], "end_col_offset": self.end[1]}
-
-    def loc(self):
-        res = self.loc_start()
-        res.update(self.loc_end())
-        return res
-
-    def __repr__(self):
-        return (
-            f"TokenInfo(type={self.type!r}, string={self.string!r}, start={self.start!r}, end={self.end!r})"
-        )
-
+    from .tokenize import TokenInfo
 
 Mark = NewType("Mark", int)
 
 
-WS_TOKENS = (Token.ENDMARKER, Token.NEWLINE, Token.DEDENT, Token.INDENT)
-SKIP_TOKENS = (Token.WS, Token.COMMENT, Token.NL)
+WS_TOKENS = {"ENDMARKER", "NEWLINE", "DEDENT", "INDENT"}
+SKIP_TOKENS = ("WS", "COMMENT", "NL")
+
+
+def rs_tokenize(source: str) -> list[TokenInfo]:
+    import winnow_parser as wp
+
+    from peg_parser.tokenize import TokenInfo
+
+    return wp.tokenize(source), wp.TokInfo, TokenInfo
+
+
+def py_tokenize(source: str) -> list[TokenInfo]:
+    from peg_parser.tokenize import TokenInfo, generate_tokens
+
+    return list(generate_tokens(source)), TokenInfo, TokenInfo
 
 
 class Tokenizer:
@@ -57,6 +39,7 @@ class Tokenizer:
         *,
         path: str = "",
         verbose: bool = False,
+        use_rust_tokenizer=False,
     ):
         self._readline = readline
         self._tokens = []
@@ -80,7 +63,11 @@ class Tokenizer:
                 break
             source += line
             self._lines[len(self._lines) + 1] = line
-        self._raw_tokens = tokenize(source)
+
+        if use_rust_tokenizer:
+            self._raw_tokens, self.tok_cls, self.new_tok = rs_tokenize(source)
+        else:
+            self._raw_tokens, self.tok_cls, self.new_tok = py_tokenize(source)
 
         self._end_parens: Final = {
             ")": "(",
@@ -107,7 +94,7 @@ class Tokenizer:
             raise StopIteration
         tok = self._raw_tokens[self._raw_index]
         self._raw_index += 1
-        return TokenInfo(tok.type, tok.string, tok.start, tok.end)
+        return tok
 
     def peek(self) -> TokenInfo:
         """Return the next token *without* updating the index."""
@@ -133,13 +120,14 @@ class Tokenizer:
         return self._tokens[self._index]
 
     def is_blank(self, tok: TokenInfo) -> bool:
-        if self._proc_macro and tok.type == Token.WS:
+        name = tok.type.name
+        if self._proc_macro and name == "WS":
             return False
-        if tok.type in SKIP_TOKENS:
+        if name in SKIP_TOKENS:
             return True
-        if tok.type == Token.ERRORTOKEN and tok.string.isspace():
+        if name == "ERRORTOKEN" and tok.string.isspace():
             return True
-        return bool(tok.type == Token.NEWLINE and self._tokens and self._tokens[-1].type == Token.NEWLINE)
+        return bool(name == "NEWLINE" and self._tokens and (self._tokens[-1].type.name) == "NEWLINE")
 
     def consume_macro_params(self) -> TokenInfo:  # noqa: C901, PLR0912
         # loop until we get , or ) without consuming it
@@ -150,10 +138,10 @@ class Tokenizer:
         string = ""
         while True:
             tok = self._fetch()
-            if tok.type == Token.OP and tok.string[-1] in "([{":  # push paren level
+            if tok.type.name == "OP" and tok.string[-1] in "([{":  # push paren level
                 paren_level.append(tok.string[-1])
             if paren_level:
-                if (tok.type == Token.OP) and (opener := self._end_parens.get(tok.string)):
+                if (tok.type.name == "OP") and (opener := self._end_parens.get(tok.string)):
                     if paren_level[-1] == opener:
                         paren_level.pop()
                     else:
@@ -181,8 +169,8 @@ class Tokenizer:
         assert start is not None
         assert end is not None
         if not string.strip():
-            return TokenInfo(Token.WS, string, start, end)
-        return TokenInfo(Token.MACRO_PARAM, string, start, end)
+            return self.new_tok("WS", string, start, end)
+        return self.new_tok("MACRO_PARAM", string, start, end)
 
     def consume_with_macro_params(self) -> TokenInfo:  # noqa: C901
         """loop until we get INDENT-DEDENT or NL"""
@@ -194,16 +182,16 @@ class Tokenizer:
         tok_idx = 0
         while True:
             tok = self._fetch()
-            if (tok_idx == 0) and tok.type == Token.NEWLINE:
+            if (tok_idx == 0) and tok.type.name == "NEWLINE":
                 tok_idx += 1
                 continue
-            elif tok.type == Token.INDENT:
+            elif tok.type.name == "INDENT":
                 if (not is_indented) and tok_idx in {0, 1}:
                     is_indented = True
                     tok_idx += 1
                     continue
                 indent += 1
-            elif tok.type == Token.DEDENT:
+            elif tok.type.name == "DEDENT":
                 if indent:
                     indent -= 1
                     tok_idx += 1
@@ -211,7 +199,7 @@ class Tokenizer:
                 else:
                     self._with_macro = False
                     break
-            elif tok.type == Token.NEWLINE:
+            elif tok.type.name == "NEWLINE":
                 if not is_indented:
                     break
                 elif not tok.string:
@@ -230,7 +218,7 @@ class Tokenizer:
             import textwrap
 
             string = textwrap.dedent(string)
-        return TokenInfo(Token.MACRO_PARAM, string, start, end)
+        return self.new_tok("MACRO_PARAM", string, start, end)
 
     def diagnose(self) -> TokenInfo:
         if not self._tokens:
@@ -241,7 +229,9 @@ class Tokenizer:
         idx = self._index - 1
         while idx >= 0:
             tok = self._tokens[idx]
-            if tok.type not in WS_TOKENS:
+            name = tok.type.name
+            # print(f"DEBUG: get_last_non_whitespace_token checking {name}")
+            if name not in WS_TOKENS:
                 return tok
             idx -= 1
         return self._tokens[-1]

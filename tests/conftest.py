@@ -27,7 +27,7 @@ def _winnow_lex_input(inp: str) -> list[TokenInfo]:
     # skip the NEWLINE, ENDMARKER tokens for easier testing
     from winnow_parser import tokenize
 
-    tokens = [tok for tok in tokenize(inp) if str(tok.type) not in ("WS", "NL")]
+    tokens = [tok for tok in tokenize(inp) if str(tok.type.name) not in ("WS", "NL")]
     if tokens and "ENDMARKER" in str(tokens[-1].type):
         tokens.pop()
     if tokens and "NEWLINE" in str(tokens[-1].type):
@@ -36,8 +36,6 @@ def _winnow_lex_input(inp: str) -> list[TokenInfo]:
 
 
 def _py_lex_input(inp: str) -> list[TokenInfo]:
-    from winnow_parser import Token
-
     from peg_parser.tokenizer import Tokenizer
 
     tokenizer = Tokenizer(io.StringIO(inp).readline)
@@ -45,14 +43,15 @@ def _py_lex_input(inp: str) -> list[TokenInfo]:
     while True:
         tok = tokenizer.getnext()
         # Filter WS and NL by string representation to be safe
-        if str(tok.type) in ("WS", "NL"):
+        type_name = getattr(tok.type, "name", str(tok.type))
+        if type_name in ("WS", "NL"):
             continue
         tokens.append(tok)
-        if tok.type == Token.ENDMARKER:
+        if type_name == "ENDMARKER":
             break
-    if tokens and str(tokens[-1].type) == "ENDMARKER":
+    if tokens and getattr(tokens[-1].type, "name", str(tokens[-1].type)) == "ENDMARKER":
         tokens.pop()
-    if tokens and str(tokens[-1].type) == "NEWLINE":
+    if tokens and getattr(tokens[-1].type, "name", str(tokens[-1].type)) == "NEWLINE":
         tokens.pop()
     return tokens
 
@@ -87,17 +86,27 @@ def python_parser_cls():
     return build_parser("XonshParser")
 
 
-@pytest.fixture(scope="session")
-def python_parse_file(python_parser_cls):
-    return python_parser_cls.parse_file
+@pytest.fixture(params=LEXERS)
+def python_parse_file(python_parser_cls, request):
+    use_rust_tokenizer = request.param == "rust"
+
+    def _parse(*args, **kw):
+        return python_parser_cls.parse_file(*args, **kw, use_rust_tokenizer=use_rust_tokenizer)
+
+    return _parse
 
 
-@pytest.fixture(scope="session")
-def python_parse_str(python_parser_cls):
-    return python_parser_cls.parse_string
+@pytest.fixture(params=LEXERS)
+def python_parse_str(python_parser_cls, request):
+    use_rust_tokenizer = request.param == "rust"
+
+    def _parse(*args, **kw):
+        return python_parser_cls.parse_string(*args, **kw, use_rust_tokenizer=use_rust_tokenizer)
+
+    return _parse
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def parse_str(python_parse_str, get_tokens):
     """Parse and print verbose output on failure"""
     session = [0]

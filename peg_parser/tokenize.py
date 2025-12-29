@@ -138,8 +138,8 @@ class Token(Enum):
 class TokenInfo:
     __slots__ = ("end", "start", "string", "type")
 
-    def __init__(self, type: Token, string: str, start: tuple[int, int], end: tuple[int, int]):
-        self.type = type
+    def __init__(self, type: Token | str, string: str, start: tuple[int, int], end: tuple[int, int]):
+        self.type = type if isinstance(type, Token) else Token[type]
         self.string = string
         self.start = start
         self.end = end
@@ -524,12 +524,13 @@ def next_psuedo_matches(state: TokenizerState) -> TokenInfo | None:
 
 def next_end_tokens(state: TokenizerState) -> Iterator[TokenInfo]:
     # Add an implicit NEWLINE if the input doesn't end in one
-    if state.last_line and state.last_line[-1] not in "\r\n" and not state.last_line.strip().startswith("#"):
+    last_line = state.line if state.line else state.last_line
+    if last_line and last_line[-1] not in "\r\n" and not last_line.strip().startswith("#"):
         yield TokenInfo(
             Token.NEWLINE,
             "",
-            (state.lnum - 1, len(state.last_line)),
-            (state.lnum - 1, len(state.last_line) + 1),
+            (state.lnum - 1, len(last_line)),
+            (state.lnum - 1, len(last_line) + 1),
         )
     for _ in state.indents[1:]:  # pop remaining indent levels
         yield TokenInfo(Token.DEDENT, "", (state.lnum, 0), (state.lnum, 0))

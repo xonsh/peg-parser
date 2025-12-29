@@ -30,6 +30,19 @@ class PegenParser(BaseParser):
         return self.parser.parse_file(file)
 
 
+class PegenRustParser(BaseParser):
+    def __init__(self):
+        from peg_parser.parser import XonshParser
+
+        self.parser = XonshParser
+
+    def parse_string(self, src_txt):
+        return self.parser.parse_string(src_txt, mode="exec", use_rust_tokenizer=True)
+
+    def parse_file(self, file):
+        return self.parser.parse_file(file, use_rust_tokenizer=True)
+
+
 class PegenV0Parser(BaseParser):
     """Python parser generated from pegen project.
     Compare it to see if we made any improvements with our pegen iterations"""

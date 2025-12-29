@@ -6,14 +6,14 @@ import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, ParamSpec, Protocol, TypedDict, TypeVar, cast
 
-from winnow_parser import Token
-
-from peg_parser.tokenizer import Mark, TokenInfo, Tokenizer
+from peg_parser.tokenizer import Mark, Tokenizer
 
 if TYPE_CHECKING:
     # see - https://github.com/python/mypy/blob/master/mypy/typeshed/stdlib/_ast.pyi
     from collections.abc import Iterator
     from pathlib import Path
+
+    from peg_parser.tokenize import TokenInfo
 
     FC = TypeVar("FC", bound=ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)
 
@@ -274,6 +274,7 @@ class Parser:
         self._verbose = verbose
         self._level = 0
         self._cache: dict[tuple[Mark, str], tuple[Any, Mark]] = {}
+        self.tok_cls = tokenizer.tok_cls
 
         # Integer tracking wether we are in a left recursive rule or not. Can be useful
         # for error reporting.
@@ -298,19 +299,20 @@ class Parser:
 
     def name(self) -> TokenInfo | None:
         tok = self._tokenizer.peek()
-        if tok.type == Token.NAME and tok.string not in self.KEYWORDS:
+
+        if tok.type.name == "NAME" and tok.string not in self.KEYWORDS:
             return self._tokenizer.getnext()
         return None
 
     def keyword(self) -> TokenInfo | None:
         tok = self._tokenizer.peek()
-        if tok.type == Token.NAME and tok.string in self.KEYWORDS:
+        if tok.type.name == "NAME" and tok.string in self.KEYWORDS:
             return self._tokenizer.getnext()
         return None
 
     def token(self, typ: str) -> TokenInfo | None:
         tok = self._tokenizer.peek()
-        if tok.type == getattr(Token, typ):
+        if tok.type.name == typ:
             return self._tokenizer.getnext()
         return None
 
@@ -319,7 +321,7 @@ class Parser:
 
     def soft_keyword(self) -> TokenInfo | None:
         tok = self._tokenizer.peek()
-        if tok.type == Token.NAME and tok.string in self.SOFT_KEYWORDS:
+        if tok.type.name == "NAME" and tok.string in self.SOFT_KEYWORDS:
             return self._tokenizer.getnext()
         return None
 
@@ -595,9 +597,8 @@ class Parser:
             self._path_token = path_tok
         return ast.JoinedStr(values=b, **locs)  # type: ignore
 
-    @staticmethod
-    def _strip_path_prefix(token: TokenInfo | Node) -> TokenInfo | None:
-        if not isinstance(token, TokenInfo):
+    def _strip_path_prefix(self, token: TokenInfo | Node) -> TokenInfo | None:
+        if not isinstance(token, self.tok_cls):
             return None
         text = token.string
         idx = text.find("'") if text.find("'") >= 0 else text.find('"')
@@ -605,8 +606,9 @@ class Parser:
             prefix, text = text[:idx].lower(), text[idx:]
             if "p" in prefix:
                 prefix = prefix.replace("p", "", 1)
-                token.string = prefix + text
-                return token
+                return self._tokenizer.new_tok(
+                    token.type.name, string=prefix + text, start=token.start, end=token.end
+                )
         return None
 
     def extract_import_level(self, tokens: list[TokenInfo]) -> int:
@@ -703,20 +705,21 @@ class Parser:
             **locs,
         )
 
-    @staticmethod
-    def is_adjacent(prev: TokenInfo | Node, curr: TokenInfo | Node | Node) -> bool:
-        end = prev.end if isinstance(prev, TokenInfo) else (prev.end_lineno, prev.end_col_offset)
-        start = curr.start if isinstance(curr, TokenInfo) else (curr.lineno, curr.col_offset)
+    def is_adjacent(self, prev: TokenInfo | Node, curr: TokenInfo | Node | Node) -> bool:
+        end = prev.end if isinstance(prev, self.tok_cls) else (prev.end_lineno, prev.end_col_offset)
+        start = curr.start if isinstance(curr, self.tok_cls) else (curr.lineno, curr.col_offset)
         return end == start
 
     def _append_node_or_token(self, tree: ast.expr | None, cmd: TokenInfo | ast.expr) -> ast.expr:
         if tree is None:
             return (
-                ast.Constant(value=cmd.string, kind=None, **cmd.loc()) if isinstance(cmd, TokenInfo) else cmd
+                ast.Constant(value=cmd.string, kind=None, **cmd.loc())
+                if isinstance(cmd, self.tok_cls)
+                else cmd
             )
 
         locs = {"lineno": tree.lineno, "col_offset": tree.col_offset}
-        if isinstance(tree, ast.Constant) and isinstance(cmd, TokenInfo):
+        if isinstance(tree, ast.Constant) and isinstance(cmd, self.tok_cls):
             return ast.Constant(value=tree.value + cmd.string, kind=None, **locs, **cmd.loc_end())
 
         # prefix@(...)
@@ -729,19 +732,19 @@ class Parser:
                 end_col_offset=cmd.end_col_offset or 0,
             )
         # @(...)suffix
-        if isinstance(tree, ast.Starred | ast.Tuple) and isinstance(cmd, TokenInfo):
+        if isinstance(tree, ast.Starred | ast.Tuple) and isinstance(cmd, self.tok_cls):
             suffix = ast.Constant(value=cmd.string, kind=None, **cmd.loc())
             elts = [*tree.elts, suffix] if isinstance(tree, ast.Tuple) else [tree, suffix]
             return ast.Tuple(elts=elts, ctx=Load, **locs, **cmd.loc_end())
         # prefix@(...)suffix
-        if isinstance(tree, ast.Tuple) and isinstance(cmd, TokenInfo):
+        if isinstance(tree, ast.Tuple) and isinstance(cmd, self.tok_cls):
             return ast.Tuple(
                 elts=[*tree.elts, ast.Constant(value=cmd.string, kind=None, **cmd.loc())],
                 ctx=Load,
                 **locs,
                 **cmd.loc_end(),
             )
-        if isinstance(cmd, TokenInfo):
+        if isinstance(cmd, self.tok_cls):
             locs["end_lineno"] = cmd.end[0]
             locs["end_col_offset"] = cmd.end[1]
         elif cmd.end_lineno is not None:
@@ -751,7 +754,7 @@ class Parser:
             left=tree,
             op=ast.Add(),
             right=ast.Constant(value=cmd.string, kind=None, **cmd.loc())
-            if isinstance(cmd, TokenInfo)
+            if isinstance(cmd, self.tok_cls)
             else cmd,
             **locs,
         )
@@ -834,7 +837,7 @@ class Parser:
 
     def proc_macro_arg(self, a: list[TokenInfo | str] | Any, **locs: int) -> ast.Constant:
         locs["col_offset"] += 1  # offset `!`
-        st = "".join((tok.string if isinstance(tok, TokenInfo) else tok) for tok in a).strip()
+        st = "".join((tok.string if isinstance(tok, self.tok_cls) else tok) for tok in a).strip()
         self._tokenizer._proc_macro = False
         return ast.Constant(value=st, kind=None, **locs)
 
@@ -881,7 +884,7 @@ class Parser:
             last_token = self._tokenizer.diagnose()
             end = last_token.start
             if sys.version_info >= (3, 12) or (
-                sys.version_info >= (3, 11) and last_token.type != Token.NEWLINE
+                sys.version_info >= (3, 11) and last_token.type.name != "NEWLINE"
             ):  # i.e. not a \n
                 end = last_token.end
             self.raise_raw_syntax_error(f"expected {expectation}", last_token.start, end)
@@ -893,12 +896,12 @@ class Parser:
         raise self._build_syntax_error(
             message,
             tok.start,
-            tok.end if sys.version_info >= (3, 12) or tok.type != Token.NEWLINE else tok.start,
+            tok.end if sys.version_info >= (3, 12) or tok.type.name != "NEWLINE" else tok.start,
         )
 
     def raise_syntax_error_known_location(self, message: str, node: Node | TokenInfo) -> None:
         """Raise a syntax error that occured at a given AST node."""
-        if isinstance(node, TokenInfo):
+        if isinstance(node, self.tok_cls):
             start = node.start
             end = node.end
         else:
@@ -913,12 +916,12 @@ class Parser:
         start_node: Node | TokenInfo,
         end_node: Node | TokenInfo,
     ) -> None:
-        if isinstance(start_node, TokenInfo):
+        if isinstance(start_node, self.tok_cls):
             start = start_node.start
         else:
             start = start_node.lineno, start_node.col_offset
 
-        if isinstance(end_node, TokenInfo):
+        if isinstance(end_node, self.tok_cls):
             end = end_node.end
         else:
             end = end_node.end_lineno or 0, end_node.end_col_offset or 0
@@ -926,7 +929,7 @@ class Parser:
         raise self._build_syntax_error(message, start, end)
 
     def raise_syntax_error_starting_from(self, message: str, start_node: Node | TokenInfo) -> None:
-        if isinstance(start_node, TokenInfo):
+        if isinstance(start_node, self.tok_cls):
             start = start_node.start
         else:
             start = start_node.lineno, start_node.col_offset
@@ -958,10 +961,13 @@ class Parser:
         path: Path,
         py_version: tuple[int, ...] | None = None,
         verbose: bool = False,
+        use_rust_tokenizer=False,
     ) -> ast.Module | Node | None:
         """Parse a file or string."""
         with open(path) as f:
-            tokenizer = Tokenizer(f.readline, verbose=verbose, path=str(path))
+            tokenizer = Tokenizer(
+                f.readline, verbose=verbose, path=str(path), use_rust_tokenizer=use_rust_tokenizer
+            )
             parser = cls(
                 tokenizer,
                 verbose=verbose,
@@ -977,10 +983,13 @@ class Parser:
         mode: Literal["eval", "exec"] = "eval",
         py_version: tuple[int, ...] | None = None,
         verbose: bool = False,
+        use_rust_tokenizer=False,
     ) -> Any:
         """Parse a string."""
         import io
 
-        tokenizer = Tokenizer(io.StringIO(source).readline, verbose=verbose)
+        tokenizer = Tokenizer(
+            io.StringIO(source).readline, verbose=verbose, use_rust_tokenizer=use_rust_tokenizer
+        )
         parser = cls(tokenizer, verbose=verbose, py_version=py_version)
         return parser.parse(mode if mode == "eval" else "file")
