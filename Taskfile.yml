@@ -143,3 +143,14 @@ tasks:
     desc: Generate a PNG trend chart of the PegenParser large file benchmark
     cmds:
       - uv run python3 plot_benchmarks.py "tests/benchmarks.py::test_large_file[PegenParser]"
+
+  hyperfine:
+    desc: compare pegen and treesitter
+    cmds:
+      - hyperfine
+        "uv run pytest tests/benchmarks.py::test_large_file[PegenParser]"
+        "uv run pytest tests/benchmarks.py::test_large_file[RuffParser]"
+        "uv run pytest tests/benchmarks.py::test_large_file[TreeSitter]"
+        -n pegen
+        -n ruff
+        -n treesitter
