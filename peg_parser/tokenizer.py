@@ -39,7 +39,7 @@ class Tokenizer:
         *,
         path: str = "",
         verbose: bool = False,
-        use_rust_tokenizer=False,
+        use_rust_tokenizer=True,
     ):
         self._readline = readline
         self._tokens = []

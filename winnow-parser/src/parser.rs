@@ -11,7 +11,7 @@ use winnow::token::any;
 // Python<'py> is Copy, Clone, but not Debug.
 #[derive(Clone)]
 pub struct PState<'s> {
-    pub source: &'s str,
+    pub source: &'s [u8],
     pub py: Python<'s>,
     pub ast: Bound<'s, PyModule>, // Cached ast module
 }
@@ -29,7 +29,7 @@ pub type TokenStream<'s> = Stateful<&'s [TokInfo], PState<'s>>;
 
 // ### Helpers ###
 
-fn get_text<'s>(input: &TokenStream<'s>, tok: &TokInfo) -> &'s str {
+fn get_text<'s>(input: &TokenStream<'s>, tok: &TokInfo) -> &'s [u8] {
     &input.state.source[tok.span.0..tok.span.1]
 }
 
@@ -41,7 +41,7 @@ fn parse_token_type<'s>(input: &mut TokenStream<'s>, kind: Token) -> ModalResult
 }
 
 // Helper to create a parser for a specific OP
-fn op<'s>(target: &'static str) -> impl FnMut(&mut TokenStream<'s>) -> ModalResult<TokInfo> {
+fn op<'s>(target: &'static [u8]) -> impl FnMut(&mut TokenStream<'s>) -> ModalResult<TokInfo> {
     move |input: &mut TokenStream<'s>| {
         let checkpoint = input.checkpoint();
         let tok = any.parse_next(input)?;
@@ -57,7 +57,7 @@ fn op<'s>(target: &'static str) -> impl FnMut(&mut TokenStream<'s>) -> ModalResu
 }
 
 // Helper to create a parser for a specific Keyword
-fn kw<'s>(target: &'static str) -> impl FnMut(&mut TokenStream<'s>) -> ModalResult<TokInfo> {
+fn kw<'s>(target: &'static [u8]) -> impl FnMut(&mut TokenStream<'s>) -> ModalResult<TokInfo> {
     move |input: &mut TokenStream<'s>| {
         let checkpoint = input.checkpoint();
         let tok = any.parse_next(input)?;
@@ -87,6 +87,7 @@ fn parse_string<'s>(input: &mut TokenStream<'s>) -> ModalResult<TokInfo> {
     parse_token_type(input, Token::STRING)
 }
 
+// Match NEWLINE
 // Match NEWLINE
 fn parse_newline<'s>(input: &mut TokenStream<'s>) -> ModalResult<TokInfo> {
     parse_token_type(input, Token::NEWLINE)
@@ -149,7 +150,9 @@ fn set_context(py: Python, node: &Py<PyAny>, ctx: Py<PyAny>) -> ModalResult<()> 
 
 // file[ast.Module]: a=[statements] ENDMARKER { ast.Module(body=a or [], type_ignores=[]) }
 pub fn parse_file<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
+    println!("Entering parse_file");
     let a = opt(parse_statements).parse_next(input)?;
+    println!("parse_statements result: is_some={}", a.is_some());
     let _ = parse_endmarker.parse_next(input)?;
 
     let py = input.state.py;
@@ -205,14 +208,18 @@ pub fn parse_statement<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>
 
     input.reset(&checkpoint);
 
-    parse_simple_stmts.parse_next(input)
+    if let Ok(stmts) = parse_simple_stmts.parse_next(input) {
+        return Ok(stmts);
+    }
+
+    Err(ErrMode::Backtrack(ContextError::new()))
 }
 
 // while_stmt
 fn parse_while_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let _ = kw("while").parse_next(input)?;
+    let _ = kw(b"while").parse_next(input)?;
     let test = parse_named_expression(input)?;
-    let _ = op(":").parse_next(input)?;
+    let _ = op(b":").parse_next(input)?;
     let body = parse_block(input)?;
     let orelse_block = opt(parse_else_block).parse_next(input)?;
 
@@ -231,18 +238,18 @@ fn parse_while_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 
 // for_stmt
 fn parse_for_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let is_async = if peek(kw("async")).parse_next(input).is_ok() {
-        let _ = kw("async").parse_next(input)?;
+    let is_async = if peek(kw(b"async")).parse_next(input).is_ok() {
+        let _ = kw(b"async").parse_next(input)?;
         true
     } else {
         false
     };
 
-    let _ = kw("for").parse_next(input)?;
+    let _ = kw(b"for").parse_next(input)?;
     let target = parse_star_expressions(input)?;
-    let _ = kw("in").parse_next(input)?;
+    let _ = kw(b"in").parse_next(input)?;
     let iter = parse_star_expressions(input)?;
-    let _ = op(":").parse_next(input)?;
+    let _ = op(b":").parse_next(input)?;
     let body = parse_block(input)?;
     let orelse_block = opt(parse_else_block).parse_next(input)?;
 
@@ -268,8 +275,8 @@ fn parse_for_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 // with_item: expression ['as' star_target]
 fn parse_with_item<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let context_expr = parse_expression(input)?;
-    let optional_vars = if peek(kw("as")).parse_next(input).is_ok() {
-        let _ = kw("as").parse_next(input)?;
+    let optional_vars = if peek(kw(b"as")).parse_next(input).is_ok() {
+        let _ = kw(b"as").parse_next(input)?;
         let target = parse_star_targets(input)?; // need star_target parsing or just expression and set store
         let py = input.state.py;
         let ast = input.state.ast.clone();
@@ -294,27 +301,27 @@ fn parse_with_item<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 
 // with_stmt
 fn parse_with_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let is_async = if peek(kw("async")).parse_next(input).is_ok() {
-        let _ = kw("async").parse_next(input)?;
+    let is_async = if peek(kw(b"async")).parse_next(input).is_ok() {
+        let _ = kw(b"async").parse_next(input)?;
         true
     } else {
         false
     };
 
-    let _ = kw("with").parse_next(input)?;
+    let _ = kw(b"with").parse_next(input)?;
 
-    let items_list = if peek(op("(")).parse_next(input).is_ok() {
-        let _ = op("(").parse_next(input)?;
-        let items = separated(1.., parse_with_item, op(",")).parse_next(input)?;
-        let _ = opt(op(",")).parse_next(input)?;
-        let _ = op(")").parse_next(input)?;
+    let items_list = if peek(op(b"(")).parse_next(input).is_ok() {
+        let _ = op(b"(").parse_next(input)?;
+        let items = separated(1.., parse_with_item, op(b",")).parse_next(input)?;
+        let _ = opt(op(b",")).parse_next(input)?;
+        let _ = op(b")").parse_next(input)?;
         items
     } else {
-        separated(1.., parse_with_item, op(",")).parse_next(input)?
+        separated(1.., parse_with_item, op(b",")).parse_next(input)?
     };
 
     let _: Vec<Py<PyAny>> = items_list;
-    let _ = op(":").parse_next(input)?;
+    let _ = op(b":").parse_next(input)?;
 
     // type_comment?
     let body = parse_block(input)?;
@@ -333,16 +340,17 @@ fn parse_with_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 
 // except_block
 fn parse_except_block<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let _ = kw("except").parse_next(input)?;
-    let (typ, name) = if peek(op(":")).parse_next(input).is_ok() {
+    let _ = kw(b"except").parse_next(input)?;
+    let (typ, name) = if peek(op(b":")).parse_next(input).is_ok() {
         let py = input.state.py;
         (py.None().into(), py.None().into())
     } else {
         let t = parse_expression(input)?;
-        let n: Py<PyAny> = if peek(kw("as")).parse_next(input).is_ok() {
-            let _ = kw("as").parse_next(input)?;
+        let n: Py<PyAny> = if peek(kw(b"as")).parse_next(input).is_ok() {
+            let _ = kw(b"as").parse_next(input)?;
             let name_tok = parse_name(input)?;
-            let txt = get_text(input, &name_tok);
+            let txt_bytes = get_text(input, &name_tok);
+            let txt = std::str::from_utf8(txt_bytes).unwrap();
             let py = input.state.py;
             pyo3::types::PyString::new(py, txt).into()
         } else {
@@ -352,7 +360,7 @@ fn parse_except_block<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>>
         (t, n)
     };
 
-    let _ = op(":").parse_next(input)?;
+    let _ = op(b":").parse_next(input)?;
     let body = parse_block(input)?;
 
     let py = input.state.py;
@@ -367,25 +375,25 @@ fn parse_except_block<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>>
 
 // try_stmt
 fn parse_try_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let _ = kw("try").parse_next(input)?;
-    let _ = op(":").parse_next(input)?;
+    let _ = kw(b"try").parse_next(input)?;
+    let _ = op(b":").parse_next(input)?;
     let body = parse_block(input)?;
 
     let mut handlers = Vec::new();
-    while peek(kw("except")).parse_next(input).is_ok() {
+    while peek(kw(b"except")).parse_next(input).is_ok() {
         handlers.push(parse_except_block(input)?);
     }
 
-    let orelse = if peek(kw("else")).parse_next(input).is_ok() {
+    let orelse = if peek(kw(b"else")).parse_next(input).is_ok() {
         parse_else_block(input)?
     } else {
         let py = input.state.py;
         PyList::empty(py).into()
     };
 
-    let finalbody = if peek(kw("finally")).parse_next(input).is_ok() {
-        let _ = kw("finally").parse_next(input)?;
-        let _ = op(":").parse_next(input)?;
+    let finalbody = if peek(kw(b"finally")).parse_next(input).is_ok() {
+        let _ = kw(b"finally").parse_next(input)?;
+        let _ = op(b":").parse_next(input)?;
         parse_block(input)?
     } else {
         let py = input.state.py;
@@ -407,8 +415,8 @@ fn parse_try_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 // For now alias to parse_star_expressions
 // star_expression: '*' bitwise_or | expression
 fn parse_star_expression<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    if peek(op("*")).parse_next(input).is_ok() {
-        let _ = op("*").parse_next(input)?;
+    if peek(op(b"*")).parse_next(input).is_ok() {
+        let _ = op(b"*").parse_next(input)?;
         let expr = parse_bitwise_or(input)?;
         let py = input.state.py;
         let ast = input.state.ast.clone();
@@ -426,8 +434,8 @@ fn parse_star_expressions<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyA
     // start with one
     let first = parse_star_expression(input)?;
 
-    if peek(op(",")).parse_next(input).is_ok() {
-        let _ = op(",").parse_next(input)?;
+    if peek(op(b",")).parse_next(input).is_ok() {
+        let _ = op(b",").parse_next(input)?;
 
         let mut elts = vec![first];
 
@@ -445,16 +453,16 @@ fn parse_star_expressions<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyA
 
             // If we see ',', we consumed it. Now we expect expression OR end.
             // If end, break (trailing comma).
-            if peek(op(")")).parse_next(input).is_ok()
-                || peek(op("]")).parse_next(input).is_ok()
-                || peek(op("}")).parse_next(input).is_ok()
-                || peek(op(":")).parse_next(input).is_ok()
+            if peek(op(b")")).parse_next(input).is_ok()
+                || peek(op(b"]")).parse_next(input).is_ok()
+                || peek(op(b"}")).parse_next(input).is_ok()
+                || peek(op(b":")).parse_next(input).is_ok()
                 || peek(parse_newline).parse_next(input).is_ok()
             {
                 break;
             }
             // Also 'in' for for loops? `for x, y in ...`
-            if peek(kw("in")).parse_next(input).is_ok() {
+            if peek(kw(b"in")).parse_next(input).is_ok() {
                 break;
             }
 
@@ -480,8 +488,8 @@ fn parse_star_expressions<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyA
                 elts.push(next_expr);
 
                 // Expect comma for next?
-                if peek(op(",")).parse_next(input).is_ok() {
-                    let _ = op(",").parse_next(input)?;
+                if peek(op(b",")).parse_next(input).is_ok() {
+                    let _ = op(b",").parse_next(input)?;
                     continue;
                 } else {
                     break; // no comma, end of list
@@ -512,48 +520,48 @@ fn parse_star_targets<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>>
 //     | &'if' if_stmt
 //     ...
 pub fn parse_compound_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    if peek(kw("if")).parse_next(input).is_ok() {
+    if peek(kw(b"if")).parse_next(input).is_ok() {
         return parse_if_stmt(input);
     }
-    if peek(kw("while")).parse_next(input).is_ok() {
+    if peek(kw(b"while")).parse_next(input).is_ok() {
         return parse_while_stmt(input);
     }
-    if peek(kw("class")).parse_next(input).is_ok() {
+    if peek(kw(b"class")).parse_next(input).is_ok() {
         return parse_class_def(input);
     }
 
-    if peek(kw("async")).parse_next(input).is_ok() {
+    if peek(kw(b"async")).parse_next(input).is_ok() {
         let checkpoint = input.checkpoint();
-        let _ = kw("async").parse_next(input)?;
-        if peek(kw("def")).parse_next(input).is_ok() {
+        let _ = kw(b"async").parse_next(input)?;
+        if peek(kw(b"def")).parse_next(input).is_ok() {
             input.reset(&checkpoint);
             return parse_function_def(input);
         }
-        if peek(kw("for")).parse_next(input).is_ok() {
+        if peek(kw(b"for")).parse_next(input).is_ok() {
             input.reset(&checkpoint);
             return parse_for_stmt(input);
         }
-        if peek(kw("with")).parse_next(input).is_ok() {
+        if peek(kw(b"with")).parse_next(input).is_ok() {
             input.reset(&checkpoint);
             return parse_with_stmt(input);
         }
         input.reset(&checkpoint);
     }
 
-    if peek(kw("def")).parse_next(input).is_ok() || peek(op("@")).parse_next(input).is_ok() {
+    if peek(kw(b"def")).parse_next(input).is_ok() || peek(op(b"@")).parse_next(input).is_ok() {
         return parse_function_def(input);
     }
 
-    if peek(kw("for")).parse_next(input).is_ok() {
+    if peek(kw(b"for")).parse_next(input).is_ok() {
         return parse_for_stmt(input);
     }
-    if peek(kw("try")).parse_next(input).is_ok() {
+    if peek(kw(b"try")).parse_next(input).is_ok() {
         return parse_try_stmt(input);
     }
-    if peek(kw("with")).parse_next(input).is_ok() {
+    if peek(kw(b"with")).parse_next(input).is_ok() {
         return parse_with_stmt(input);
     }
-    if peek(kw("match")).parse_next(input).is_ok() {
+    if peek(kw(b"match")).parse_next(input).is_ok() {
         return parse_match_stmt(input);
     }
 
@@ -563,8 +571,8 @@ pub fn parse_compound_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<Py
 // decorators: ('@' named_expression NEWLINE)+
 fn parse_decorators<'s>(input: &mut TokenStream<'s>) -> ModalResult<Vec<Py<PyAny>>> {
     let mut decs = Vec::new();
-    while peek(op("@")).parse_next(input).is_ok() {
-        let _ = op("@").parse_next(input)?;
+    while peek(op(b"@")).parse_next(input).is_ok() {
+        let _ = op(b"@").parse_next(input)?;
         let expr = parse_named_expression(input)?;
         let _ = parse_newline(input)?;
         decs.push(expr);
@@ -575,10 +583,11 @@ fn parse_decorators<'s>(input: &mut TokenStream<'s>) -> ModalResult<Vec<Py<PyAny
 // param: NAME annotation?
 fn parse_param<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let name_tok = parse_name(input)?;
-    let name = get_text(input, &name_tok);
+    let name_bytes = get_text(input, &name_tok);
+    let name = std::str::from_utf8(name_bytes).unwrap();
 
-    let annotation = if peek(op(":")).parse_next(input).is_ok() {
-        let _ = op(":").parse_next(input)?;
+    let annotation = if peek(op(b":")).parse_next(input).is_ok() {
+        let _ = op(b":").parse_next(input)?;
         Some(parse_expression(input)?)
     } else {
         None
@@ -600,7 +609,7 @@ fn parse_param<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 fn parse_params<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     // Simplified: param (',' param)* [',']
     // TODO: support defaults, slash, star, etc.
-    let args_list = separated(0.., parse_param, op(",")).parse_next(input)?;
+    let args_list = separated(0.., parse_param, op(b",")).parse_next(input)?;
     let _: Vec<Py<PyAny>> = args_list; // consume the vec
 
     // For now we just put them in 'args' (posonlyargs=[], args=args_list, ...)
@@ -635,31 +644,32 @@ fn parse_params<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 fn parse_function_def<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let decorators = parse_decorators(input)?;
 
-    let is_async = if peek(kw("async")).parse_next(input).is_ok() {
-        let _ = kw("async").parse_next(input)?;
+    let is_async = if peek(kw(b"async")).parse_next(input).is_ok() {
+        let _ = kw(b"async").parse_next(input)?;
         true
     } else {
         false
     };
 
-    let _ = kw("def").parse_next(input)?;
+    let _ = kw(b"def").parse_next(input)?;
     let name_tok = parse_name(input)?;
-    let name = get_text(input, &name_tok);
+    let name_bytes = get_text(input, &name_tok);
+    let name = std::str::from_utf8(name_bytes).unwrap();
 
     // TODO: type_params
 
-    let _ = op("(").parse_next(input)?;
+    let _ = op(b"(").parse_next(input)?;
     let args = opt(parse_params).parse_next(input)?;
-    let _ = op(")").parse_next(input)?;
+    let _ = op(b")").parse_next(input)?;
 
-    let returns = if peek(op("->")).parse_next(input).is_ok() {
-        let _ = op("->").parse_next(input)?;
+    let returns = if peek(op(b"->")).parse_next(input).is_ok() {
+        let _ = op(b"->").parse_next(input)?;
         Some(parse_expression(input)?)
     } else {
         None
     };
 
-    let _ = op(":").parse_next(input)?;
+    let _ = op(b":").parse_next(input)?;
 
     // TODO: func_type_comment
 
@@ -720,7 +730,7 @@ fn parse_arguments<'s>(input: &mut TokenStream<'s>) -> ModalResult<(Py<PyAny>, P
     let mut args = Vec::new();
     let mut keywords = Vec::new();
 
-    if peek(op(")")).parse_next(input).is_ok() {
+    if peek(op(b")")).parse_next(input).is_ok() {
         let py = input.state.py;
         return Ok((PyList::empty(py).into(), PyList::empty(py).into()));
     }
@@ -733,7 +743,7 @@ fn parse_arguments<'s>(input: &mut TokenStream<'s>) -> ModalResult<(Py<PyAny>, P
         let mut matched = false;
 
         // Check for **kwargs
-        if let Ok(_) = op("**").parse_next(input) {
+        if let Ok(_) = op(b"**").parse_next(input) {
             let expr = parse_expression(input)?;
             let kw = ast
                 .call_method1("keyword", (py.None(), expr))
@@ -744,10 +754,11 @@ fn parse_arguments<'s>(input: &mut TokenStream<'s>) -> ModalResult<(Py<PyAny>, P
             // Check for keyword arg: NAME '=' strict
             // We need to match NAME then '='
             if let Ok(name_tok) = parse_name.parse_next(input) {
-                if let Ok(_) = op("=").parse_next(input) {
+                if let Ok(_) = op(b"=").parse_next(input) {
                     // It IS a keyword arg
                     let val = parse_expression(input)?;
-                    let name = get_text(input, &name_tok);
+                    let name_bytes = get_text(input, &name_tok);
+                    let name = std::str::from_utf8(name_bytes).unwrap();
                     let kw = ast
                         .call_method1("keyword", (name, val))
                         .map_err(|_| make_error("keyword failed".into()))?;
@@ -763,7 +774,7 @@ fn parse_arguments<'s>(input: &mut TokenStream<'s>) -> ModalResult<(Py<PyAny>, P
         }
 
         if !matched {
-            if let Ok(_) = op("*").parse_next(input) {
+            if let Ok(_) = op(b"*").parse_next(input) {
                 let expr = parse_expression(input)?;
                 let load = ctx_load(&ast)?;
                 let starred = ast
@@ -776,9 +787,9 @@ fn parse_arguments<'s>(input: &mut TokenStream<'s>) -> ModalResult<(Py<PyAny>, P
             }
         }
 
-        if peek(op(",")).parse_next(input).is_ok() {
-            let _ = op(",").parse_next(input)?;
-            if peek(op(")")).parse_next(input).is_ok() {
+        if peek(op(b",")).parse_next(input).is_ok() {
+            let _ = op(b",").parse_next(input)?;
+            if peek(op(b")")).parse_next(input).is_ok() {
                 break;
             }
         } else {
@@ -795,23 +806,24 @@ fn parse_arguments<'s>(input: &mut TokenStream<'s>) -> ModalResult<(Py<PyAny>, P
 fn parse_class_def<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let decorators = parse_decorators(input)?;
 
-    let _ = kw("class").parse_next(input)?;
+    let _ = kw(b"class").parse_next(input)?;
     let name_tok = parse_name(input)?;
-    let name = get_text(input, &name_tok);
+    let name_bytes = get_text(input, &name_tok);
+    let name = std::str::from_utf8(name_bytes).unwrap();
 
     // type_params?
 
-    let (bases, keywords) = if peek(op("(")).parse_next(input).is_ok() {
-        let _ = op("(").parse_next(input)?;
+    let (bases, keywords) = if peek(op(b"(")).parse_next(input).is_ok() {
+        let _ = op(b"(").parse_next(input)?;
         let (b, k) = parse_arguments(input)?;
-        let _ = op(")").parse_next(input)?;
+        let _ = op(b")").parse_next(input)?;
         (b, k)
     } else {
         let py = input.state.py;
         (PyList::empty(py).into(), PyList::empty(py).into())
     };
 
-    let _ = op(":").parse_next(input)?;
+    let _ = op(b":").parse_next(input)?;
     let body = parse_block(input)?;
 
     let py = input.state.py;
@@ -829,9 +841,9 @@ fn parse_class_def<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 //     | 'if' a=named_expression ':' b=block c=elif_stmt { ast.If(test=a, body=b, orelse=c or [], LOCATIONS) }
 //     | 'if' a=named_expression ':' b=block c=[else_block] { ast.If(test=a, body=b, orelse=c or [], LOCATIONS) }
 fn parse_if_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let _ = kw("if").parse_next(input)?;
+    let _ = kw(b"if").parse_next(input)?;
     let a = parse_named_expression(input)?;
-    let _ = op(":").parse_next(input)?;
+    let _ = op(b":").parse_next(input)?;
     let b = parse_block(input)?;
     let c = opt(parse_else_block).parse_next(input)?;
 
@@ -850,8 +862,8 @@ fn parse_if_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 }
 
 fn parse_else_block<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let _ = kw("else").parse_next(input)?;
-    let _ = cut_err(op(":")).parse_next(input)?;
+    let _ = kw(b"else").parse_next(input)?;
+    let _ = cut_err(op(b":")).parse_next(input)?;
     parse_block(input)
 }
 
@@ -886,7 +898,7 @@ pub fn parse_simple_stmts<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyA
     let checkpoint = input.checkpoint();
 
     // Option 1: simple_stmt !';' NEWLINE
-    if let Ok((stmt, _, _)) = (parse_simple_stmt, not(op(";")), parse_newline).parse_next(input) {
+    if let Ok((stmt, _, _)) = (parse_simple_stmt, not(op(b";")), parse_newline).parse_next(input) {
         let py = input.state.py;
         let list = PyList::new(py, vec![stmt]).unwrap();
         return Ok(list.into());
@@ -897,8 +909,8 @@ pub fn parse_simple_stmts<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyA
     // Option 2: ';'.simple_stmt+ [';'] NEWLINE
 
     if let Ok((stmts, _, _)) = (
-        separated(1.., parse_simple_stmt, op(";")),
-        opt(op(";")),
+        separated(1.., parse_simple_stmt, op(b";")),
+        opt(op(b";")),
         parse_newline,
     )
         .parse_next(input)
@@ -914,7 +926,7 @@ pub fn parse_simple_stmts<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyA
 
 // break_stmt: 'break'
 fn parse_break_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let _ = kw("break").parse_next(input)?;
+    let _ = kw(b"break").parse_next(input)?;
     let ast = input.state.ast.clone();
     let node = ast
         .call_method0("Break")
@@ -924,7 +936,7 @@ fn parse_break_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 
 // continue_stmt: 'continue'
 fn parse_continue_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let _ = kw("continue").parse_next(input)?;
+    let _ = kw(b"continue").parse_next(input)?;
     let ast = input.state.ast.clone();
     let node = ast
         .call_method0("Continue")
@@ -934,7 +946,7 @@ fn parse_continue_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>
 
 // return_stmt: 'return' [star_expressions]
 fn parse_return_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let _ = kw("return").parse_next(input)?;
+    let _ = kw(b"return").parse_next(input)?;
     let value = opt(parse_star_expressions).parse_next(input)?;
 
     let ast = input.state.ast.clone();
@@ -950,11 +962,11 @@ fn parse_return_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> 
 
 // raise_stmt: 'raise' [expression ['from' expression]]
 fn parse_raise_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let _ = kw("raise").parse_next(input)?;
+    let _ = kw(b"raise").parse_next(input)?;
     let exc = opt(parse_expression).parse_next(input)?;
     let cause = if exc.is_some() {
-        if peek(kw("from")).parse_next(input).is_ok() {
-            let _ = kw("from").parse_next(input)?;
+        if peek(kw(b"from")).parse_next(input).is_ok() {
+            let _ = kw(b"from").parse_next(input)?;
             opt(parse_expression).parse_next(input)?
         } else {
             None
@@ -981,8 +993,8 @@ fn parse_raise_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 
 // global_stmt: 'global' NAME+
 fn parse_global_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let _ = kw("global").parse_next(input)?;
-    let names = separated(1.., parse_name, op(",")).parse_next(input)?;
+    let _ = kw(b"global").parse_next(input)?;
+    let names = separated(1.., parse_name, op(b",")).parse_next(input)?;
 
     let names_vec: Vec<TokInfo> = names;
     let mut names_strs = Vec::with_capacity(names_vec.len());
@@ -1000,8 +1012,8 @@ fn parse_global_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> 
 
 // nonlocal_stmt: 'nonlocal' NAME+
 fn parse_nonlocal_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let _ = kw("nonlocal").parse_next(input)?;
-    let names = separated(1.., parse_name, op(",")).parse_next(input)?;
+    let _ = kw(b"nonlocal").parse_next(input)?;
+    let names = separated(1.., parse_name, op(b",")).parse_next(input)?;
 
     let names_vec: Vec<TokInfo> = names;
     let mut names_strs = Vec::with_capacity(names_vec.len());
@@ -1019,10 +1031,10 @@ fn parse_nonlocal_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>
 
 // assert_stmt: 'assert' expression [',' expression]
 fn parse_assert_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let _ = kw("assert").parse_next(input)?;
+    let _ = kw(b"assert").parse_next(input)?;
     let test = parse_expression(input)?;
-    let msg = if peek(op(",")).parse_next(input).is_ok() {
-        let _ = op(",").parse_next(input)?;
+    let msg = if peek(op(b",")).parse_next(input).is_ok() {
+        let _ = op(b",").parse_next(input)?;
         opt(parse_expression).parse_next(input)?
     } else {
         None
@@ -1051,13 +1063,13 @@ fn parse_assignment<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let ast = input.state.ast.clone();
 
     // Check for '=' (Assign)
-    if peek(op("=")).parse_next(input).is_ok() {
+    if peek(op(b"=")).parse_next(input).is_ok() {
         let mut targets = vec![lhs.bind(py).clone().unbind()];
-        while let Ok(_) = op("=").parse_next(input) {
+        while let Ok(_) = op(b"=").parse_next(input) {
             let rhs = parse_star_expressions(input)?;
 
             // If another '=' follows, rhs is also a target, else it is value
-            if peek(op("=")).parse_next(input).is_ok() {
+            if peek(op(b"=")).parse_next(input).is_ok() {
                 targets.push(rhs);
             } else {
                 // Final value
@@ -1077,10 +1089,10 @@ fn parse_assignment<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     }
 
     // Check for ':' (AnnAssign)
-    if let Ok(_) = op(":").parse_next(input) {
+    if let Ok(_) = op(b":").parse_next(input) {
         let annotation = parse_expression(input)?;
-        let value = if peek(op("=")).parse_next(input).is_ok() {
-            let _ = op("=").parse_next(input)?;
+        let value = if peek(op(b"=")).parse_next(input).is_ok() {
+            let _ = op(b"=").parse_next(input)?;
             Some(parse_expression(input)?)
         } else {
             None
@@ -1103,13 +1115,13 @@ fn parse_assignment<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 
     // Check for AugAssign (+=, -=, ...)
     // List of aug ops
-    let aug_op_node = if let Ok(_) = op("+=").parse_next(input) {
+    let aug_op_node = if let Ok(_) = op(b"+=").parse_next(input) {
         ast.call_method0("Add")
-    } else if let Ok(_) = op("-=").parse_next(input) {
+    } else if let Ok(_) = op(b"-=").parse_next(input) {
         ast.call_method0("Sub")
-    } else if let Ok(_) = op("*=").parse_next(input) {
+    } else if let Ok(_) = op(b"*=").parse_next(input) {
         ast.call_method0("Mult")
-    } else if let Ok(_) = op("/=").parse_next(input) {
+    } else if let Ok(_) = op(b"/=").parse_next(input) {
         ast.call_method0("Div")
     }
     // ... add others ...
@@ -1137,8 +1149,8 @@ fn parse_assignment<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 // import_stmt
 fn parse_import_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     // Basic 'import name' support
-    let _ = kw("import").parse_next(input)?;
-    let names = separated(1.., parse_name, op(",")).parse_next(input)?;
+    let _ = kw(b"import").parse_next(input)?;
+    let names = separated(1.., parse_name, op(b",")).parse_next(input)?;
 
     let names_vec: Vec<TokInfo> = names;
     let ast = input.state.ast.clone();
@@ -1161,7 +1173,7 @@ fn parse_import_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> 
 
 // del_stmt: 'del' star_targets
 fn parse_del_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let _ = kw("del").parse_next(input)?;
+    let _ = kw(b"del").parse_next(input)?;
     let targets = parse_star_targets(input)?;
 
     // targets must be set context to Del?
@@ -1197,7 +1209,7 @@ fn parse_del_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 fn parse_match_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     // TODO: Implement Match (Python 3.10)
     // For now just fail.
-    let _ = kw("match").parse_next(input)?;
+    let _ = kw(b"match").parse_next(input)?;
     Err(ErrMode::Backtrack(ContextError::new()))
 }
 
@@ -1214,31 +1226,9 @@ fn parse_match_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 //     | &'del' del_stmt
 //     | assignment_or_expression
 pub fn parse_simple_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    // The original `parse_simple_stmt` had a `pass` specific block.
-    // The new structure implies `parse_pass_stmt` exists, but it's not in the provided snippet.
-    // I'll assume `parse_pass_stmt` is a separate function like others.
-    // Also, `parse_import_name` and `parse_import_from` are not in the original snippet,
-    // but `parse_import_stmt` is. I'll use `parse_import_stmt` for `import` and assume
-    // `from` will be handled by `parse_import_from` if it exists elsewhere.
-    // For now, I'll adapt the provided `parse_simple_stmt` to use `parse_import_stmt`
-    // for both `import` and `from` if `parse_import_from` is not defined.
-    // Given the user's instruction, I'll stick to the provided `parse_simple_stmt` structure
-    // and assume `parse_import_name` and `parse_import_from` are intended to be used.
-    // If they don't exist, it will be a compilation error for the user to fix.
-
-    // Re-evaluating the provided `parse_simple_stmt` block:
-    // It seems to be a conceptual outline rather than a direct replacement for the `if peek(kw("pass"))` block.
-    // The user's instruction is to "wire `parse_del_stmt` into `parse_simple_stmt`".
-    // The provided `parse_simple_stmt` in the instruction is a *commented-out grammar* followed by a *partial* implementation.
-    // The partial implementation is missing the `pass` case and the final `Expr` case.
-    // I should integrate `del` into the *existing* `parse_simple_stmt` and then add the `parse_assignment` and `parse_star_expressions` fallback.
-
-    // Let's reconstruct `parse_simple_stmt` by adding `del` and keeping the existing logic.
-
     // pass
-    if peek(kw("pass")).parse_next(input).is_ok() {
-        let _ = kw("pass").parse_next(input)?;
-
+    if peek(kw(b"pass")).parse_next(input).is_ok() {
+        let _ = kw(b"pass").parse_next(input)?;
         let ast = input.state.ast.clone();
         let node = ast
             .call_method0("Pass")
@@ -1246,40 +1236,40 @@ pub fn parse_simple_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAn
         return Ok(node.into());
     }
 
-    // Other simple statements
-    if peek(kw("break")).parse_next(input).is_ok() {
+    if peek(kw(b"break")).parse_next(input).is_ok() {
         return parse_break_stmt(input);
     }
-    if peek(kw("continue")).parse_next(input).is_ok() {
+    if peek(kw(b"continue")).parse_next(input).is_ok() {
         return parse_continue_stmt(input);
     }
-    if peek(kw("return")).parse_next(input).is_ok() {
+    if peek(kw(b"return")).parse_next(input).is_ok() {
         return parse_return_stmt(input);
     }
-    if peek(kw("raise")).parse_next(input).is_ok() {
+    if peek(kw(b"raise")).parse_next(input).is_ok() {
         return parse_raise_stmt(input);
     }
-    if peek(kw("global")).parse_next(input).is_ok() {
+    if peek(kw(b"global")).parse_next(input).is_ok() {
         return parse_global_stmt(input);
     }
-    if peek(kw("nonlocal")).parse_next(input).is_ok() {
+    if peek(kw(b"nonlocal")).parse_next(input).is_ok() {
         return parse_nonlocal_stmt(input);
     }
-    if peek(kw("assert")).parse_next(input).is_ok() {
+    if peek(kw(b"assert")).parse_next(input).is_ok() {
         return parse_assert_stmt(input);
     }
-    if peek(kw("import")).parse_next(input).is_ok() {
+    if peek(kw(b"import")).parse_next(input).is_ok() {
         return parse_import_stmt(input);
     }
-    if peek(kw("del")).parse_next(input).is_ok() {
-        // Added del_stmt
+    if peek(kw(b"del")).parse_next(input).is_ok() {
         return parse_del_stmt(input);
     }
 
     // Assignment?
+    let checkpoint = input.checkpoint();
     if let Ok(assign) = parse_assignment(input) {
         return Ok(assign);
     }
+    input.reset(&checkpoint);
 
     // Default to star_expressions (expr)
     let e = parse_star_expressions(input)?;
@@ -1309,10 +1299,10 @@ fn parse_expression<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let checkpoint = input.checkpoint();
     if let Ok(disj) = parse_disjunction(input) {
         // Check for 'if'
-        if peek(kw("if")).parse_next(input).is_ok() {
-            let _ = kw("if").parse_next(input)?;
+        if peek(kw(b"if")).parse_next(input).is_ok() {
+            let _ = kw(b"if").parse_next(input)?;
             let test = parse_disjunction(input)?;
-            let _ = kw("else").parse_next(input)?;
+            let _ = kw(b"else").parse_next(input)?;
             let orelse = parse_expression(input)?;
 
             let py = input.state.py;
@@ -1328,7 +1318,7 @@ fn parse_expression<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 
     input.reset(&checkpoint);
 
-    if peek(kw("lambda")).parse_next(input).is_ok() {
+    if peek(kw(b"lambda")).parse_next(input).is_ok() {
         return parse_lambdef(input);
     }
 
@@ -1343,8 +1333,8 @@ fn parse_disjunction<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> 
 
     let mut values = vec![head];
 
-    while let Ok(_) = peek(kw("or")).parse_next(input) {
-        let _ = kw("or").parse_next(input)?;
+    while let Ok(_) = peek(kw(b"or")).parse_next(input) {
+        let _ = kw(b"or").parse_next(input)?;
         let next = parse_conjunction(input)?;
         values.push(next);
     }
@@ -1373,8 +1363,8 @@ fn parse_conjunction<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> 
 
     let mut values = vec![head];
 
-    while let Ok(_) = peek(kw("and")).parse_next(input) {
-        let _ = kw("and").parse_next(input)?;
+    while let Ok(_) = peek(kw(b"and")).parse_next(input) {
+        let _ = kw(b"and").parse_next(input)?;
         let next = parse_inversion(input)?;
         values.push(next);
     }
@@ -1399,8 +1389,8 @@ fn parse_conjunction<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> 
 //     | 'not' a=inversion { ast.UnaryOp(op=ast.Not(), operand=a, LOCATIONS) }
 //     | comparison
 fn parse_inversion<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    if peek(kw("not")).parse_next(input).is_ok() {
-        let _ = kw("not").parse_next(input)?;
+    if peek(kw(b"not")).parse_next(input).is_ok() {
+        let _ = kw(b"not").parse_next(input)?;
         let operand = parse_inversion(input)?;
         let py = input.state.py;
         let ast = input.state.ast.clone();
@@ -1430,28 +1420,28 @@ fn parse_comparison<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     loop {
         // Try match comparison operator
         let checkpoint = input.checkpoint();
-        let op_node = if let Ok(_) = op("==").parse_next(input) {
+        let op_node = if let Ok(_) = op(b"==").parse_next(input) {
             ast.call_method0("Eq")
-        } else if let Ok(_) = op("!=").parse_next(input) {
+        } else if let Ok(_) = op(b"!=").parse_next(input) {
             ast.call_method0("NotEq")
-        } else if let Ok(_) = op("<").parse_next(input) {
+        } else if let Ok(_) = op(b"<").parse_next(input) {
             ast.call_method0("Lt")
-        } else if let Ok(_) = op("<=").parse_next(input) {
+        } else if let Ok(_) = op(b"<=").parse_next(input) {
             ast.call_method0("LtE")
-        } else if let Ok(_) = op(">").parse_next(input) {
+        } else if let Ok(_) = op(b">").parse_next(input) {
             ast.call_method0("Gt")
-        } else if let Ok(_) = op(">=").parse_next(input) {
+        } else if let Ok(_) = op(b">=").parse_next(input) {
             ast.call_method0("GtE")
-        } else if let Ok(_) = kw("is").parse_next(input) {
-            if let Ok(_) = kw("not").parse_next(input) {
+        } else if let Ok(_) = kw(b"is").parse_next(input) {
+            if let Ok(_) = kw(b"not").parse_next(input) {
                 ast.call_method0("IsNot")
             } else {
                 ast.call_method0("Is")
             }
-        } else if let Ok(_) = kw("in").parse_next(input) {
+        } else if let Ok(_) = kw(b"in").parse_next(input) {
             ast.call_method0("In")
-        } else if let Ok(_) = kw("not").parse_next(input) {
-            if let Ok(_) = kw("in").parse_next(input) {
+        } else if let Ok(_) = kw(b"not").parse_next(input) {
+            if let Ok(_) = kw(b"in").parse_next(input) {
                 ast.call_method0("NotIn")
             } else {
                 input.reset(&checkpoint);
@@ -1494,7 +1484,7 @@ fn parse_comparison<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 fn parse_bitwise_or<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let mut left = parse_bitwise_xor(input)?;
 
-    while let Ok(_) = op("|").parse_next(input) {
+    while let Ok(_) = op(b"|").parse_next(input) {
         let right = parse_bitwise_xor(input)?;
         let py = input.state.py;
         let ast = input.state.ast.clone();
@@ -1511,7 +1501,7 @@ fn parse_bitwise_or<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 
 fn parse_bitwise_xor<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let mut left = parse_bitwise_and(input)?;
-    while let Ok(_) = op("^").parse_next(input) {
+    while let Ok(_) = op(b"^").parse_next(input) {
         let right = parse_bitwise_and(input)?;
         let py = input.state.py;
         let ast = input.state.ast.clone();
@@ -1528,7 +1518,7 @@ fn parse_bitwise_xor<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> 
 
 fn parse_bitwise_and<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let mut left = parse_shift_expr(input)?;
-    while let Ok(_) = op("&").parse_next(input) {
+    while let Ok(_) = op(b"&").parse_next(input) {
         let right = parse_shift_expr(input)?;
         let py = input.state.py;
         let ast = input.state.ast.clone();
@@ -1548,9 +1538,9 @@ fn parse_shift_expr<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     loop {
         let py = input.state.py;
         let ast = input.state.ast.clone();
-        let op_node = if let Ok(_) = op("<<").parse_next(input) {
+        let op_node = if let Ok(_) = op(b"<<").parse_next(input) {
             ast.call_method0("LShift")
-        } else if let Ok(_) = op(">>").parse_next(input) {
+        } else if let Ok(_) = op(b">>").parse_next(input) {
             ast.call_method0("RShift")
         } else {
             break;
@@ -1570,9 +1560,9 @@ fn parse_sum<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     loop {
         let py = input.state.py;
         let ast = input.state.ast.clone();
-        let op_node = if let Ok(_) = op("+").parse_next(input) {
+        let op_node = if let Ok(_) = op(b"+").parse_next(input) {
             ast.call_method0("Add")
-        } else if let Ok(_) = op("-").parse_next(input) {
+        } else if let Ok(_) = op(b"-").parse_next(input) {
             ast.call_method0("Sub")
         } else {
             break;
@@ -1592,15 +1582,15 @@ fn parse_term<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     loop {
         let py = input.state.py;
         let ast = input.state.ast.clone();
-        let op_node = if let Ok(_) = op("*").parse_next(input) {
+        let op_node = if let Ok(_) = op(b"*").parse_next(input) {
             ast.call_method0("Mult")
-        } else if let Ok(_) = op("/").parse_next(input) {
+        } else if let Ok(_) = op(b"/").parse_next(input) {
             ast.call_method0("Div")
-        } else if let Ok(_) = op("//").parse_next(input) {
+        } else if let Ok(_) = op(b"//").parse_next(input) {
             ast.call_method0("FloorDiv")
-        } else if let Ok(_) = op("%").parse_next(input) {
+        } else if let Ok(_) = op(b"%").parse_next(input) {
             ast.call_method0("Mod")
-        } else if let Ok(_) = op("@").parse_next(input) {
+        } else if let Ok(_) = op(b"@").parse_next(input) {
             ast.call_method0("MatMult")
         } else {
             break;
@@ -1625,7 +1615,7 @@ fn parse_factor<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let py = input.state.py;
     let ast = input.state.ast.clone();
 
-    if let Ok(_) = op("+").parse_next(input) {
+    if let Ok(_) = op(b"+").parse_next(input) {
         let op_node = ast
             .call_method0("UAdd")
             .map_err(|_| make_error("UAdd failed".into()))?;
@@ -1635,7 +1625,7 @@ fn parse_factor<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
             .map_err(|_| make_error("UnaryOp failed".into()))?;
         return Ok(node.into());
     }
-    if let Ok(_) = op("-").parse_next(input) {
+    if let Ok(_) = op(b"-").parse_next(input) {
         let op_node = ast
             .call_method0("USub")
             .map_err(|_| make_error("USub failed".into()))?;
@@ -1645,7 +1635,7 @@ fn parse_factor<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
             .map_err(|_| make_error("UnaryOp failed".into()))?;
         return Ok(node.into());
     }
-    if let Ok(_) = op("~").parse_next(input) {
+    if let Ok(_) = op(b"~").parse_next(input) {
         let op_node = ast
             .call_method0("Invert")
             .map_err(|_| make_error("Invert failed".into()))?;
@@ -1664,7 +1654,7 @@ fn parse_factor<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 //     | await_primary
 fn parse_power<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let left = parse_await_primary(input)?;
-    if let Ok(_) = op("**").parse_next(input) {
+    if let Ok(_) = op(b"**").parse_next(input) {
         let right = parse_factor(input)?;
         let py = input.state.py;
         let ast = input.state.ast.clone();
@@ -1683,7 +1673,7 @@ fn parse_power<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 //     | 'await' a=primary { ast.Await(a, LOCATIONS) }
 //     | primary
 fn parse_await_primary<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    if let Ok(_) = kw("await").parse_next(input) {
+    if let Ok(_) = kw(b"await").parse_next(input) {
         let a = parse_primary(input)?;
         let py = input.state.py;
         let ast = input.state.ast.clone();
@@ -1702,11 +1692,11 @@ fn parse_slice<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let checkpoint = input.checkpoint();
 
     // Check for starting ':' -> Slice with no lower
-    if peek(op(":")).parse_next(input).is_ok() {
-        let _ = op(":").parse_next(input)?;
-        let upper = if !peek(op(":")).parse_next(input).is_ok()
-            && !peek(op(",")).parse_next(input).is_ok()
-            && !peek(op("]")).parse_next(input).is_ok()
+    if peek(op(b":")).parse_next(input).is_ok() {
+        let _ = op(b":").parse_next(input)?;
+        let upper = if !peek(op(b":")).parse_next(input).is_ok()
+            && !peek(op(b",")).parse_next(input).is_ok()
+            && !peek(op(b"]")).parse_next(input).is_ok()
         {
             parse_expression(input).ok()
         } else {
@@ -1714,9 +1704,10 @@ fn parse_slice<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
         };
 
         // Step?
-        let step = if peek(op(":")).parse_next(input).is_ok() {
-            let _ = op(":").parse_next(input)?;
-            if !peek(op(",")).parse_next(input).is_ok() && !peek(op("]")).parse_next(input).is_ok()
+        let step = if peek(op(b":")).parse_next(input).is_ok() {
+            let _ = op(b":").parse_next(input)?;
+            if !peek(op(b",")).parse_next(input).is_ok()
+                && !peek(op(b"]")).parse_next(input).is_ok()
             {
                 parse_expression(input).ok()
             } else {
@@ -1747,21 +1738,21 @@ fn parse_slice<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     // Try parse expression
     if let Ok(lower) = parse_expression(input) {
         // If followed by ':', it's a Slice
-        if peek(op(":")).parse_next(input).is_ok() {
-            let _ = op(":").parse_next(input)?;
-            let upper = if !peek(op(":")).parse_next(input).is_ok()
-                && !peek(op(",")).parse_next(input).is_ok()
-                && !peek(op("]")).parse_next(input).is_ok()
+        if peek(op(b":")).parse_next(input).is_ok() {
+            let _ = op(b":").parse_next(input)?;
+            let upper = if !peek(op(b":")).parse_next(input).is_ok()
+                && !peek(op(b",")).parse_next(input).is_ok()
+                && !peek(op(b"]")).parse_next(input).is_ok()
             {
                 parse_expression(input).ok()
             } else {
                 None
             };
 
-            let step = if peek(op(":")).parse_next(input).is_ok() {
-                let _ = op(":").parse_next(input)?;
-                if !peek(op(",")).parse_next(input).is_ok()
-                    && !peek(op("]")).parse_next(input).is_ok()
+            let step = if peek(op(b":")).parse_next(input).is_ok() {
+                let _ = op(b":").parse_next(input)?;
+                if !peek(op(b",")).parse_next(input).is_ok()
+                    && !peek(op(b"]")).parse_next(input).is_ok()
                 {
                     parse_expression(input).ok()
                 } else {
@@ -1804,19 +1795,19 @@ fn parse_slice<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 fn parse_slices<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let first = parse_slice(input)?;
 
-    if peek(op(",")).parse_next(input).is_ok() {
-        let _ = op(",").parse_next(input)?;
+    if peek(op(b",")).parse_next(input).is_ok() {
+        let _ = op(b",").parse_next(input)?;
         let mut elts = vec![first];
 
         loop {
-            if peek(op("]")).parse_next(input).is_ok() {
+            if peek(op(b"]")).parse_next(input).is_ok() {
                 break;
             }
 
             if let Ok(next_slice) = parse_slice(input) {
                 elts.push(next_slice);
-                if peek(op(",")).parse_next(input).is_ok() {
-                    let _ = op(",").parse_next(input)?;
+                if peek(op(b",")).parse_next(input).is_ok() {
+                    let _ = op(b",").parse_next(input)?;
                 } else {
                     break;
                 }
@@ -1853,7 +1844,7 @@ fn parse_primary<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 
     loop {
         // Attribute: . NAME
-        if let Ok(_) = op(".").parse_next(input) {
+        if let Ok(_) = op(b".").parse_next(input) {
             let name_tok = parse_name(input)?;
             let text = get_text(input, &name_tok);
             left = ast
@@ -1864,9 +1855,9 @@ fn parse_primary<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
         }
 
         // Call: ( ... )
-        if let Ok(_) = op("(").parse_next(input) {
+        if let Ok(_) = op(b"(").parse_next(input) {
             let (args, keywords) = parse_arguments(input)?;
-            let _ = op(")").parse_next(input)?;
+            let _ = op(b")").parse_next(input)?;
 
             left = ast
                 .call_method1("Call", (left, args, keywords))
@@ -1876,9 +1867,9 @@ fn parse_primary<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
         }
 
         // Subscript: [ ... ]
-        if let Ok(_) = op("[").parse_next(input) {
+        if let Ok(_) = op(b"[").parse_next(input) {
             let slice = parse_slices(input)?;
-            let _ = op("]").parse_next(input)?;
+            let _ = op(b"]").parse_next(input)?;
             left = ast
                 .call_method1("Subscript", (left, slice, load.bind(py).clone().unbind()))
                 .map_err(|_| make_error("Subscript failed".into()))?
@@ -1897,22 +1888,22 @@ fn parse_generators<'s>(input: &mut TokenStream<'s>) -> ModalResult<Vec<Py<PyAny
     let mut generators = Vec::new();
 
     loop {
-        let is_async = if peek(kw("async")).parse_next(input).is_ok() {
-            let _ = kw("async").parse_next(input)?;
+        let is_async = if peek(kw(b"async")).parse_next(input).is_ok() {
+            let _ = kw(b"async").parse_next(input)?;
             1 // int for Async
         } else {
             0
         };
 
-        if peek(kw("for")).parse_next(input).is_ok() {
-            let _ = kw("for").parse_next(input)?;
+        if peek(kw(b"for")).parse_next(input).is_ok() {
+            let _ = kw(b"for").parse_next(input)?;
             let target = parse_star_targets(input)?;
-            let _ = kw("in").parse_next(input)?;
+            let _ = kw(b"in").parse_next(input)?;
             let iter = parse_disjunction(input)?; // or_test
 
             let mut ifs = Vec::new();
-            while peek(kw("if")).parse_next(input).is_ok() {
-                let _ = kw("if").parse_next(input)?;
+            while peek(kw(b"if")).parse_next(input).is_ok() {
+                let _ = kw(b"if").parse_next(input)?;
                 let cond = parse_disjunction(input)?;
                 ifs.push(cond);
             }
@@ -1932,8 +1923,8 @@ fn parse_generators<'s>(input: &mut TokenStream<'s>) -> ModalResult<Vec<Py<PyAny
 
             // Check if next is 'async for' or 'for' to continue loop
             // If not, break
-            let has_async = peek(kw("async")).parse_next(input).is_ok();
-            let has_for = peek(kw("for")).parse_next(input).is_ok();
+            let has_async = peek(kw(b"async")).parse_next(input).is_ok();
+            let has_for = peek(kw(b"for")).parse_next(input).is_ok();
 
             if !has_async && !has_for {
                 break;
@@ -1950,9 +1941,9 @@ fn parse_generators<'s>(input: &mut TokenStream<'s>) -> ModalResult<Vec<Py<PyAny
 // lambdef:
 //     | 'lambda' [params] ':' body=expression
 fn parse_lambdef<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let _ = kw("lambda").parse_next(input)?;
+    let _ = kw(b"lambda").parse_next(input)?;
 
-    let args = if !peek(op(":")).parse_next(input).is_ok() {
+    let args = if !peek(op(b":")).parse_next(input).is_ok() {
         parse_params(input)?
     } else {
         let py = input.state.py;
@@ -1973,7 +1964,7 @@ fn parse_lambdef<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
         .into()
     };
 
-    let _ = op(":").parse_next(input)?;
+    let _ = op(b":").parse_next(input)?;
     let body = parse_expression(input)?;
 
     let py = input.state.py;
@@ -1985,7 +1976,7 @@ fn parse_lambdef<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 }
 
 fn parse_dict_maker<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let _ = op("{").parse_next(input)?;
+    let _ = op(b"{").parse_next(input)?;
 
     // Check for DictComp
     // dict_comprehension: key ':' value comp_for
@@ -1993,37 +1984,37 @@ fn parse_dict_maker<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     // Or **kwargs.
 
     // If **kwargs, it must be dict, not comp.
-    if peek(op("**")).parse_next(input).is_ok() {
+    if peek(op(b"**")).parse_next(input).is_ok() {
         // Normal dict loop (start with **)
         let mut keys = Vec::new();
         let mut values = Vec::new();
 
         loop {
-            if peek(op("}")).parse_next(input).is_ok() {
+            if peek(op(b"}")).parse_next(input).is_ok() {
                 break;
             }
 
-            if peek(op("**")).parse_next(input).is_ok() {
-                let _ = op("**").parse_next(input)?;
+            if peek(op(b"**")).parse_next(input).is_ok() {
+                let _ = op(b"**").parse_next(input)?;
                 let expr = parse_bitwise_or(input)?;
                 let py = input.state.py;
                 keys.push(py.None().into());
                 values.push(expr);
             } else {
                 let key = parse_expression(input)?;
-                let _ = op(":").parse_next(input)?;
+                let _ = op(b":").parse_next(input)?;
                 let value = parse_expression(input)?;
                 keys.push(key);
                 values.push(value);
             }
 
-            if peek(op(",")).parse_next(input).is_ok() {
-                let _ = op(",").parse_next(input)?;
+            if peek(op(b",")).parse_next(input).is_ok() {
+                let _ = op(b",").parse_next(input)?;
             } else {
                 break;
             }
         }
-        let _ = op("}").parse_next(input)?;
+        let _ = op(b"}").parse_next(input)?;
         let py = input.state.py;
         let ast = input.state.ast.clone();
         let keys_list = PyList::new(py, keys).unwrap();
@@ -2036,13 +2027,13 @@ fn parse_dict_maker<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 
     // Parse first key/value
     let key = parse_expression(input)?;
-    let _ = op(":").parse_next(input)?;
+    let _ = op(b":").parse_next(input)?;
     let value = parse_expression(input)?;
 
     // Check for comprehension
-    if peek(kw("for")).parse_next(input).is_ok() || peek(kw("async")).parse_next(input).is_ok() {
+    if peek(kw(b"for")).parse_next(input).is_ok() || peek(kw(b"async")).parse_next(input).is_ok() {
         let generators = parse_generators(input)?;
-        let _ = op("}").parse_next(input)?;
+        let _ = op(b"}").parse_next(input)?;
 
         let py = input.state.py;
         let ast = input.state.ast.clone();
@@ -2057,37 +2048,37 @@ fn parse_dict_maker<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let mut keys = vec![key];
     let mut values = vec![value];
 
-    if peek(op(",")).parse_next(input).is_ok() {
-        let _ = op(",").parse_next(input)?;
+    if peek(op(b",")).parse_next(input).is_ok() {
+        let _ = op(b",").parse_next(input)?;
 
         loop {
-            if peek(op("}")).parse_next(input).is_ok() {
+            if peek(op(b"}")).parse_next(input).is_ok() {
                 break;
             }
 
-            if peek(op("**")).parse_next(input).is_ok() {
-                let _ = op("**").parse_next(input)?;
+            if peek(op(b"**")).parse_next(input).is_ok() {
+                let _ = op(b"**").parse_next(input)?;
                 let expr = parse_bitwise_or(input)?;
                 let py = input.state.py;
                 keys.push(py.None().into());
                 values.push(expr);
             } else {
                 let k = parse_expression(input)?;
-                let _ = op(":").parse_next(input)?;
+                let _ = op(b":").parse_next(input)?;
                 let v = parse_expression(input)?;
                 keys.push(k);
                 values.push(v);
             }
 
-            if peek(op(",")).parse_next(input).is_ok() {
-                let _ = op(",").parse_next(input)?;
+            if peek(op(b",")).parse_next(input).is_ok() {
+                let _ = op(b",").parse_next(input)?;
             } else {
                 break;
             }
         }
     }
 
-    let _ = op("}").parse_next(input)?;
+    let _ = op(b"}").parse_next(input)?;
     let py = input.state.py;
     let ast = input.state.ast.clone();
     let keys_list = PyList::new(py, keys).unwrap();
@@ -2099,15 +2090,15 @@ fn parse_dict_maker<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 }
 
 fn parse_set_maker<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let _ = op("{").parse_next(input)?;
+    let _ = op(b"{").parse_next(input)?;
 
     // Parse first element
     let first = parse_star_expression(input)?;
 
     // Check for comprehension
-    if peek(kw("for")).parse_next(input).is_ok() || peek(kw("async")).parse_next(input).is_ok() {
+    if peek(kw(b"for")).parse_next(input).is_ok() || peek(kw(b"async")).parse_next(input).is_ok() {
         let generators = parse_generators(input)?;
-        let _ = op("}").parse_next(input)?;
+        let _ = op(b"}").parse_next(input)?;
 
         let py = input.state.py;
         let ast = input.state.ast.clone();
@@ -2120,26 +2111,26 @@ fn parse_set_maker<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 
     let mut elts = vec![first];
 
-    if peek(op(",")).parse_next(input).is_ok() {
-        let _ = op(",").parse_next(input)?;
+    if peek(op(b",")).parse_next(input).is_ok() {
+        let _ = op(b",").parse_next(input)?;
 
         loop {
-            if peek(op("}")).parse_next(input).is_ok() {
+            if peek(op(b"}")).parse_next(input).is_ok() {
                 break;
             }
 
             let expr = parse_star_expression(input)?;
             elts.push(expr);
 
-            if peek(op(",")).parse_next(input).is_ok() {
-                let _ = op(",").parse_next(input)?;
+            if peek(op(b",")).parse_next(input).is_ok() {
+                let _ = op(b",").parse_next(input)?;
             } else {
                 break;
             }
         }
     }
 
-    let _ = op("}").parse_next(input)?;
+    let _ = op(b"}").parse_next(input)?;
 
     let py = input.state.py;
     let ast = input.state.ast.clone();
@@ -2163,7 +2154,7 @@ fn parse_fstring_middle<'s>(
             }
         } else {
             // inside format spec, we end at '}'
-            if peek(op("}")).parse_next(input).is_ok() {
+            if peek(op(b"}")).parse_next(input).is_ok() {
                 break;
             }
         }
@@ -2179,7 +2170,7 @@ fn parse_fstring_middle<'s>(
         }
 
         // Replacement field { ... }
-        if peek(op("{")).parse_next(input).is_ok() {
+        if peek(op(b"{")).parse_next(input).is_ok() {
             let node = parse_fstring_replacement_field(input)?;
             parts.push(node);
             continue;
@@ -2195,19 +2186,19 @@ fn parse_fstring_replacement_field<'s>(input: &mut TokenStream<'s>) -> ModalResu
     let py = input.state.py;
     let ast = input.state.ast.clone();
 
-    let _ = op("{").parse_next(input)?;
+    let _ = op(b"{").parse_next(input)?;
     let value = parse_expression(input)?;
 
     let mut conversion = -1;
-    if let Ok(_) = op("!").parse_next(input) {
+    if let Ok(_) = op(b"!").parse_next(input) {
         // expect NAME ('s', 'r', 'a')
         if let Ok(tok) = parse_name(input) {
             let c = get_text(input, &tok);
-            if c == "s" {
+            if c == b"s" {
                 conversion = 115;
-            } else if c == "r" {
+            } else if c == b"r" {
                 conversion = 114;
-            } else if c == "a" {
+            } else if c == b"a" {
                 conversion = 97;
             } else {
                 return Err(ErrMode::Backtrack(ContextError::new()));
@@ -2218,14 +2209,14 @@ fn parse_fstring_replacement_field<'s>(input: &mut TokenStream<'s>) -> ModalResu
     }
 
     let mut format_spec: Py<PyAny> = py.None();
-    if let Ok(_) = op(":").parse_next(input) {
+    if let Ok(_) = op(b":").parse_next(input) {
         let spec_parts = parse_fstring_middle(input, true)?;
         let spec_list = PyList::new(py, spec_parts).unwrap();
         let joined = ast.call_method1("JoinedStr", (spec_list,)).unwrap();
         format_spec = joined.into();
     }
 
-    let _ = op("}").parse_next(input)?;
+    let _ = op(b"}").parse_next(input)?;
 
     let node = ast
         .call_method1("FormattedValue", (value, conversion, format_spec))
@@ -2258,35 +2249,41 @@ fn parse_atom<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 
     if let Ok(tok) = parse_name(input) {
         let text = get_text(input, &tok);
-        if text == "True" {
+        if text == b"True" {
+            // ... (keep constants)
             let node = ast
                 .call_method1("Constant", (true,))
                 .map_err(|_| make_error("Constant failed".into()))?;
             return Ok(node.into());
-        } else if text == "False" {
+        } else if text == b"False" {
+            // ...
             let node = ast
                 .call_method1("Constant", (false,))
                 .map_err(|_| make_error("Constant failed".into()))?;
             return Ok(node.into());
-        } else if text == "None" {
+        } else if text == b"None" {
+            // ...
             let node = ast
                 .call_method1("Constant", (py.None(),))
                 .map_err(|_| make_error("Constant failed".into()))?;
             return Ok(node.into());
         } else {
             let load = ctx_load(&ast)?;
+            let text_str = std::str::from_utf8(text).unwrap();
             let node = ast
-                .call_method1("Name", (text, load))
+                .call_method1("Name", (text_str, load))
                 .map_err(|_| make_error("Name failed".into()))?;
             return Ok(node.into());
         }
     }
 
     if let Ok(tok) = parse_number(input) {
+        // ... (keep number logic)
         let text = get_text(input, &tok);
-        let val = match text.parse::<i64>() {
+        let text_str = std::str::from_utf8(text).unwrap();
+        let val = match text_str.parse::<i64>() {
             Ok(i) => i.into_pyobject(py).unwrap().into_any().unbind(),
-            Err(_) => text.into_pyobject(py).unwrap().into_any().unbind(),
+            Err(_) => text_str.into_pyobject(py).unwrap().into_any().unbind(),
         };
         let node = ast
             .call_method1("Constant", (val,))
@@ -2301,8 +2298,12 @@ fn parse_atom<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     loop {
         if let Ok(tok) = parse_string(input) {
             let text = get_text(input, &tok);
+            let text_str = std::str::from_utf8(text).unwrap();
+            let val = ast
+                .call_method1("literal_eval", (text_str,))
+                .map_err(|_| make_error("literal_eval failed".into()))?;
             let node = ast
-                .call_method1("Constant", (text,))
+                .call_method1("Constant", (val,))
                 .map_err(|_| make_error("Constant failed".into()))?;
             string_nodes.push(node.unbind());
             continue;
@@ -2370,7 +2371,7 @@ fn parse_atom<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
         }
     }
 
-    if let Ok(_) = op("...").parse_next(input) {
+    if let Ok(_) = op(b"...").parse_next(input) {
         let node = ast
             .call_method1("Constant", (py.Ellipsis(),))
             .map_err(|_| make_error("Constant failed".into()))?;
@@ -2378,10 +2379,10 @@ fn parse_atom<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     }
 
     // Group (...) or Tuple
-    if peek(op("(")).parse_next(input).is_ok() {
-        let _ = op("(").parse_next(input)?;
-        if peek(op(")")).parse_next(input).is_ok() {
-            let _ = op(")").parse_next(input)?;
+    if peek(op(b"(")).parse_next(input).is_ok() {
+        let _ = op(b"(").parse_next(input)?;
+        if peek(op(b")")).parse_next(input).is_ok() {
+            let _ = op(b")").parse_next(input)?;
             let load = ctx_load(&ast)?;
             let node = ast
                 .call_method1("Tuple", (PyList::empty(py), load))
@@ -2390,7 +2391,7 @@ fn parse_atom<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
         }
 
         let expr = parse_star_expressions(input)?; // Returns Tuple or Expr
-        let _ = op(")").parse_next(input)?;
+        let _ = op(b")").parse_next(input)?;
         // If expr is NOT a Tuple node, it is a grouping (parens)
         // If it returns Tuple, it was explicitly created by comma.
         // So we return expr as is.
@@ -2400,9 +2401,9 @@ fn parse_atom<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     }
 
     // List [...]
-    if let Ok(_) = op("[").parse_next(input) {
-        if peek(op("]")).parse_next(input).is_ok() {
-            let _ = op("]").parse_next(input)?;
+    if let Ok(_) = op(b"[").parse_next(input) {
+        if peek(op(b"]")).parse_next(input).is_ok() {
+            let _ = op(b"]").parse_next(input)?;
             let load = ctx_load(&ast)?;
             let empty = PyList::empty(py);
             let node = ast.call_method1("List", (empty, load)).unwrap();
@@ -2411,10 +2412,11 @@ fn parse_atom<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 
         let first = parse_star_expression(input)?;
 
-        if peek(kw("for")).parse_next(input).is_ok() || peek(kw("async")).parse_next(input).is_ok()
+        if peek(kw(b"for")).parse_next(input).is_ok()
+            || peek(kw(b"async")).parse_next(input).is_ok()
         {
             let generators = parse_generators(input)?;
-            let _ = op("]").parse_next(input)?;
+            let _ = op(b"]").parse_next(input)?;
             let gens_list = PyList::new(py, generators).unwrap();
             let node = ast
                 .call_method1("ListComp", (first, gens_list))
@@ -2423,25 +2425,25 @@ fn parse_atom<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
         }
 
         let mut elts = vec![first];
-        if peek(op(",")).parse_next(input).is_ok() {
-            let _ = op(",").parse_next(input)?;
+        if peek(op(b",")).parse_next(input).is_ok() {
+            let _ = op(b",").parse_next(input)?;
             loop {
-                if peek(op("]")).parse_next(input).is_ok() {
+                if peek(op(b"]")).parse_next(input).is_ok() {
                     break;
                 }
 
                 let expr = parse_star_expression(input)?;
                 elts.push(expr);
 
-                if peek(op(",")).parse_next(input).is_ok() {
-                    let _ = op(",").parse_next(input)?;
+                if peek(op(b",")).parse_next(input).is_ok() {
+                    let _ = op(b",").parse_next(input)?;
                 } else {
                     break;
                 }
             }
         }
 
-        let _ = op("]").parse_next(input)?;
+        let _ = op(b"]").parse_next(input)?;
         let load = ctx_load(&ast)?;
         let elts_list = PyList::new(py, elts).unwrap();
         let node = ast.call_method1("List", (elts_list, load)).unwrap();
@@ -2449,12 +2451,12 @@ fn parse_atom<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     }
 
     // Dict/Set {...}
-    if peek(op("{")).parse_next(input).is_ok() {
+    if peek(op(b"{")).parse_next(input).is_ok() {
         // Check for empty
         let checkpoint = input.checkpoint();
-        let _ = op("{").parse_next(input)?;
-        if peek(op("}")).parse_next(input).is_ok() {
-            let _ = op("}").parse_next(input)?;
+        let _ = op(b"{").parse_next(input)?;
+        if peek(op(b"}")).parse_next(input).is_ok() {
+            let _ = op(b"}").parse_next(input)?;
             return Ok(ast
                 .call_method1("Dict", (PyList::empty(py), PyList::empty(py)))
                 .unwrap()
@@ -2471,16 +2473,16 @@ fn parse_atom<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 
 fn parse_dict_or_set_atom<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let checkpoint = input.checkpoint();
-    let _ = op("{").parse_next(input)?;
+    let _ = op(b"{").parse_next(input)?;
 
     // Lookahead
-    if peek(op("**")).parse_next(input).is_ok() {
+    if peek(op(b"**")).parse_next(input).is_ok() {
         input.reset(&checkpoint);
         return parse_dict_maker(input);
     }
 
     if let Ok(_) = parse_expression(input) {
-        if peek(op(":")).parse_next(input).is_ok() {
+        if peek(op(b":")).parse_next(input).is_ok() {
             input.reset(&checkpoint);
             return parse_dict_maker(input);
         } else {
@@ -2498,11 +2500,34 @@ fn parse_dict_or_set_atom<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyA
 pub fn parse<'s>(py: Python<'s>, source: &'s str) -> PyResult<Py<PyAny>> {
     let source_py = PyString::new(py, source).into();
     let tokens = tokenize(py, source_py);
-    let input_tokens = tokens.as_slice();
+    let filtered_tokens: Vec<TokInfo> = tokens
+        .into_iter()
+        .filter(|t| {
+            !matches!(
+                t.typ,
+                Token::WS | Token::NL | Token::COMMENT | Token::ENCODING | Token::TYPE_COMMENT
+            )
+        })
+        .collect();
+
+    // DEBUG
+    println!(
+        "Filtered tokens: {:?}",
+        filtered_tokens
+            .iter()
+            .map(|t| (t.typ, t.span))
+            .collect::<Vec<_>>()
+    );
+
+    let input_tokens = filtered_tokens.as_slice();
 
     let ast = py.import("ast")?.into();
 
-    let state = PState { source, py, ast };
+    let state = PState {
+        source: source.as_bytes(),
+        py,
+        ast,
+    };
     let mut input = Stateful {
         input: input_tokens,
         state,
