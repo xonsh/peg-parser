@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import maturin_import_hook
 
 maturin_import_hook.install()
@@ -14,6 +16,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
+from winnow_parser import parse_code
 
 from tests.tools import nodes_equal
 
@@ -35,39 +38,9 @@ def _winnow_lex_input(inp: str) -> list[TokenInfo]:
     return tokens
 
 
-def _py_lex_input(inp: str) -> list[TokenInfo]:
-    from peg_parser.tokenizer import Tokenizer
-
-    tokenizer = Tokenizer(io.StringIO(inp).readline)
-    tokens = []
-    while True:
-        tok = tokenizer.getnext()
-        # Filter WS and NL by string representation to be safe
-        type_name = getattr(tok.type, "name", str(tok.type))
-        if type_name in ("WS", "NL"):
-            continue
-        tokens.append(tok)
-        if type_name == "ENDMARKER":
-            break
-    if tokens and getattr(tokens[-1].type, "name", str(tokens[-1].type)) == "ENDMARKER":
-        tokens.pop()
-    if tokens and getattr(tokens[-1].type, "name", str(tokens[-1].type)) == "NEWLINE":
-        tokens.pop()
-    return tokens
-
-
-LEXERS = ["rust", "py"]
-
-
-@pytest.fixture(params=LEXERS, name="lexer")
-def _lexer(request):
-    return _winnow_lex_input if request.param == "rust" else _py_lex_input
-
-
-def build_parser(name: str):
-    from peg_parser import parser
-
-    return getattr(parser, name)
+@pytest.fixture(name="lexer")
+def _lexer():
+    return _winnow_lex_input
 
 
 def _get_tokens(inp):
@@ -81,27 +54,20 @@ def get_tokens():
     return _get_tokens
 
 
-@pytest.fixture(scope="session")
-def python_parser_cls():
-    return build_parser("XonshParser")
-
-
-@pytest.fixture(params=LEXERS)
-def python_parse_file(python_parser_cls, request):
-    use_rust_tokenizer = request.param == "rust"
-
-    def _parse(*args, **kw):
-        return python_parser_cls.parse_file(*args, **kw, use_rust_tokenizer=use_rust_tokenizer)
+@pytest.fixture
+def python_parse_file():
+    def _parse(file):
+        code = Path(file).read_text()
+        return parse_code(code)
 
     return _parse
 
 
-@pytest.fixture(params=LEXERS)
-def python_parse_str(python_parser_cls, request):
-    use_rust_tokenizer = request.param == "rust"
-
-    def _parse(*args, **kw):
-        return python_parser_cls.parse_string(*args, **kw, use_rust_tokenizer=use_rust_tokenizer)
+@pytest.fixture
+def python_parse_str():
+    def _parse(code: str, **kw):
+        # todo: handle extra parameters
+        return parse_code(code)
 
     return _parse
 
@@ -234,7 +200,3 @@ def check_xonsh_ast(parse_str, xsh):
         return obs
 
     return factory
-
-
-if __name__ == "__main__":
-    build_parser("XonshParser")

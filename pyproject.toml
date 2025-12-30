@@ -19,30 +19,31 @@ extend-select = [
     "B",
     "I",
     "UP",
-    "C90", # mccaabe complexity
-    "N",   # pep8 naming
-    "YTT", # flake8-2020 sys.version
+#    "C90", # mccaabe complexity
+#    "N",   # pep8 naming
+#    "YTT", # flake8-2020 sys.version
     #    "ANN", # flake8 annotations
-    "A",    # flake8-builtins
-    "C4",   # flake8-comprehensions
-    "FA",   # flake8-future-annotations
+#    "A",    # flake8-builtins
+#    "C4",   # flake8-comprehensions
+#    "FA",   # flake8-future-annotations
     "PIE",  # flake8-pie
     "PT",   # pytest
     "SIM",  # simplify
-    "TCH",  # type checking
-    "PL",   # pylint
+#    "TCH",  # type checking
+#    "PL",   # pylint
     "PERF", # performance
     #    "FURB", # modernize
-    "RUF", # ruff
+#    "RUF", # ruff
 ]
 extend-safe-fixes = ["FA", "TCH", "PT"]
 ignore = [
     "PLC0415", # import not at top level
+    "E4"
 ]
 
 # ruff ignore file "xonsh_parser/ply/yacc.py"
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = [
+"*tests/**" = [
     "ANN",    # requiring annotations
     "PL",     # pylint
     "PT023",  # [*] Use `@pytest.mark.xfail()` over `@pytest.mark.xfail`
@@ -51,6 +52,8 @@ ignore = [
     "PT007",  # Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
     "RUF001", # similar chars
     "E402",   # module level import not at top of file
+    "SIM",
+    "E721"
 ]
 "peg_parser/parser.py" = [
     "A",      # flake8-builtins

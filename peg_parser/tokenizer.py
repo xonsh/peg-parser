@@ -129,7 +129,7 @@ class Tokenizer:
             return True
         return bool(name == "NEWLINE" and self._tokens and (self._tokens[-1].type.name) == "NEWLINE")
 
-    def consume_macro_params(self) -> TokenInfo:  # noqa: C901, PLR0912
+    def consume_macro_params(self) -> TokenInfo:
         # loop until we get , or ) without consuming it
         start: tuple[int, int] | None = None
         end: tuple[int, int] | None = None
@@ -172,7 +172,7 @@ class Tokenizer:
             return self.new_tok("WS", string, start, end)
         return self.new_tok("MACRO_PARAM", string, start, end)
 
-    def consume_with_macro_params(self) -> TokenInfo:  # noqa: C901
+    def consume_with_macro_params(self) -> TokenInfo:
         """loop until we get INDENT-DEDENT or NL"""
 
         is_indented: bool = False
