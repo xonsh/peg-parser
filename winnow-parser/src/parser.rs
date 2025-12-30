@@ -238,15 +238,18 @@ fn parse_while_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 
 // for_stmt
 fn parse_for_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let is_async = if peek(kw(b"async")).parse_next(input).is_ok() {
-        let _ = kw(b"async").parse_next(input)?;
+    let is_async = if peek(|i: &mut TokenStream<'s>| parse_token_type(i, Token::ASYNC))
+        .parse_next(input)
+        .is_ok()
+    {
+        let _ = parse_token_type(input, Token::ASYNC)?;
         true
     } else {
         false
     };
 
     let _ = kw(b"for").parse_next(input)?;
-    let target = parse_star_expressions(input)?;
+    let target = parse_star_targets(input)?;
     let _ = kw(b"in").parse_next(input)?;
     let iter = parse_star_expressions(input)?;
     let _ = op(b":").parse_next(input)?;
@@ -277,7 +280,7 @@ fn parse_with_item<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let context_expr = parse_expression(input)?;
     let optional_vars = if peek(kw(b"as")).parse_next(input).is_ok() {
         let _ = kw(b"as").parse_next(input)?;
-        let target = parse_star_targets(input)?; // need star_target parsing or just expression and set store
+        let target = parse_star_target(input)?; // need star_target parsing or just expression and set store
         let py = input.state.py;
         let ast = input.state.ast.clone();
         set_context(py, &target, ctx_store(&ast)?)?;
@@ -301,8 +304,11 @@ fn parse_with_item<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 
 // with_stmt
 fn parse_with_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    let is_async = if peek(kw(b"async")).parse_next(input).is_ok() {
-        let _ = kw(b"async").parse_next(input)?;
+    let is_async = if peek(|i: &mut TokenStream<'s>| parse_token_type(i, Token::ASYNC))
+        .parse_next(input)
+        .is_ok()
+    {
+        let _ = parse_token_type(input, Token::ASYNC)?;
         true
     } else {
         false
@@ -373,42 +379,112 @@ fn parse_except_block<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>>
     Ok(node.into())
 }
 
+fn parse_except_star_block<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
+    let _ = kw(b"except").parse_next(input)?;
+    let _ = op(b"*").parse_next(input)?;
+
+    let (typ, name) = if peek(op(b":")).parse_next(input).is_ok() {
+        let py = input.state.py;
+        (py.None().into(), py.None().into())
+    } else {
+        let t = parse_expression(input)?;
+        let n: Py<PyAny> = if peek(kw(b"as")).parse_next(input).is_ok() {
+            let _ = kw(b"as").parse_next(input)?;
+            let name_tok = parse_name(input)?;
+            let txt_bytes = get_text(input, &name_tok);
+            let txt = std::str::from_utf8(txt_bytes).unwrap();
+            let py = input.state.py;
+            pyo3::types::PyString::new(py, txt).into()
+        } else {
+            let py = input.state.py;
+            py.None().into()
+        };
+        (t, n)
+    };
+
+    let _ = op(b":").parse_next(input)?;
+    let body = parse_block(input)?;
+
+    let py = input.state.py;
+    let ast = input.state.ast.clone();
+
+    // ExceptHandler(type, name, body) - same node type for except*
+    let node = ast
+        .call_method1("ExceptHandler", (typ, name, body))
+        .map_err(|_| make_error("ExceptHandler star failed".into()))?;
+    Ok(node.into())
+}
+
 // try_stmt
 fn parse_try_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let _ = kw(b"try").parse_next(input)?;
     let _ = op(b":").parse_next(input)?;
     let body = parse_block(input)?;
 
-    let mut handlers = Vec::new();
-    while peek(kw(b"except")).parse_next(input).is_ok() {
-        handlers.push(parse_except_block(input)?);
+    let is_try_star = peek((kw(b"except"), op(b"*"))).parse_next(input).is_ok();
+
+    if is_try_star {
+        let mut handlers = Vec::new();
+        while peek((kw(b"except"), op(b"*"))).parse_next(input).is_ok() {
+            handlers.push(parse_except_star_block(input)?);
+        }
+
+        let orelse = if peek(kw(b"else")).parse_next(input).is_ok() {
+            parse_else_block(input)?
+        } else {
+            let py = input.state.py;
+            PyList::empty(py).into()
+        };
+
+        let finalbody = if peek(kw(b"finally")).parse_next(input).is_ok() {
+            let _ = kw(b"finally").parse_next(input)?;
+            let _ = op(b":").parse_next(input)?;
+            parse_block(input)?
+        } else {
+            let py = input.state.py;
+            PyList::empty(py).into()
+        };
+
+        let py = input.state.py;
+        let ast = input.state.ast.clone();
+        let handlers_list = PyList::new(py, handlers).unwrap();
+
+        let node = ast
+            .call_method1("TryStar", (body, handlers_list, orelse, finalbody))
+            .map_err(|_| make_error("TryStar failed".into()))?;
+        Ok(node.into())
+    } else {
+        let mut handlers = Vec::new();
+        while peek(kw(b"except")).parse_next(input).is_ok() {
+            handlers.push(parse_except_block(input)?);
+        }
+
+        let orelse = if peek(kw(b"else")).parse_next(input).is_ok() {
+            parse_else_block(input)?
+        } else {
+            let py = input.state.py;
+            PyList::empty(py).into()
+        };
+
+        let finalbody = if peek(kw(b"finally")).parse_next(input).is_ok() {
+            let _ = kw(b"finally").parse_next(input)?;
+            let _ = op(b":").parse_next(input)?;
+            parse_block(input)?
+        } else {
+            let py = input.state.py;
+            PyList::empty(py).into()
+        };
+
+        // Try(body, handlers, orelse, finalbody)
+        let py = input.state.py;
+        let ast = input.state.ast.clone();
+        let handlers_list = PyList::new(py, handlers).unwrap();
+
+        let node = ast
+            .call_method1("Try", (body, handlers_list, orelse, finalbody))
+            .map_err(|_| make_error("Try failed".into()))?;
+        Ok(node.into())
     }
-
-    let orelse = if peek(kw(b"else")).parse_next(input).is_ok() {
-        parse_else_block(input)?
-    } else {
-        let py = input.state.py;
-        PyList::empty(py).into()
-    };
-
-    let finalbody = if peek(kw(b"finally")).parse_next(input).is_ok() {
-        let _ = kw(b"finally").parse_next(input)?;
-        let _ = op(b":").parse_next(input)?;
-        parse_block(input)?
-    } else {
-        let py = input.state.py;
-        PyList::empty(py).into()
-    };
-
-    // Try(body, handlers, orelse, finalbody)
-    let py = input.state.py;
-    let ast = input.state.ast.clone();
-    let handlers_list = PyList::new(py, handlers).unwrap();
-
-    let node = ast
-        .call_method1("Try", (body, handlers_list, orelse, finalbody))
-        .map_err(|_| make_error("Try failed".into()))?;
-    Ok(node.into())
 }
 
 // Helper needed: parse_star_targets (same as star_expressions but used for assignment)
@@ -512,7 +588,86 @@ fn parse_star_expressions<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyA
 }
 
 fn parse_star_targets<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    parse_star_expressions(input)
+    let first = parse_star_target(input)?;
+
+    if !peek(op(b",")).parse_next(input).is_ok() {
+        return Ok(first);
+    }
+
+    let mut elts = vec![first];
+    let _ = op(b",").parse_next(input)?;
+
+    loop {
+        let checkpoint = input.checkpoint();
+        if let Ok(next) = parse_star_target(input) {
+            elts.push(next);
+            if peek(op(b",")).parse_next(input).is_ok() {
+                let _ = op(b",").parse_next(input)?;
+            } else {
+                break;
+            }
+        } else {
+            input.reset(&checkpoint);
+            break;
+        }
+    }
+
+    let py = input.state.py;
+    let ast = input.state.ast.clone();
+    let elts_list = PyList::new(py, elts).unwrap();
+    // Use Load context for targets here, similar to parse_t_primary.
+    // The set_context function will handle switching to Store/Del when needed during assignment parsing.
+    let ctx = ctx_load(&ast)?;
+
+    Ok(ast.call_method1("Tuple", (elts_list, ctx)).unwrap().into())
+}
+
+fn parse_star_target<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
+    if peek(op(b"*")).parse_next(input).is_ok() {
+        let _ = op(b"*").parse_next(input)?;
+        let expr = parse_star_target(input)?;
+        let py = input.state.py;
+        let ast = input.state.ast.clone();
+        let ctx = ctx_store(&ast)?;
+        return Ok(ast.call_method1("Starred", (expr, ctx)).unwrap().into());
+    }
+    parse_t_primary(input)
+}
+
+fn parse_t_primary<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
+    let mut left = parse_atom(input)?;
+    let py = input.state.py;
+    let ast = input.state.ast.clone();
+    let load = ctx_load(&ast)?;
+
+    loop {
+        if peek(op(b".")).parse_next(input).is_ok() {
+            let _ = op(b".").parse_next(input)?;
+            let name_tok = parse_name(input)?;
+            let text = get_text(input, &name_tok);
+            let text_str = std::str::from_utf8(text).unwrap();
+            left = ast
+                .call_method1(
+                    "Attribute",
+                    (left, text_str, load.bind(py).clone().unbind()),
+                )
+                .map_err(|_| make_error("Attribute failed".into()))?
+                .into();
+            continue;
+        }
+        if peek(op(b"[")).parse_next(input).is_ok() {
+            let _ = op(b"[").parse_next(input)?;
+            let slice = parse_slices(input)?;
+            let _ = op(b"]").parse_next(input)?;
+            left = ast
+                .call_method1("Subscript", (left, slice, load.bind(py).clone().unbind()))
+                .map_err(|_| make_error("Subscript failed".into()))?
+                .into();
+            continue;
+        }
+        break;
+    }
+    Ok(left)
 }
 
 // compound_stmt:
@@ -530,9 +685,12 @@ pub fn parse_compound_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<Py
         return parse_class_def(input);
     }
 
-    if peek(kw(b"async")).parse_next(input).is_ok() {
+    if peek(|i: &mut TokenStream<'s>| parse_token_type(i, Token::ASYNC))
+        .parse_next(input)
+        .is_ok()
+    {
         let checkpoint = input.checkpoint();
-        let _ = kw(b"async").parse_next(input)?;
+        let _ = parse_token_type(input, Token::ASYNC)?;
         if peek(kw(b"def")).parse_next(input).is_ok() {
             input.reset(&checkpoint);
             return parse_function_def(input);
@@ -580,8 +738,8 @@ fn parse_decorators<'s>(input: &mut TokenStream<'s>) -> ModalResult<Vec<Py<PyAny
     Ok(decs)
 }
 
-// param: NAME annotation?
-fn parse_param<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
+// param_def: NAME annotation? ['=' expression]
+fn parse_param_def<'s>(input: &mut TokenStream<'s>) -> ModalResult<(Py<PyAny>, Option<Py<PyAny>>)> {
     let name_tok = parse_name(input)?;
     let name_bytes = get_text(input, &name_tok);
     let name = std::str::from_utf8(name_bytes).unwrap();
@@ -593,47 +751,186 @@ fn parse_param<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
         None
     };
 
+    let default = if peek(op(b"=")).parse_next(input).is_ok() {
+        let _ = op(b"=").parse_next(input)?;
+        Some(parse_expression(input)?)
+    } else {
+        None
+    };
+
     let py = input.state.py;
     let ast = input.state.ast.clone();
     let ann_obj = match annotation {
         Some(a) => a,
-        None => py.None().into(),
+        None => py.None(),
     };
 
     let node = ast
         .call_method1("arg", (name, ann_obj, py.None()))
         .map_err(|_| make_error("arg failed".into()))?;
-    Ok(node.into())
+
+    Ok((node.into(), default))
 }
 
 fn parse_params<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    // Simplified: param (',' param)* [',']
-    // TODO: support defaults, slash, star, etc.
-    let args_list = separated(0.., parse_param, op(b",")).parse_next(input)?;
-    let _: Vec<Py<PyAny>> = args_list; // consume the vec
+    let mut posonlyargs = Vec::new();
+    let mut args = Vec::new(); // Initially all positional go here until we see /
+    let mut vararg = None;
+    let mut kwonlyargs = Vec::new();
+    let mut kw_defaults = Vec::new();
+    let mut kwarg = None;
+    let mut defaults = Vec::new();
 
-    // For now we just put them in 'args' (posonlyargs=[], args=args_list, ...)
     let py = input.state.py;
+
+    // State machine: 0=Positional, 1=KwOnly
+    let mut mode = 0;
+
+    if !peek(op(b")")).parse_next(input).is_ok() && !peek(op(b":")).parse_next(input).is_ok() {
+        loop {
+            if peek(op(b")")).parse_next(input).is_ok() || peek(op(b":")).parse_next(input).is_ok()
+            {
+                break;
+            }
+
+            if peek(op(b"**")).parse_next(input).is_ok() {
+                let _ = op(b"**").parse_next(input)?;
+                let (arg, _) = parse_param_def(input)?; // kwarg cannot have default
+                kwarg = Some(arg);
+                // End of params
+                if peek(op(b",")).parse_next(input).is_ok() {
+                    let _ = op(b",").parse_next(input)?; // Trailing comma allowed? Yes
+                }
+                break;
+            }
+
+            if peek(op(b"*")).parse_next(input).is_ok() {
+                if mode == 1 {
+                    return Err(ErrMode::Backtrack(ContextError::new())); // Double *
+                }
+                let _ = op(b"*").parse_next(input)?;
+                mode = 1; // Switch to KwOnly
+
+                // Check if distinct vararg name exists: *args vs *
+                if peek(parse_name).parse_next(input).is_ok() {
+                    let (arg, _) = parse_param_def(input)?;
+                    vararg = Some(arg);
+                } else {
+                    // It is just *, separator. vararg remains None.
+                }
+
+                if peek(op(b",")).parse_next(input).is_ok() {
+                    let _ = op(b",").parse_next(input)?;
+                    continue;
+                } else {
+                    break;
+                }
+            }
+
+            // Check for / (PosOnly separator) logic is tricky because it looks backward.
+            // But we parse forward. We can check if next token is param.
+            // Actually / is a separator. `arg, arg, /`
+            // If we encounter /, all current `args` become `posonlyargs`. `args` clears.
+            // But / follows a param.
+
+            // Wait, we can't easily peek / unless we are at a separator position.
+            // Let's parse a param first check.
+            // But / might be the FIRST thing? No `def f(/):` is invalid. `def f(a, /):`
+
+            // We are in a loop expecting a param, OR * OR ** OR / (if it was trailing?)
+            // Actually / comes AFTER a param and BEFORE comma (or end).
+
+            // This loop structure handles "start of param parsing".
+
+            let (p_arg, p_def) = parse_param_def(input)?;
+
+            // After parsing a param, we look for `,` OR `/`.
+            // If `/`, then `p_arg` and all previous `args` move to `posonly`.
+
+            let mut seen_slash = false;
+
+            if peek(op(b",")).parse_next(input).is_ok() {
+                let _ = op(b",").parse_next(input)?;
+
+                // After comma, we might see `/` immediately? `a, /`
+                if mode == 0 && peek(op(b"/")).parse_next(input).is_ok() {
+                    let _ = op(b"/").parse_next(input)?;
+                    seen_slash = true;
+                    // Check for comma after slash
+                    if peek(op(b",")).parse_next(input).is_ok() {
+                        let _ = op(b",").parse_next(input)?;
+                    }
+                }
+            } else {
+                // No comma. Could be end `)` OR `/` then end.
+                if mode == 0 && peek(op(b"/")).parse_next(input).is_ok() {
+                    let _ = op(b"/").parse_next(input)?;
+                    seen_slash = true;
+                    // Check for comma after slash
+                    if peek(op(b",")).parse_next(input).is_ok() {
+                        let _ = op(b",").parse_next(input)?;
+                    }
+                }
+            }
+
+            if mode == 0 {
+                args.push(p_arg);
+                if let Some(d) = p_def {
+                    defaults.push(d);
+                }
+
+                if seen_slash {
+                    posonlyargs.append(&mut args); // args -> posonlyargs
+                                                   // defaults splitting?
+                                                   // AST stores defaults in `defaults` list matching (posonly + args).
+                                                   // We just accumulate defaults. `defaults` list logic is tricky in AST.
+                                                   // Actually, ast.arguments struct:
+                                                   // defaults: list of default values for arguments that can be passed positionally.
+                                                   // If there are fewer defaults, they correspond to the last n arguments.
+                                                   // So we just keep collecting defaults in `defaults`.
+                }
+            } else {
+                // mode 1 (KwOnly)
+                kwonlyargs.push(p_arg);
+                match p_def {
+                    Some(d) => kw_defaults.push(d),
+                    None => kw_defaults.push(py.None()),
+                }
+            }
+
+            if peek(op(b")")).parse_next(input).is_ok() {
+                break;
+            }
+        }
+    }
+
     let ast = input.state.ast.clone();
+    let posonly_list = PyList::new(py, posonlyargs).unwrap();
+    let args_list = PyList::new(py, args).unwrap();
+    let kwonly_list = PyList::new(py, kwonlyargs).unwrap();
+    let defaults_list = PyList::new(py, defaults).unwrap();
+    let kw_defaults_list = PyList::new(py, kw_defaults).unwrap();
 
-    let posonlyargs = PyList::empty(py);
-    let args = PyList::new(py, args_list).unwrap();
-    let kwonlyargs = PyList::empty(py);
-    let kw_defaults = PyList::empty(py);
-    let defaults = PyList::empty(py);
+    let vararg_obj = match vararg {
+        Some(v) => v,
+        None => py.None(),
+    };
+    let kwarg_obj = match kwarg {
+        Some(k) => k,
+        None => py.None(),
+    };
 
-    // arguments(posonlyargs, args, vararg, kwonlyargs, kw_defaults, kwarg, defaults)
     let node = ast
         .call_method1(
             "arguments",
             (
-                posonlyargs,
-                args,
-                py.None(),
-                kwonlyargs,
-                kw_defaults,
-                py.None(),
-                defaults,
+                posonly_list,
+                args_list,
+                vararg_obj,
+                kwonly_list,
+                kw_defaults_list,
+                kwarg_obj,
+                defaults_list,
             ),
         )
         .map_err(|_| make_error("arguments failed".into()))?;
@@ -644,8 +941,11 @@ fn parse_params<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 fn parse_function_def<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let decorators = parse_decorators(input)?;
 
-    let is_async = if peek(kw(b"async")).parse_next(input).is_ok() {
-        let _ = kw(b"async").parse_next(input)?;
+    let is_async = if peek(|i: &mut TokenStream<'s>| parse_token_type(i, Token::ASYNC))
+        .parse_next(input)
+        .is_ok()
+    {
+        let _ = parse_token_type(input, Token::ASYNC)?;
         true
     } else {
         false
@@ -859,6 +1159,238 @@ fn parse_if_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
         .call_method1("If", (a, b, orelse))
         .map_err(|_| make_error("if creation failed".into()))?;
     Ok(node.into())
+}
+
+// match_stmt: "match" subject_expr ':' NEWLINE INDENT case_block+ DEDENT
+fn parse_match_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
+    let _ = kw(b"match").parse_next(input)?;
+
+    // Subject expression can be a tuple without parens: match a, b:
+    // We use parse_expression, check for comma.
+    // Simplifying: parse expression. If comma follows, parse tuple.
+    // But parse_expression handles operator precedence.
+    // We assume parse_expression parses 'a, b' as tuple? No, parse_expression expects single expr.
+    // Grammar: subject_expr: star_named_expression ',' star_named_expressions? | named_expression
+
+    let subject = parse_testlist(input)?; // Try parsing list of expressions (tuple) or single expr
+
+    let _ = op(b":").parse_next(input)?;
+    let _ = parse_newline(input)?;
+    let _ = parse_indent(input)?;
+
+    let blocks: Vec<Py<PyAny>> = repeat(1.., parse_case_block).parse_next(input)?;
+
+    let _ = parse_dedent(input)?;
+
+    let py = input.state.py;
+    let ast = input.state.ast.clone();
+    let cases = PyList::new(py, blocks).unwrap();
+
+    let node = ast
+        .call_method1("Match", (subject, cases))
+        .map_err(|_| make_error("Match failed".into()))?;
+    Ok(node.into())
+}
+
+// case_block: "case" patterns [guard] ':' block
+fn parse_case_block<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
+    let _ = kw(b"case").parse_next(input)?;
+    let pattern = parse_pattern_top(input)?;
+
+    let guard = if peek(kw(b"if")).parse_next(input).is_ok() {
+        let _ = kw(b"if").parse_next(input)?;
+        Some(parse_named_expression(input)?)
+    } else {
+        None
+    };
+
+    let _ = op(b":").parse_next(input)?;
+    let body = parse_block(input)?;
+
+    let py = input.state.py;
+    let ast = input.state.ast.clone();
+    let guard_obj = match guard {
+        Some(g) => g,
+        None => py.None(),
+    };
+
+    let node = ast
+        .call_method1("match_case", (pattern, guard_obj, body))
+        .map_err(|_| make_error("match_case failed".into()))?;
+    Ok(node.into())
+}
+
+// Top-level pattern (allows open sequence like 'case a, b:')
+fn parse_pattern_top<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
+    // simplified: just parse a pattern.
+    // TODO: Handle open sequence (comma separated without parens).
+    // For now, delegate to parse_pattern (closed or AS or OR).
+    parse_pattern(input)
+}
+
+fn parse_pattern<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
+    // pattern: as_pattern | or_pattern
+    // or_pattern: closed_pattern ('|' closed_pattern)*
+    // as_pattern: or_pattern 'as' capture
+
+    // We parse closed_pattern first, then check loop for | or as.
+    // Actually precedence: OR binds looser than AS?
+    // Grammar: pattern: as_pattern | or_pattern.
+    // as_pattern: or_pattern 'as' capture.
+    // So 'a | b as c' -> (a | b) as c.
+    // This implies we parse OR pattern first, then check AS.
+
+    let p = parse_or_pattern(input)?;
+
+    if peek(kw(b"as")).parse_next(input).is_ok() {
+        let _ = kw(b"as").parse_next(input)?;
+        let name_tok = parse_name(input)?; // capture target
+        let name_bytes = get_text(input, &name_tok);
+        let name = std::str::from_utf8(name_bytes).unwrap();
+
+        let py = input.state.py;
+        let ast = input.state.ast.clone();
+        let node = ast.call_method1("MatchAs", (p, name)).unwrap(); // MatchAs(pattern, name)
+        return Ok(node.into());
+    }
+
+    Ok(p)
+}
+
+fn parse_or_pattern<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
+    let first = parse_closed_pattern(input)?;
+    let mut rest = Vec::new();
+
+    while peek(op(b"|")).parse_next(input).is_ok() {
+        let _ = op(b"|").parse_next(input)?;
+        let next = parse_closed_pattern(input)?;
+        rest.push(next);
+    }
+
+    if rest.is_empty() {
+        Ok(first)
+    } else {
+        let mut patterns = vec![first];
+        patterns.extend(rest);
+        let py = input.state.py;
+        let ast = input.state.ast.clone();
+        let list = PyList::new(py, patterns).unwrap();
+        let node = ast.call_method1("MatchOr", (list,)).unwrap();
+        Ok(node.into())
+    }
+}
+
+fn parse_closed_pattern<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
+    // literal, capture, wildcard, value, group, sequence, mapping, class
+
+    // Wildcard: _
+    // Capture: NAME (soft keyword check?)
+    // Literal: NUMBER, STRING, None, True, False
+    // Value: NAME.NAME...
+    // Group: (...)
+    // Sequence: [...]
+    // Mapping: { ... }
+
+    let py = input.state.py;
+    let ast = input.state.ast.clone();
+
+    // Check Literals
+    if peek(parse_number).parse_next(input).is_ok() {
+        let tok = parse_number(input)?;
+        let text = get_text(input, &tok);
+        let text_str = std::str::from_utf8(text).unwrap();
+        let val = match text_str.parse::<i64>() {
+            Ok(i) => i.into_pyobject(py).unwrap().into_any().unbind(),
+            Err(_) => text_str.into_pyobject(py).unwrap().into_any().unbind(),
+        };
+        let const_node = ast.call_method1("Constant", (val,)).unwrap();
+        let node = ast.call_method1("MatchValue", (const_node,)).unwrap();
+        return Ok(node.into());
+    }
+    if peek(parse_string).parse_next(input).is_ok() {
+        let tok = parse_string(input)?;
+        let text = get_text(input, &tok);
+        let text_str = std::str::from_utf8(text).unwrap();
+        let val = ast.call_method1("literal_eval", (text_str,)).unwrap();
+        let const_node = ast.call_method1("Constant", (val,)).unwrap();
+        let node = ast.call_method1("MatchValue", (const_node,)).unwrap();
+        return Ok(node.into());
+    }
+    if peek(kw(b"None")).parse_next(input).is_ok() {
+        let _ = kw(b"None").parse_next(input)?;
+        let node = ast.call_method1("MatchSingleton", (py.None(),)).unwrap();
+        return Ok(node.into());
+    }
+    if peek(kw(b"True")).parse_next(input).is_ok() {
+        let _ = kw(b"True").parse_next(input)?;
+        let node = ast.call_method1("MatchSingleton", (true,)).unwrap();
+        return Ok(node.into());
+    }
+    if peek(kw(b"False")).parse_next(input).is_ok() {
+        let _ = kw(b"False").parse_next(input)?;
+        let node = ast.call_method1("MatchSingleton", (false,)).unwrap();
+        return Ok(node.into());
+    }
+
+    // Check Group/Sequence [ ]
+    if peek(op(b"[")).parse_next(input).is_ok() {
+        // [...] sequence
+        let _ = op(b"[").parse_next(input)?;
+        let patterns: Vec<Py<PyAny>> = separated(0.., parse_pattern, op(b",")).parse_next(input)?;
+        let _ = op(b"]").parse_next(input)?;
+        let list = PyList::new(py, patterns).unwrap();
+        let node = ast.call_method1("MatchSequence", (list,)).unwrap();
+        return Ok(node.into());
+    }
+
+    // Check Wildcard / Capture / Value
+    if peek(parse_name).parse_next(input).is_ok() {
+        let name_tok = parse_name(input)?;
+        let name_bytes = get_text(input, &name_tok);
+        let name = std::str::from_utf8(name_bytes).unwrap();
+
+        if name == "_" {
+            // Wildcard -> MatchAs(name=None)
+            let node = ast.call_method1("MatchAs", (py.None(), py.None())).unwrap();
+            return Ok(node.into());
+        }
+
+        // Ensure it's not a known keyword that forbids capture?
+        // 'match', 'case' can be captured? Yes.
+
+        // TODO: Value pattern (dotted name). if followed by '.'
+        // TODO: Class pattern (call-like). if followed by '('
+
+        // For now assume Capture
+        let node = ast.call_method1("MatchAs", (py.None(), name)).unwrap();
+        Ok(node.into())
+    } else {
+        Err(ErrMode::Backtrack(ContextError::new()))
+    }
+}
+
+// Helpers for testlist (tuple parsing) needed for subject
+fn parse_testlist<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
+    let first = parse_expression(input)?;
+    if peek(op(b",")).parse_next(input).is_ok() {
+        let mut elts = vec![first];
+        while peek(op(b",")).parse_next(input).is_ok() {
+            let _ = op(b",").parse_next(input)?;
+            if peek(parse_expression).parse_next(input).is_ok() {
+                let next = parse_expression(input)?;
+                elts.push(next);
+            }
+        }
+        let py = input.state.py;
+        let ast = input.state.ast.clone();
+        let list = PyList::new(py, elts).unwrap();
+        // Tuple(elts, Load)
+        let ctx = ctx_load(&ast)?;
+        let node = ast.call_method1("Tuple", (list, ctx)).unwrap();
+        Ok(node.into())
+    } else {
+        Ok(first)
+    }
 }
 
 fn parse_else_block<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
@@ -1146,28 +1678,141 @@ fn parse_assignment<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     Err(ErrMode::Backtrack(ContextError::new()))
 }
 
+// dotted_name: NAME ('.' NAME)*
+fn parse_dotted_name<'s>(input: &mut TokenStream<'s>) -> ModalResult<String> {
+    let first = parse_name(input)?;
+    let mut name_acc = String::from_utf8(get_text(input, &first).to_vec()).unwrap();
+
+    while peek(op(b".")).parse_next(input).is_ok() {
+        let _ = op(b".").parse_next(input)?;
+        name_acc.push('.');
+        let next = parse_name(input)?;
+        let next_str = std::str::from_utf8(get_text(input, &next)).unwrap();
+        name_acc.push_str(next_str);
+    }
+    Ok(name_acc)
+}
+
 // import_stmt
 fn parse_import_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    // Basic 'import name' support
     let _ = kw(b"import").parse_next(input)?;
-    let names = separated(1.., parse_name, op(b",")).parse_next(input)?;
 
-    let names_vec: Vec<TokInfo> = names;
-    let ast = input.state.ast.clone();
-    let mut aliases = Vec::new();
+    let parse_alias = |input: &mut TokenStream<'s>| -> ModalResult<Py<PyAny>> {
+        let name = parse_dotted_name(input)?;
+        let asname = if peek(kw(b"as")).parse_next(input).is_ok() {
+            let _ = kw(b"as").parse_next(input)?;
+            let t = parse_name(input)?;
+            let s = std::str::from_utf8(get_text(input, &t)).unwrap();
+            Some(s)
+        } else {
+            None
+        };
 
-    for t in names_vec {
-        let name = get_text(input, &t);
-        let alias = ast
-            .call_method1("alias", (name, input.state.py.None()))
+        let py = input.state.py;
+        let ast = input.state.ast.clone();
+        let asname_obj: Py<PyAny> = match asname {
+            Some(s) => PyString::new(py, s).into_any().unbind(),
+            None => py.None(),
+        };
+        let node = ast
+            .call_method1("alias", (name, asname_obj))
             .map_err(|_| make_error("alias failed".into()))?;
-        aliases.push(alias);
-    }
+        Ok(node.into())
+    };
 
-    let aliases_list = PyList::new(input.state.py, aliases).unwrap();
+    let aliases = separated(1.., parse_alias, op(b",")).parse_next(input)?;
+    let aliases_vec: Vec<Py<PyAny>> = aliases;
+    let aliases_list = PyList::new(input.state.py, aliases_vec).unwrap();
+    let ast = input.state.ast.clone();
     let node = ast
         .call_method1("Import", (aliases_list,))
         .map_err(|_| make_error("Import failed".into()))?;
+    Ok(node.into())
+}
+
+// import_from_stmt
+fn parse_import_from_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
+    let _ = kw(b"from").parse_next(input)?;
+
+    // level calculation
+    let mut level = 0;
+    while peek(op(b".")).parse_next(input).is_ok() || peek(op(b"...")).parse_next(input).is_ok() {
+        if peek(op(b"...")).parse_next(input).is_ok() {
+            let _ = op(b"...").parse_next(input)?;
+            level += 3;
+        } else {
+            let _ = op(b".").parse_next(input)?;
+            level += 1;
+        }
+    }
+
+    let module = if !peek(kw(b"import")).parse_next(input).is_ok()
+        && peek(parse_name).parse_next(input).is_ok()
+    {
+        Some(parse_dotted_name(input)?)
+    } else {
+        None
+    };
+
+    let _ = kw(b"import").parse_next(input)?;
+
+    let py = input.state.py;
+    let ast = input.state.ast.clone();
+
+    let parse_alias = |input: &mut TokenStream<'s>| -> ModalResult<Py<PyAny>> {
+        let name = if peek(op(b"*")).parse_next(input).is_ok() {
+            let _ = op(b"*").parse_next(input)?;
+            "*".to_string()
+        } else {
+            let n_tok = parse_name(input)?;
+            String::from_utf8(get_text(input, &n_tok).to_vec()).unwrap()
+        };
+
+        let asname = if name != "*" && peek(kw(b"as")).parse_next(input).is_ok() {
+            let _ = kw(b"as").parse_next(input)?;
+            let t = parse_name(input)?;
+            let s = std::str::from_utf8(get_text(input, &t)).unwrap();
+            Some(s)
+        } else {
+            None
+        };
+
+        let asname_obj: Py<PyAny> = match asname {
+            Some(s) => PyString::new(py, s).into_any().unbind(),
+            None => py.None(),
+        };
+        let node = ast
+            .call_method1("alias", (name, asname_obj))
+            .map_err(|_| make_error("alias failed".into()))?;
+        Ok(node.into())
+    };
+
+    // names: '*' | '(' import_as_names ')' | import_as_names
+    let names_list_obj = if peek(op(b"*")).parse_next(input).is_ok() {
+        let _ = op(b"*").parse_next(input)?;
+        let alias = ast.call_method1("alias", ("*", py.None())).unwrap();
+        PyList::new(py, vec![alias]).unwrap()
+    } else if peek(op(b"(")).parse_next(input).is_ok() {
+        let _ = op(b"(").parse_next(input)?;
+        let names = separated(1.., parse_alias, op(b",")).parse_next(input)?;
+        let _ = opt(op(b",")).parse_next(input)?;
+        let _ = op(b")").parse_next(input)?;
+        let names_vec: Vec<Py<PyAny>> = names;
+        PyList::new(py, names_vec).unwrap()
+    } else {
+        let names = separated(1.., parse_alias, op(b",")).parse_next(input)?;
+        let names_vec: Vec<Py<PyAny>> = names;
+        PyList::new(py, names_vec).unwrap()
+    };
+
+    let module_obj: Py<PyAny> = match module {
+        Some(m) => PyString::new(py, &m).into_any().unbind(),
+        None => py.None(),
+    };
+
+    let node = ast
+        .call_method1("ImportFrom", (module_obj, names_list_obj, level))
+        .map_err(|_| make_error("ImportFrom failed".into()))?;
     Ok(node.into())
 }
 
@@ -1205,13 +1850,7 @@ fn parse_del_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     Ok(node.into())
 }
 
-// match_stmt: 'match' subject_expr:' newline indent [match_case+] dedent
-fn parse_match_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    // TODO: Implement Match (Python 3.10)
-    // For now just fail.
-    let _ = kw(b"match").parse_next(input)?;
-    Err(ErrMode::Backtrack(ContextError::new()))
-}
+// Match stmt moved to earlier section
 
 // simple_stmt:
 //     | &('import' | 'from') import_stmt
@@ -1260,6 +1899,9 @@ pub fn parse_simple_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAn
     if peek(kw(b"import")).parse_next(input).is_ok() {
         return parse_import_stmt(input);
     }
+    if peek(kw(b"from")).parse_next(input).is_ok() {
+        return parse_import_from_stmt(input);
+    }
     if peek(kw(b"del")).parse_next(input).is_ok() {
         return parse_del_stmt(input);
     }
@@ -1296,6 +1938,10 @@ fn parse_named_expression<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyA
 //     | disjunction
 //     | lambdef
 fn parse_expression<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
+    if peek(kw(b"lambda")).parse_next(input).is_ok() {
+        return parse_lambdef(input);
+    }
+
     let checkpoint = input.checkpoint();
     if let Ok(disj) = parse_disjunction(input) {
         // Check for 'if'
@@ -1315,12 +1961,6 @@ fn parse_expression<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
         return Ok(disj);
     }
     input.reset(&checkpoint);
-
-    input.reset(&checkpoint);
-
-    if peek(kw(b"lambda")).parse_next(input).is_ok() {
-        return parse_lambdef(input);
-    }
 
     Err(ErrMode::Backtrack(ContextError::new()))
 }
@@ -1673,7 +2313,7 @@ fn parse_power<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
 //     | 'await' a=primary { ast.Await(a, LOCATIONS) }
 //     | primary
 fn parse_await_primary<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
-    if let Ok(_) = kw(b"await").parse_next(input) {
+    if let Ok(_) = parse_token_type(input, Token::AWAIT) {
         let a = parse_primary(input)?;
         let py = input.state.py;
         let ast = input.state.ast.clone();
@@ -1847,8 +2487,12 @@ fn parse_primary<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
         if let Ok(_) = op(b".").parse_next(input) {
             let name_tok = parse_name(input)?;
             let text = get_text(input, &name_tok);
+            let text_str = std::str::from_utf8(text).unwrap();
             left = ast
-                .call_method1("Attribute", (left, text, load.bind(py).clone().unbind()))
+                .call_method1(
+                    "Attribute",
+                    (left, text_str, load.bind(py).clone().unbind()),
+                )
                 .map_err(|_| make_error("Attribute failed".into()))?
                 .into();
             continue;
@@ -1888,8 +2532,11 @@ fn parse_generators<'s>(input: &mut TokenStream<'s>) -> ModalResult<Vec<Py<PyAny
     let mut generators = Vec::new();
 
     loop {
-        let is_async = if peek(kw(b"async")).parse_next(input).is_ok() {
-            let _ = kw(b"async").parse_next(input)?;
+        let is_async = if peek(|i: &mut TokenStream<'s>| parse_token_type(i, Token::ASYNC))
+            .parse_next(input)
+            .is_ok()
+        {
+            let _ = parse_token_type(input, Token::ASYNC)?;
             1 // int for Async
         } else {
             0
@@ -1923,7 +2570,14 @@ fn parse_generators<'s>(input: &mut TokenStream<'s>) -> ModalResult<Vec<Py<PyAny
 
             // Check if next is 'async for' or 'for' to continue loop
             // If not, break
-            let has_async = peek(kw(b"async")).parse_next(input).is_ok();
+            let has_async = peek(|i: &mut TokenStream<'s>| parse_token_type(i, Token::ASYNC))
+                .parse_next(input)
+                .is_ok();
+            let has_for = peek(kw(b"for")).parse_next(input).is_ok();
+
+            if !has_async && !has_for {
+                break;
+            }
             let has_for = peek(kw(b"for")).parse_next(input).is_ok();
 
             if !has_async && !has_for {
@@ -1938,13 +2592,164 @@ fn parse_generators<'s>(input: &mut TokenStream<'s>) -> ModalResult<Vec<Py<PyAny
     Ok(generators)
 }
 
+// lambda_param_def: NAME [= default] (no annotation)
+fn parse_lambda_param_def<'s>(
+    input: &mut TokenStream<'s>,
+) -> ModalResult<(Py<PyAny>, Option<Py<PyAny>>)> {
+    let name_tok = parse_name(input)?;
+    let name_bytes = get_text(input, &name_tok);
+    let name = std::str::from_utf8(name_bytes).unwrap();
+
+    let default = if peek(op(b"=")).parse_next(input).is_ok() {
+        let _ = op(b"=").parse_next(input)?;
+        Some(parse_expression(input)?)
+    } else {
+        None
+    };
+
+    let py = input.state.py;
+    let ast = input.state.ast.clone();
+
+    let node = ast
+        .call_method1("arg", (name, py.None(), py.None()))
+        .map_err(|_| make_error("arg failed".into()))?;
+
+    Ok((node.into(), default))
+}
+
+fn parse_lambda_params<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
+    let mut posonlyargs = Vec::new();
+    let mut args = Vec::new();
+    let mut vararg = None;
+    let mut kwonlyargs = Vec::new();
+    let mut kw_defaults = Vec::new();
+    let mut kwarg = None;
+    let mut defaults = Vec::new();
+
+    let py = input.state.py;
+
+    let mut mode = 0;
+
+    loop {
+        if peek(op(b":")).parse_next(input).is_ok() {
+            break;
+        }
+
+        if peek(op(b"**")).parse_next(input).is_ok() {
+            let _ = op(b"**").parse_next(input)?;
+            let (arg, _) = parse_lambda_param_def(input)?;
+            kwarg = Some(arg);
+            if peek(op(b",")).parse_next(input).is_ok() {
+                let _ = op(b",").parse_next(input)?;
+            }
+            break;
+        }
+
+        if peek(op(b"*")).parse_next(input).is_ok() {
+            if mode == 1 {
+                return Err(ErrMode::Backtrack(ContextError::new()));
+            }
+            let _ = op(b"*").parse_next(input)?;
+            mode = 1;
+
+            if peek(parse_name).parse_next(input).is_ok() {
+                let (arg, _) = parse_lambda_param_def(input)?;
+                vararg = Some(arg);
+            }
+
+            if peek(op(b",")).parse_next(input).is_ok() {
+                let _ = op(b",").parse_next(input)?;
+                continue;
+            } else {
+                if peek(op(b":")).parse_next(input).is_ok() {
+                    break;
+                }
+                break;
+            }
+        }
+
+        let (p_arg, p_def) = parse_lambda_param_def(input)?;
+
+        let mut seen_slash = false;
+
+        if peek(op(b",")).parse_next(input).is_ok() {
+            let _ = op(b",").parse_next(input)?;
+
+            if mode == 0 && peek(op(b"/")).parse_next(input).is_ok() {
+                let _ = op(b"/").parse_next(input)?;
+                seen_slash = true;
+                if peek(op(b",")).parse_next(input).is_ok() {
+                    let _ = op(b",").parse_next(input)?;
+                }
+            }
+        } else {
+            if mode == 0 && peek(op(b"/")).parse_next(input).is_ok() {
+                let _ = op(b"/").parse_next(input)?;
+                seen_slash = true;
+                if peek(op(b",")).parse_next(input).is_ok() {
+                    let _ = op(b",").parse_next(input)?;
+                }
+            }
+        }
+
+        if mode == 0 {
+            args.push(p_arg);
+            if let Some(d) = p_def {
+                defaults.push(d);
+            }
+
+            if seen_slash {
+                posonlyargs.append(&mut args);
+            }
+        } else {
+            kwonlyargs.push(p_arg);
+            match p_def {
+                Some(d) => kw_defaults.push(d),
+                None => kw_defaults.push(py.None()),
+            }
+        }
+    }
+
+    let ast = input.state.ast.clone();
+    let posonly_list = PyList::new(py, posonlyargs).unwrap();
+    let args_list = PyList::new(py, args).unwrap();
+    let kwonly_list = PyList::new(py, kwonlyargs).unwrap();
+    let defaults_list = PyList::new(py, defaults).unwrap();
+    let kw_defaults_list = PyList::new(py, kw_defaults).unwrap();
+
+    let vararg_obj = match vararg {
+        Some(v) => v,
+        None => py.None(),
+    };
+    let kwarg_obj = match kwarg {
+        Some(k) => k,
+        None => py.None(),
+    };
+
+    let node = ast
+        .call_method1(
+            "arguments",
+            (
+                posonly_list,
+                args_list,
+                vararg_obj,
+                kwonly_list,
+                kw_defaults_list,
+                kwarg_obj,
+                defaults_list,
+            ),
+        )
+        .map_err(|_| make_error("arguments failed".into()))?;
+    Ok(node.into())
+}
+
 // lambdef:
 //     | 'lambda' [params] ':' body=expression
 fn parse_lambdef<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let _ = kw(b"lambda").parse_next(input)?;
 
     let args = if !peek(op(b":")).parse_next(input).is_ok() {
-        parse_params(input)?
+        parse_lambda_params(input)?
     } else {
         let py = input.state.py;
         let ast = input.state.ast.clone();
@@ -2096,7 +2901,11 @@ fn parse_set_maker<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let first = parse_star_expression(input)?;
 
     // Check for comprehension
-    if peek(kw(b"for")).parse_next(input).is_ok() || peek(kw(b"async")).parse_next(input).is_ok() {
+    if peek(kw(b"for")).parse_next(input).is_ok()
+        || peek(|i: &mut TokenStream<'s>| parse_token_type(i, Token::ASYNC))
+            .parse_next(input)
+            .is_ok()
+    {
         let generators = parse_generators(input)?;
         let _ = op(b"}").parse_next(input)?;
 
@@ -2413,7 +3222,9 @@ fn parse_atom<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
         let first = parse_star_expression(input)?;
 
         if peek(kw(b"for")).parse_next(input).is_ok()
-            || peek(kw(b"async")).parse_next(input).is_ok()
+            || peek(|i: &mut TokenStream<'s>| parse_token_type(i, Token::ASYNC))
+                .parse_next(input)
+                .is_ok()
         {
             let generators = parse_generators(input)?;
             let _ = op(b"]").parse_next(input)?;
@@ -2511,13 +3322,6 @@ pub fn parse<'s>(py: Python<'s>, source: &'s str) -> PyResult<Py<PyAny>> {
         .collect();
 
     // DEBUG
-    println!(
-        "Filtered tokens: {:?}",
-        filtered_tokens
-            .iter()
-            .map(|t| (t.typ, t.span))
-            .collect::<Vec<_>>()
-    );
 
     let input_tokens = filtered_tokens.as_slice();
 
@@ -2547,9 +3351,4 @@ pub fn parse<'s>(py: Python<'s>, source: &'s str) -> PyResult<Py<PyAny>> {
 #[pyfunction]
 pub fn parse_code(py: Python, source: &str) -> PyResult<Py<PyAny>> {
     parse(py, source)
-}
-
-#[pyfunction]
-pub fn ping() -> String {
-    "pong".to_string()
 }

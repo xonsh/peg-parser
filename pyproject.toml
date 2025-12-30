@@ -2,7 +2,7 @@
 line-length = 110
 extend-exclude = [
     "tests/xonsh-data",
-    "tests/data",
+    "**/tests/data",
     "ply_parser/tests/data",
     "pegen",
     "benchmarks",

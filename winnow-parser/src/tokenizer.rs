@@ -770,7 +770,13 @@ impl<'s> Tokenizer<'s> {
                                     // identifiers can start search path?
                                     parse_search_path.map(|_| Token::SEARCH_PATH),
                                     parse_full_string.map(|_| Token::STRING),
-                                    parse_name.map(|_| Token::NAME)
+                                    parse_name.map(|n| {
+                                        match n {
+                                            b"async" => Token::ASYNC,
+                                            b"await" => Token::AWAIT,
+                                            _ => Token::NAME,
+                                        }
+                                    })
                                 )),
                                 b'\'' | b'"' => alt((
                                      parse_fstring_start,
@@ -820,7 +826,17 @@ impl<'s> Tokenizer<'s> {
                                 parse_fstring_start,
                                 parse_search_path.map(|_| Token::SEARCH_PATH),
                                 parse_full_string.map(|_| Token::STRING),
-                                parse_name.map(|_| Token::NAME)
+                                parse_name.map(|n| {
+                                    // println!("Name token: {:?}", std::str::from_utf8(n).unwrap());
+                                    match n {
+                                        b"async" => {
+                                            // println!("Matched async!");
+                                            Token::ASYNC
+                                        },
+                                        b"await" => Token::AWAIT,
+                                        _ => Token::NAME,
+                                    }
+                                })
                             )),
                             b'\'' | b'"' => alt((
                                  parse_fstring_start,
