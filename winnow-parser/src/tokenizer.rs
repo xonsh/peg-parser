@@ -892,7 +892,7 @@ impl<'s> Tokenizer<'s> {
                 }
                 Err(_) => {
                     if self.offset == start_offset && !self.input.is_empty() {
-                        let mut it = self.input.input;
+                        let it = self.input.input;
                         let l = if it[0] < 128 {
                             1
                         } else {
