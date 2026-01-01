@@ -396,7 +396,9 @@ for_stmt[Union[ast.For, ast.AsyncFor]]:
 
 with_stmt[Union[ast.With, ast.AsyncWith]]:
     | invalid_with_stmt_indent
-    | &with_macro_start ~ with_macro_stmt
+    | 'with' '!' ~ a=with_item ':' {
+        self.handle_with_macro_start(a, LOCATIONS)
+      }
     | 'with' '(' a=','.with_item+ ','? ')' ':' b=block {
         ast.With(items=a, body=b, LOCATIONS)
      }
@@ -417,15 +419,6 @@ with_item[ast.withitem]:
     | invalid_with_item
     | e=expression { ast.withitem(context_expr=e, optional_vars=None) }
 
-with_macro_stmt[ast.With]:
-    | a=with_macro_start b=MACRO_PARAM {
-        self.handle_with_macro_stmt(a, b, LOCATIONS)
-     }
-
-with_macro_start: # same line
-    | 'with' '!' ~ a=with_item ':' {
-        self.handle_with_macro_start(a)
-    }
 
 
 # Try statement
@@ -933,6 +926,7 @@ await_primary (memo):
 primary:
     | a=primary '.' b=NAME { ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS) }
     | a1=primary b1=genexp { ast.Call(func=a1, args=[b1], keywords=[], LOCATIONS) }
+#    | a2=primary '!(' b2=[call_macro_arg*] &&')' { self.handle_func_macro_start(a2, LOCATIONS) }
     | a2=func_macro_start ~ b2=[MACRO_PARAM*] &&')' { self.macro_call(a2, b2, LOCATIONS) }
     | a3=primary '(' b3=[arguments] ')' {
         ast.Call(
@@ -952,6 +946,10 @@ func_macro_start:
     | a=primary '!(' {
         self.handle_func_macro_start(a)
     }
+# todo: try using any-token instead of hardcoding in Tokenizer
+#call_macro_arg:
+#    | '(' ~ ANY_TOKEN ')'
+#    | '[' ~ ANY_TOKEN ']'
 
 sub_procs[ast.Call]:
     | '$(' ~ args=proc_cmds ')' { self.handle_proc("subproc_captured", args, LOCATIONS) }

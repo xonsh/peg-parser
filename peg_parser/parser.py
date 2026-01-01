@@ -3,12 +3,10 @@ from __future__ import annotations
 import ast
 import itertools
 import sys
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, NoReturn, cast
 
 from peg_parser.subheader import Del, Load, Node, Parser, Store, Target, logger, memoize, memoize_left_rec
-
-if TYPE_CHECKING:
-    from peg_parser.tokenize import TokenInfo
+from peg_parser.tokenize import TokenInfo
 
 
 # Keywords and soft keywords are listed at the end of the parser definition.
@@ -1064,7 +1062,7 @@ class XonshParser(Parser):
 
     @memoize
     def with_stmt(self) -> ast.With | ast.AsyncWith | None:
-        # with_stmt: invalid_with_stmt_indent | &with_macro_start ~ with_macro_stmt | 'with' '(' ','.with_item+ ','? ')' ':' block | 'with' ','.with_item+ ':' type_comment_str? block | 'async' 'with' '(' ','.with_item+ ','? ')' ':' block | 'async' 'with' ','.with_item+ ':' type_comment_str? block | invalid_with_stmt
+        # with_stmt: invalid_with_stmt_indent | 'with' '!' ~ with_item ':' | 'with' '(' ','.with_item+ ','? ')' ':' block | 'with' ','.with_item+ ':' type_comment_str? block | 'async' 'with' '(' ','.with_item+ ','? ')' ':' block | 'async' 'with' ','.with_item+ ':' type_comment_str? block | invalid_with_stmt
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if self.call_invalid_rules and (self.invalid_with_stmt_indent()):
@@ -1072,11 +1070,13 @@ class XonshParser(Parser):
         self._reset(mark)
         cut = False
         if (
-            (self.positive_lookahead(self.with_macro_start))
+            (self.expect("with"))
+            and (self.expect("!"))
             and (cut := True)
-            and (with_macro_stmt := self.with_macro_stmt())
+            and (a := self.with_item())
+            and (self.expect(":"))
         ):
-            return with_macro_stmt
+            return self.handle_with_macro_start(a, **self.span(_lnum, _col))
         self._reset(mark)
         if cut:
             return None
@@ -1145,34 +1145,6 @@ class XonshParser(Parser):
         if e := self.expression():
             return ast.withitem(context_expr=e, optional_vars=None)
         self._reset(mark)
-        return None
-
-    @memoize
-    def with_macro_stmt(self) -> ast.With | None:
-        # with_macro_stmt: with_macro_start MACRO_PARAM
-        mark = self._mark()
-        _lnum, _col = self._tokenizer.peek().start
-        if (a := self.with_macro_start()) and (b := self.token("MACRO_PARAM")):
-            return self.handle_with_macro_stmt(a, b, **self.span(_lnum, _col))
-        self._reset(mark)
-        return None
-
-    @memoize
-    def with_macro_start(self) -> Any | None:
-        # with_macro_start: 'with' '!' ~ with_item ':'
-        mark = self._mark()
-        cut = False
-        if (
-            (self.expect("with"))
-            and (self.expect("!"))
-            and (cut := True)
-            and (a := self.with_item())
-            and (self.expect(":"))
-        ):
-            return self.handle_with_macro_start(a)
-        self._reset(mark)
-        if cut:
-            return None
         return None
 
     @memoize
@@ -2949,7 +2921,7 @@ class XonshParser(Parser):
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect(":")) and (spec := self.repeated(self.fstring_format_spec),):
             return ast.JoinedStr(
-                values=spec if spec and (len(spec) > 1 or cast("ast.Constant", spec[0]).value) else [],
+                values=spec if spec and (len(spec) > 1 or cast(ast.Constant, spec[0]).value) else [],
                 **self.span(_lnum, _col),
             )
         self._reset(mark)
@@ -3589,7 +3561,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_arguments(self) -> None:
+    def invalid_arguments(self) -> NoReturn | None:
         # invalid_arguments: args ',' '*' | expression for_if_clauses ',' [args | expression for_if_clauses] | NAME '=' expression for_if_clauses | [(args ',')] NAME '=' &(',' | ')') | args for_if_clauses | args ',' expression for_if_clauses | args ',' args
         mark = self._mark()
         if (a := self.args()) and (self.expect(",")) and (self.expect("*")):
@@ -3652,9 +3624,10 @@ class XonshParser(Parser):
                 else "positional argument follows keyword argument"
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_kwarg(self) -> None:
+    def invalid_kwarg(self) -> NoReturn | None:
         # invalid_kwarg: ('True' | 'False' | 'None') '=' | NAME '=' expression for_if_clauses | !(NAME '=') expression '=' | '**' expression '=' expression
         mark = self._mark()
         if (a := self._tmp_48()) and (b := self.expect("=")):
@@ -3683,6 +3656,7 @@ class XonshParser(Parser):
         ):
             self.raise_syntax_error_known_range("cannot assign to keyword argument unpacking", a3, b3)
         self._reset(mark)
+        return None
 
     @memoize
     def expression_without_invalid(self) -> Node | Any | None:
@@ -3728,7 +3702,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_expression(self) -> None:
+    def invalid_expression(self) -> NoReturn | None:
         # invalid_expression: !(NAME STRING | SOFT_KEYWORD) disjunction expression_without_invalid | disjunction 'if' disjunction !('else' | ':') | 'lambda' lambda_params? ':' &(FSTRING_MIDDLE | fstring_replacement_field)
         mark = self._mark()
         if (
@@ -3758,9 +3732,10 @@ class XonshParser(Parser):
                 "f-string: lambda expressions are not allowed without parentheses", a2, b2
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_named_expression(self) -> None:
+    def invalid_named_expression(self) -> NoReturn | None:
         # invalid_named_expression: expression ':=' expression | NAME '=' bitwise_or !('=' | ':=') | !(plist | ptuple | genexp | 'True' | 'None' | 'False') bitwise_or '=' bitwise_or !('=' | ':=')
         mark = self._mark()
         if (a := self.expression()) and (self.expect(":=")) and (self.expression()):
@@ -3800,7 +3775,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_assignment(self) -> None:
+    def invalid_assignment(self) -> NoReturn | None:
         # invalid_assignment: invalid_ann_assign_target ':' expression | star_named_expression ',' star_named_expressions* ':' expression | expression ':' expression | ((star_targets '='))* star_expressions '=' | ((star_targets '='))* yield_expr '=' | star_expressions augassign annotated_rhs
         mark = self._mark()
         if (
@@ -3836,6 +3811,7 @@ class XonshParser(Parser):
                 f"'{self.get_expr_name(a)}' is an illegal expression for augmented assignment", a
             )
         self._reset(mark)
+        return None
 
     @memoize
     def invalid_ann_assign_target(self) -> Node | None:
@@ -3858,23 +3834,25 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_del_stmt(self) -> None:
+    def invalid_del_stmt(self) -> NoReturn | None:
         # invalid_del_stmt: 'del' star_expressions
         mark = self._mark()
         if (self.expect("del")) and (a := self.star_expressions()):
             self.raise_syntax_error_invalid_target(Target.DEL_TARGETS, a)
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_block(self) -> None:
+    def invalid_block(self) -> NoReturn | None:
         # invalid_block: NEWLINE !INDENT
         mark = self._mark()
         if (self.token("NEWLINE")) and (self.negative_lookahead(self.token, "INDENT")):
             self.raise_indentation_error("expected an indented block")
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_comprehension(self) -> None:
+    def invalid_comprehension(self) -> NoReturn | None:
         # invalid_comprehension: ('[' | '(' | '{') starred_expression for_if_clauses | ('[' | '{') star_named_expression ',' star_named_expressions for_if_clauses | ('[' | '{') star_named_expression ',' for_if_clauses
         mark = self._mark()
         if (self._tmp_58()) and (a1 := self.starred_expression()) and (self.for_if_clauses()):
@@ -3901,9 +3879,10 @@ class XonshParser(Parser):
                 "did you forget parentheses around the comprehension target?", a, b
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_dict_comprehension(self) -> None:
+    def invalid_dict_comprehension(self) -> NoReturn | None:
         # invalid_dict_comprehension: '{' '**' bitwise_or for_if_clauses '}'
         mark = self._mark()
         if (
@@ -3915,9 +3894,10 @@ class XonshParser(Parser):
         ):
             self.raise_syntax_error_known_location("dict unpacking cannot be used in dict comprehension", a)
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_parameters(self) -> None:
+    def invalid_parameters(self) -> NoReturn | None:
         # invalid_parameters: "/" ',' | (slash_no_default | slash_with_default) param_maybe_default* '/' | slash_no_default? param_no_default* invalid_parameters_helper param_no_default | param_no_default* '(' param_no_default+ ','? ')' | [(slash_no_default | slash_with_default)] param_maybe_default* '*' (',' | param_no_default) param_maybe_default* '/' | param_maybe_default+ '/' '*'
         mark = self._mark()
         if (a := self.expect("/")) and (self.expect(",")):
@@ -3959,6 +3939,7 @@ class XonshParser(Parser):
         if (self.repeated(self.param_maybe_default)) and (self.expect("/")) and (a5 := self.expect("*")):
             self.raise_syntax_error_known_location("expected comma between / and *", a5)
         self._reset(mark)
+        return None
 
     @memoize
     def invalid_default(self) -> Any | None:
@@ -4021,7 +4002,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_lambda_parameters(self) -> None:
+    def invalid_lambda_parameters(self) -> NoReturn | None:
         # invalid_lambda_parameters: "/" ',' | (lambda_slash_no_default | lambda_slash_with_default) lambda_param_maybe_default* '/' | lambda_slash_no_default? lambda_param_no_default* invalid_lambda_parameters_helper lambda_param_no_default | lambda_param_no_default* '(' ','.lambda_param+ ','? ')' | [(lambda_slash_no_default | lambda_slash_with_default)] lambda_param_maybe_default* '*' (',' | lambda_param_no_default) lambda_param_maybe_default* '/' | lambda_param_maybe_default+ '/' '*'
         mark = self._mark()
         if (a := self.expect("/")) and (self.expect(",")):
@@ -4071,6 +4052,7 @@ class XonshParser(Parser):
         ):
             self.raise_syntax_error_known_location("expected comma between / and *", a5)
         self._reset(mark)
+        return None
 
     @memoize
     def invalid_lambda_parameters_helper(self) -> Any | None:
@@ -4085,7 +4067,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_lambda_star_etc(self) -> None:
+    def invalid_lambda_star_etc(self) -> NoReturn | None:
         # invalid_lambda_star_etc: '*' (':' | ',' (':' | '**')) | '*' lambda_param '=' | '*' (lambda_param_no_default | ',') lambda_param_maybe_default* '*' (lambda_param_no_default | ',')
         mark = self._mark()
         if (self.expect("*")) and (self._tmp_72()):
@@ -4103,6 +4085,7 @@ class XonshParser(Parser):
         ):
             self.raise_syntax_error_known_location("* argument may appear only once", a)
         self._reset(mark)
+        return None
 
     @memoize
     def invalid_lambda_kwds(self) -> Any | None:
@@ -4125,7 +4108,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_double_type_comments(self) -> None:
+    def invalid_double_type_comments(self) -> NoReturn | None:
         # invalid_double_type_comments: TYPE_COMMENT NEWLINE TYPE_COMMENT NEWLINE INDENT
         mark = self._mark()
         if (
@@ -4137,9 +4120,10 @@ class XonshParser(Parser):
         ):
             self.raise_syntax_error("Cannot have two type comments on def")
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_with_item(self) -> None:
+    def invalid_with_item(self) -> NoReturn | None:
         # invalid_with_item: expression 'as' expression &(',' | ')' | ':')
         mark = self._mark()
         if (
@@ -4150,17 +4134,19 @@ class XonshParser(Parser):
         ):
             self.raise_syntax_error_invalid_target(Target.STAR_TARGETS, a)
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_for_target(self) -> None:
+    def invalid_for_target(self) -> NoReturn | None:
         # invalid_for_target: 'async'? 'for' star_expressions
         mark = self._mark()
         if (self.expect("async"),) and (self.expect("for")) and (a := self.star_expressions()):
             self.raise_syntax_error_invalid_target(Target.FOR_TARGETS, a)
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_group(self) -> None:
+    def invalid_group(self) -> NoReturn | None:
         # invalid_group: '(' starred_expression ')' | '(' '**' expression ')'
         mark = self._mark()
         if (self.expect("(")) and (a := self.starred_expression()) and (self.expect(")")):
@@ -4169,6 +4155,7 @@ class XonshParser(Parser):
         if (self.expect("(")) and (b := self.expect("**")) and (self.expression()) and (self.expect(")")):
             self.raise_syntax_error_known_location("cannot use double starred expression here", b)
         self._reset(mark)
+        return None
 
     @memoize
     def invalid_import(self) -> Any | None:
@@ -4185,15 +4172,16 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_import_from_targets(self) -> None:
+    def invalid_import_from_targets(self) -> NoReturn | None:
         # invalid_import_from_targets: import_from_as_names ',' NEWLINE
         mark = self._mark()
         if (self.import_from_as_names()) and (self.expect(",")) and (self.token("NEWLINE")):
             self.raise_syntax_error("trailing comma not allowed without surrounding parentheses")
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_with_stmt(self) -> None:
+    def invalid_with_stmt(self) -> NoReturn | None:
         # invalid_with_stmt: 'async'? 'with' ','.(expression ['as' star_target])+ &&':' | 'async'? 'with' '(' ','.(expressions ['as' star_target])+ ','? ')' &&':'
         mark = self._mark()
         if (
@@ -4218,7 +4206,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_with_stmt_indent(self) -> None:
+    def invalid_with_stmt_indent(self) -> NoReturn | None:
         # invalid_with_stmt_indent: 'async'? 'with' ','.(expression ['as' star_target])+ ':' NEWLINE !INDENT | 'async'? 'with' '(' ','.(expressions ['as' star_target])+ ','? ')' ':' NEWLINE !INDENT
         mark = self._mark()
         if (
@@ -4248,9 +4236,10 @@ class XonshParser(Parser):
                 f"expected an indented block after 'with' statement on line {a.start[0]}"
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_try_stmt(self) -> None:
+    def invalid_try_stmt(self) -> NoReturn | None:
         # invalid_try_stmt: 'try' ':' NEWLINE !INDENT | 'try' ':' block !('except' | 'finally') | 'try' ':' block* except_block+ 'except' '*' expression ['as' NAME] ':' | 'try' ':' block* except_star_block+ 'except' [expression ['as' NAME]] ':'
         mark = self._mark()
         if (
@@ -4299,9 +4288,10 @@ class XonshParser(Parser):
                 "cannot have both 'except' and 'except*' on the same 'try'", a
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_except_stmt(self) -> None:
+    def invalid_except_stmt(self) -> NoReturn | None:
         # invalid_except_stmt: 'except' '*'? expression ',' expressions ['as' NAME] ':' | 'except' '*'? expression ['as' NAME] NEWLINE | 'except' '*'? NEWLINE | 'except' '*' (NEWLINE | ':')
         mark = self._mark()
         if (
@@ -4330,9 +4320,10 @@ class XonshParser(Parser):
         if (self.expect("except")) and (self.expect("*")) and (self._tmp_86()):
             self.raise_syntax_error("expected one or more exception types")
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_finally_stmt(self) -> None:
+    def invalid_finally_stmt(self) -> NoReturn | None:
         # invalid_finally_stmt: 'finally' ':' NEWLINE !INDENT
         mark = self._mark()
         if (
@@ -4345,9 +4336,10 @@ class XonshParser(Parser):
                 f"expected an indented block after 'finally' statement on line {a.start[0]}"
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_except_stmt_indent(self) -> None:
+    def invalid_except_stmt_indent(self) -> NoReturn | None:
         # invalid_except_stmt_indent: 'except' expression ['as' NAME] ':' NEWLINE !INDENT | 'except' ':' NEWLINE !INDENT
         mark = self._mark()
         if (
@@ -4372,9 +4364,10 @@ class XonshParser(Parser):
                 f"expected an indented block after 'except' statement on line {a.start[0]}"
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_except_star_stmt_indent(self) -> None:
+    def invalid_except_star_stmt_indent(self) -> NoReturn | None:
         # invalid_except_star_stmt_indent: 'except' '*' expression ['as' NAME] ':' NEWLINE !INDENT
         mark = self._mark()
         if (
@@ -4390,9 +4383,10 @@ class XonshParser(Parser):
                 f"expected an indented block after 'except*' statement on line {a.start[0]}"
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_match_stmt(self) -> None:
+    def invalid_match_stmt(self) -> NoReturn | None:
         # invalid_match_stmt: "match" subject_expr !':' | "match" subject_expr ':' NEWLINE !INDENT
         mark = self._mark()
         if (self.expect("match")) and (self.subject_expr()) and (self.negative_lookahead(self.expect, ":")):
@@ -4409,9 +4403,10 @@ class XonshParser(Parser):
                 f"expected an indented block after 'match' statement on line {a.start[0]}"
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_case_block(self) -> None:
+    def invalid_case_block(self) -> NoReturn | None:
         # invalid_case_block: "case" patterns guard? !':' | "case" patterns guard? ':' NEWLINE !INDENT
         mark = self._mark()
         if (
@@ -4434,9 +4429,10 @@ class XonshParser(Parser):
                 f"expected an indented block after 'case' statement on line {a.start[0]}"
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_as_pattern(self) -> None:
+    def invalid_as_pattern(self) -> NoReturn | None:
         # invalid_as_pattern: or_pattern 'as' "_" | or_pattern 'as' !NAME expression
         mark = self._mark()
         if (self.or_pattern()) and (self.expect("as")) and (a := self.expect("_")):
@@ -4450,9 +4446,10 @@ class XonshParser(Parser):
         ):
             self.raise_syntax_error_known_location("invalid pattern target", a1)
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_class_pattern(self) -> None:
+    def invalid_class_pattern(self) -> NoReturn | None:
         # invalid_class_pattern: name_or_attr '(' invalid_class_argument_pattern
         mark = self._mark()
         if (
@@ -4463,6 +4460,7 @@ class XonshParser(Parser):
         ):
             self.raise_syntax_error_known_range("positional patterns follow keyword patterns", a[0], a[-1])
         self._reset(mark)
+        return None
 
     @memoize
     def invalid_class_argument_pattern(self) -> Any | None:
@@ -4479,7 +4477,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_if_stmt(self) -> None:
+    def invalid_if_stmt(self) -> NoReturn | None:
         # invalid_if_stmt: 'if' named_expression NEWLINE | 'if' named_expression ':' NEWLINE !INDENT
         mark = self._mark()
         if (self.expect("if")) and (self.named_expression()) and (self.token("NEWLINE")):
@@ -4496,9 +4494,10 @@ class XonshParser(Parser):
                 f"expected an indented block after 'if' statement on line {a.start[0]}"
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_elif_stmt(self) -> None:
+    def invalid_elif_stmt(self) -> NoReturn | None:
         # invalid_elif_stmt: 'elif' named_expression NEWLINE | 'elif' named_expression ':' NEWLINE !INDENT
         mark = self._mark()
         if (self.expect("elif")) and (self.named_expression()) and (self.token("NEWLINE")):
@@ -4515,9 +4514,10 @@ class XonshParser(Parser):
                 f"expected an indented block after 'elif' statement on line {a.start[0]}"
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_else_stmt(self) -> None:
+    def invalid_else_stmt(self) -> NoReturn | None:
         # invalid_else_stmt: 'else' ':' NEWLINE !INDENT
         mark = self._mark()
         if (
@@ -4530,9 +4530,10 @@ class XonshParser(Parser):
                 f"expected an indented block after 'else' statement on line {a.start[0]}"
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_while_stmt(self) -> None:
+    def invalid_while_stmt(self) -> NoReturn | None:
         # invalid_while_stmt: 'while' named_expression NEWLINE | 'while' named_expression ':' NEWLINE !INDENT
         mark = self._mark()
         if (self.expect("while")) and (self.named_expression()) and (self.token("NEWLINE")):
@@ -4549,9 +4550,10 @@ class XonshParser(Parser):
                 f"expected an indented block after 'while' statement on line {a.start[0]}"
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_for_stmt(self) -> None:
+    def invalid_for_stmt(self) -> NoReturn | None:
         # invalid_for_stmt: 'async'? 'for' star_targets 'in' star_expressions NEWLINE | 'async'? 'for' star_targets 'in' star_expressions ':' NEWLINE !INDENT
         mark = self._mark()
         if (
@@ -4578,9 +4580,10 @@ class XonshParser(Parser):
                 f"expected an indented block after 'for' statement on line {a.start[0]}"
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_def_raw(self) -> None:
+    def invalid_def_raw(self) -> NoReturn | None:
         # invalid_def_raw: 'async'? 'def' NAME type_params? '(' params? ')' return_expr? ':' NEWLINE !INDENT
         mark = self._mark()
         if (
@@ -4600,9 +4603,10 @@ class XonshParser(Parser):
                 f"expected an indented block after function definition on line {a.start[0]}"
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_class_def_raw(self) -> None:
+    def invalid_class_def_raw(self) -> NoReturn | None:
         # invalid_class_def_raw: 'class' NAME type_params? ['(' arguments? ')'] NEWLINE | 'class' NAME type_params? ['(' arguments? ')'] ':' NEWLINE !INDENT
         mark = self._mark()
         if (
@@ -4627,9 +4631,10 @@ class XonshParser(Parser):
                 f"expected an indented block after class definition on line {a.start[0]}"
             )
         self._reset(mark)
+        return None
 
     @memoize
-    def invalid_double_starred_kvpairs(self) -> None:
+    def invalid_double_starred_kvpairs(self) -> NoReturn | None:
         # invalid_double_starred_kvpairs: ','.double_starred_kvpair+ ',' invalid_kvpair | expression ':' '*' bitwise_or | expression ':' &('}' | ',')
         mark = self._mark()
         if (
@@ -4649,7 +4654,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_kvpair(self) -> None:
+    def invalid_kvpair(self) -> NoReturn | None:
         # invalid_kvpair: expression !(':') | expression ':' '*' bitwise_or | expression ':' &('}' | ',') | expression ':'
         mark = self._mark()
         if (a := self.expression()) and (self.negative_lookahead(self.expect, ":")):
@@ -4668,6 +4673,7 @@ class XonshParser(Parser):
         if (self.expression()) and (a3 := self.expect(":")):
             self.raise_syntax_error_known_location("expression expected after dictionary key and ':'", a3)
         self._reset(mark)
+        return None
 
     @memoize
     def invalid_starred_expression(self) -> Any | None:
@@ -4684,7 +4690,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_replacement_field(self) -> None:
+    def invalid_replacement_field(self) -> NoReturn | None:
         # invalid_replacement_field: '{' '=' | '{' '!' | '{' ':' | '{' '}' | '{' !annotated_rhs | '{' annotated_rhs !('=' | '!' | ':' | '}') | '{' annotated_rhs '=' !('!' | ':' | '}') | '{' annotated_rhs '='? invalid_conversion_character | '{' annotated_rhs '='? ['!' NAME] !(':' | '}') | '{' annotated_rhs '='? ['!' NAME] ':' fstring_format_spec* !'}' | '{' annotated_rhs '='? ['!' NAME] !'}'
         mark = self._mark()
         if (self.expect("{")) and (a := self.expect("=")):
@@ -4754,7 +4760,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def invalid_conversion_character(self) -> None:
+    def invalid_conversion_character(self) -> NoReturn | None:
         # invalid_conversion_character: '!' &(':' | '}') | '!' !NAME
         mark = self._mark()
         if (self.expect("!")) and (self.positive_lookahead(self._tmp_97)):
@@ -4763,6 +4769,7 @@ class XonshParser(Parser):
         if (self.expect("!")) and (self.negative_lookahead(self.name)):
             self.raise_syntax_error_on_next_token("f-string: invalid conversion character")
         self._reset(mark)
+        return None
 
     @memoize
     def _tmp_1(self) -> Any | None:

@@ -31,7 +31,22 @@ def py_tokenize(source: str) -> list[TokenInfo]:
 class Tokenizer:
     """Caching wrapper for the tokenize module"""
 
-    _tokens: list[TokenInfo]
+    __slots__ = (
+        "_readline",
+        "_tokens",
+        "_index",
+        "_verbose",
+        "_lines",
+        "_path",
+        "_stack",
+        "_call_macro",
+        "_proc_macro",
+        "_raw_tokens",
+        "_raw_index",
+        "_end_parens",
+        "tok_cls",
+        "new_tok",
+    )
 
     def __init__(
         self,
@@ -42,14 +57,13 @@ class Tokenizer:
         use_rust_tokenizer=True,
     ):
         self._readline = readline
-        self._tokens = []
+        self._tokens: list[TokenInfo] = []
         self._index = Mark(0)
         self._verbose = verbose
         self._lines: dict[int, str] = {}
         self._path = path
         self._stack: list[TokenInfo] = []  # temporarily hold tokens
         self._call_macro = False
-        self._with_macro = False
         self._proc_macro = False
 
         self._raw_tokens: list[TokenInfo] = []
@@ -100,9 +114,9 @@ class Tokenizer:
         """Return the next token *without* updating the index."""
         try:
             while self._index == len(self._tokens):
-                if self._with_macro:
-                    tok = self.consume_with_macro_params()
-                elif self._call_macro:
+                # if self._with_macro:
+                #     tok = self.consume_with_macro_params()
+                if self._call_macro:
                     tok = self.consume_macro_params()
                 elif self._stack:
                     tok = self._stack.pop()
@@ -197,7 +211,7 @@ class Tokenizer:
                     tok_idx += 1
                     continue
                 else:
-                    self._with_macro = False
+                    # self._with_macro = False
                     break
             elif tok.type.name == "NEWLINE":
                 if not is_indented:

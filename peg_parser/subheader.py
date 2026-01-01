@@ -256,6 +256,18 @@ class Target(enum.Enum):
 
 
 class Parser:
+    __slots__ = (
+        "_tokenizer",
+        "_verbose",
+        "_level",
+        "_cache",
+        "tok_cls",
+        "in_recursive_rule",
+        "_path_token",
+        "_index",
+        "filename",
+        "py_version",
+    )
     KEYWORDS: ClassVar[tuple[str, ...]]
     SOFT_KEYWORDS: ClassVar[tuple[str, ...]]
 
@@ -820,16 +832,15 @@ class Parser:
         loccall = xonsh_call("locals", **locs)
         body = ast.Constant(value=b.string, kind=None, **b.loc())
         a.context_expr = xonsh_call("__xonsh__.enter_macro", a.context_expr, body, gblcall, loccall, **locs)
-        self._tokenizer._with_macro = False
         return ast.With(items=[a], body=[ast.Pass(**locs)], type_comment=None, **locs)
 
     def handle_func_macro_start(self, a: Node) -> Node:
         self._tokenizer._call_macro = True
         return a
 
-    def handle_with_macro_start(self, a: ast.withitem) -> ast.withitem:
-        self._tokenizer._with_macro = True
-        return a
+    def handle_with_macro_start(self, a: ast.withitem, **locs: int) -> ast.With:
+        macro_tok = self._tokenizer.consume_with_macro_params()
+        return self.handle_with_macro_stmt(a, macro_tok, **locs)
 
     def handle_proc_macro_start(self, a: TokenInfo) -> TokenInfo:
         self._tokenizer._proc_macro = True
