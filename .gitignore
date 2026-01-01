@@ -136,3 +136,4 @@ prof/
 benchmark_*.svg
 .benchmarks/
 *.html
+*.txt
