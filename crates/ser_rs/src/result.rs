@@ -21,6 +21,8 @@ pub enum Error {
         position: usize,
         inner: Option<Box<Error>>,
     },
+    #[error("Cut at {position}")]
+    Cut { position: usize, inner: Box<Error> },
 }
 
 // impl error::Error for Error {

@@ -224,6 +224,44 @@ impl<'a, I, O> Parser<'a, I, O> {
         })
     }
 
+    /// Mark parser as a cut point. If it fails, return the error wrapped in Cut.
+    /// If it succeeds, behavior behaves normally, but if a subsequent parser in a sequence fails,
+    /// and that failure bubbles up to a choice, the Cut error protects against backtracking if it was generated inside.
+    ///
+    /// Actually, typically `cut` is used as `p.cut()`.
+    /// If `p` fails, it returns `Cut`.
+    ///
+    /// Wait, standard `cut` semantics:
+    /// `cut(p)`: if `p` fails, it is a fatal error.
+    ///
+    /// So `(a + cut(b)) | c`
+    /// If `a` matches:
+    ///   `cut(b)` is called.
+    ///   If `b` fails, `cut(b)` returns `Cut`.
+    ///   `+` returns `Cut`.
+    ///   `|` sees `Cut` and returns `Cut` (fails), skipping `c`.
+    ///
+    /// This matches the logic:
+    pub fn cut(self) -> Self
+    where
+        O: 'a,
+    {
+        Parser::new(move |input: &'a [I], start: usize| {
+            match (self.method)(input, start) {
+                Ok(res) => Ok(res),
+                Err(err) => match err {
+                    // unexpected cut error, keep it
+                    Error::Cut { .. } | Error::Expect { .. } => Err(err),
+                    // promote mismatch to cut
+                    _ => Err(Error::Cut {
+                        position: start,
+                        inner: Box::new(err),
+                    }),
+                },
+            }
+        })
+    }
+
     /// Mark parser as expected, abort early when failed in ordered choice.
     pub fn expect(self, name: &'a str) -> Self
     where
@@ -543,7 +581,7 @@ impl<'a, I, O: 'a> BitOr for Parser<'a, I, O> {
             move |input: &'a [I], start: usize| match (self.method)(input, start) {
                 Ok(out) => Ok(out),
                 Err(err) => match err {
-                    Error::Expect { .. } => Err(err),
+                    Error::Expect { .. } | Error::Cut { .. } => Err(err),
                     _ => (other.method)(input, start),
                 },
             },
