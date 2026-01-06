@@ -5,7 +5,7 @@ use super::{
     ctx_load, ctx_store, get_text, kw, make_error, op, parse_token_type, set_context, set_location,
     TokenStream,
 };
-use crate::tokenizer::Token;
+use xtokens::{Token};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use winnow::combinator::{opt, peek};

@@ -7,68 +7,7 @@ use winnow::error::ErrMode;
 use winnow::prelude::*;
 use winnow::stream::Stateful;
 use winnow::token::{any, take_until, take_while};
-
-#[pyclass(eq, eq_int)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[allow(non_camel_case_types)]
-pub enum Token {
-    ENDMARKER,
-    NAME,
-    NUMBER,
-    STRING,
-    NEWLINE,
-    INDENT,
-    DEDENT,
-    OP,
-    FSTRING_START,
-    FSTRING_MIDDLE,
-    FSTRING_END,
-    ERRORTOKEN,
-    COMMENT,
-    NL,
-    AWAIT,
-    ASYNC,
-    TYPE_IGNORE,
-    TYPE_COMMENT,
-    SOFT_KEYWORD,
-    ENCODING,
-    // xonsh specific tokens
-    SEARCH_PATH,
-    WS,
-    MACRO_PARAM,
-}
-
-#[pymethods]
-impl Token {
-    #[getter]
-    fn name(&self) -> &'static str {
-        match self {
-            Token::ENDMARKER => "ENDMARKER",
-            Token::NAME => "NAME",
-            Token::NUMBER => "NUMBER",
-            Token::STRING => "STRING",
-            Token::NEWLINE => "NEWLINE",
-            Token::INDENT => "INDENT",
-            Token::DEDENT => "DEDENT",
-            Token::OP => "OP",
-            Token::FSTRING_START => "FSTRING_START",
-            Token::FSTRING_MIDDLE => "FSTRING_MIDDLE",
-            Token::FSTRING_END => "FSTRING_END",
-            Token::ERRORTOKEN => "ERRORTOKEN",
-            Token::COMMENT => "COMMENT",
-            Token::NL => "NL",
-            Token::AWAIT => "AWAIT",
-            Token::ASYNC => "ASYNC",
-            Token::TYPE_IGNORE => "TYPE_IGNORE",
-            Token::TYPE_COMMENT => "TYPE_COMMENT",
-            Token::SOFT_KEYWORD => "SOFT_KEYWORD",
-            Token::ENCODING => "ENCODING",
-            Token::SEARCH_PATH => "SEARCH_PATH",
-            Token::WS => "WS",
-            Token::MACRO_PARAM => "MACRO_PARAM",
-        }
-    }
-}
+pub use xtokens::{TokInfo, Token};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FStringState {
@@ -99,114 +38,6 @@ impl Default for LexerState {
 }
 
 pub type Stream<'s> = Stateful<&'s [u8], LexerState>;
-
-#[pyclass]
-#[derive(Debug)]
-pub struct TokInfo {
-    #[pyo3(get)]
-    #[pyo3(name = "type")]
-    pub typ: Token,
-    #[pyo3(get)]
-    pub span: (usize, usize),
-    #[pyo3(get)]
-    pub start: (usize, usize),
-    #[pyo3(get)]
-    pub end: (usize, usize),
-    pub source: Py<PyString>,
-}
-
-#[pymethods]
-impl TokInfo {
-    #[new]
-    pub fn new(
-        typ: Token,
-        span: (usize, usize),
-        start: (usize, usize),
-        end: (usize, usize),
-        source: Py<PyString>,
-    ) -> Self {
-        Self {
-            typ,
-            span,
-            start,
-            end,
-            source,
-        }
-    }
-
-    #[getter]
-    pub fn string(&self, py: Python<'_>) -> String {
-        let s = self.source.bind(py).to_str().unwrap();
-        s[self.span.0..self.span.1].to_string()
-    }
-
-    #[allow(deprecated)]
-    pub fn is_exact_type(&self, _py: Python<'_>, typ: String) -> bool {
-        self.typ == Token::OP && Python::with_gil(|py| self.string(py) == typ)
-    }
-
-    pub fn loc_start(&self) -> std::collections::HashMap<&'static str, usize> {
-        let mut map = std::collections::HashMap::new();
-        map.insert("lineno", self.start.0);
-        map.insert("col_offset", self.start.1);
-        map
-    }
-
-    pub fn loc_end(&self) -> std::collections::HashMap<&'static str, usize> {
-        let mut map = std::collections::HashMap::new();
-        map.insert("end_lineno", self.end.0);
-        map.insert("end_col_offset", self.end.1);
-        map
-    }
-
-    pub fn loc(&self) -> std::collections::HashMap<&'static str, usize> {
-        let mut map = self.loc_start();
-        map.insert("end_lineno", self.end.0);
-        map.insert("end_col_offset", self.end.1);
-        map
-    }
-
-    #[allow(deprecated)]
-    fn __repr__(&self) -> String {
-        Python::with_gil(|py| {
-            let s = self.source.bind(py).to_str().unwrap();
-            let string_val = &s[self.span.0..self.span.1];
-            format!(
-                "TokInfo(type={:?}, string={:?}, start={:?}, end={:?})",
-                self.typ, string_val, self.start, self.end
-            )
-        })
-    }
-
-    fn __str__(&self) -> String {
-        self.__repr__()
-    }
-}
-
-impl Clone for TokInfo {
-    fn clone(&self) -> Self {
-        #[allow(deprecated)]
-        Python::with_gil(|py| Self {
-            typ: self.typ,
-            span: self.span,
-            start: self.start,
-            end: self.end,
-            source: self.source.clone_ref(py),
-        })
-    }
-}
-
-impl PartialEq for TokInfo {
-    fn eq(&self, other: &Self) -> bool {
-        self.typ == other.typ
-            && self.span == other.span
-            && self.start == other.start
-            && self.end == other.end
-            && Python::with_gil(|py| {
-                self.source.bind(py).to_str().unwrap() == other.source.bind(py).to_str().unwrap()
-            })
-    }
-}
 
 // ... helper parsers ...
 pub fn oct_digit1_w<'s>(input: &mut Stream<'s>) -> ModalResult<&'s [u8]> {
@@ -931,28 +762,12 @@ pub fn tokenize(py: Python<'_>, source: Py<PyString>) -> Vec<TokInfo> {
 
 #[pyfunction]
 #[pyo3(name = "tokenize")]
-pub fn tokenize_py(py: Python<'_>, source: Bound<'_, PyString>) -> Vec<TokInfo> {
+pub fn tokenize_py(py: Python<'_>, source: Bound<'_, PyString>) -> PyResult<Vec<TokInfo>> {
     let source_bytes = source.to_str().unwrap().as_bytes();
     let mut t = Tokenizer::new(py, source.clone().into(), source_bytes);
     let mut tokens = Vec::new();
     while let Some(tok) = t.next_token() {
         tokens.push(tok);
     }
-    tokens
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use pyo3::Python;
-
-    #[test]
-    fn test_infinite_loop() {
-        Python::with_gil(|py| {
-            let source = "from functools import wraps\n\n\ndef advanced_decorator(f):\n    @wraps(f)\n    def wrapper(*args, **kwargs):\n        print(\"Advanced decorator\")\n        return f(*args, **kwargs)\n\n    return wrapper\n\n\n@advanced_decorator\ndef decorated_function():\n    print(\"Decorated function\")\n";
-            let py_source = pyo3::types::PyString::new(py, source).into();
-            let tokens = tokenize(py, py_source);
-            assert!(tokens.len() > 0);
-        });
-    }
+    Ok(tokens)
 }

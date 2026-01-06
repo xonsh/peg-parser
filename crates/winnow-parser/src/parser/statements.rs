@@ -11,12 +11,12 @@ use super::{
     ctx_del, ctx_load, ctx_store, get_text, kw, make_error, op, parse_token_type, set_context,
     set_location, TokenStream,
 };
-use crate::tokenizer::{TokInfo, Token};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyString};
 use winnow::combinator::{cut_err, not, opt, peek, repeat, separated};
 use winnow::error::{ContextError, ErrMode};
 use winnow::prelude::*;
+use xtokens::{TokInfo, Token};
 
 // file[ast.Module]: a=[statements] ENDMARKER { ast.Module(body=a or [], type_ignores=[]) }
 pub fn parse_file<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
@@ -1196,7 +1196,7 @@ fn parse_break_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>> {
     let tokens = input.input;
     let start_tok = tokens[0].clone();
     let _ = kw(b"break").parse_next(input)?;
-    let py = input.state.py;
+    let _py = input.state.py;
     let ast = input.state.ast.clone();
     let node = ast
         .call_method0("Break")
@@ -1209,7 +1209,7 @@ fn parse_continue_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyAny>
     let tokens = input.input;
     let start_tok = tokens[0].clone();
     let _ = kw(b"continue").parse_next(input)?;
-    let py = input.state.py;
+    let _py = input.state.py;
     let ast = input.state.ast.clone();
     let node = ast
         .call_method0("Continue")
@@ -1587,7 +1587,7 @@ fn parse_import_from_stmt<'s>(input: &mut TokenStream<'s>) -> ModalResult<Py<PyA
     let ast = input.state.ast.clone();
     let names_list = PyList::new(py, names).unwrap();
     let mod_obj = match module {
-        Some(m) => PyString::new(py, &m).into(),
+        Some(ref m) => PyString::new(py, m).into(),
         None => py.None(),
     };
 

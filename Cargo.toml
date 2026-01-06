@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
-
 members = ["crates/*"]
 [workspace.dependencies]
+xtokens = { path = "crates/xtokens" }
 pyo3 = { version = "0.27.*", features = [
     "extension-module",
     "experimental-inspect",

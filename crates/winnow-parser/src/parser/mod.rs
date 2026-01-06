@@ -1,10 +1,11 @@
-use crate::tokenizer::{tokenize, TokInfo, Token};
+use crate::tokenizer::tokenize;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyString};
 use winnow::error::{ContextError, ErrMode};
 use winnow::prelude::*;
 use winnow::stream::Stateful;
 use winnow::token::any;
+use xtokens::{TokInfo, Token};
 
 pub mod atoms;
 pub mod expr_ops;
@@ -79,7 +80,7 @@ pub fn kw<'s>(target: &'static [u8]) -> impl FnMut(&mut TokenStream<'s>) -> Moda
 }
 
 // ### Error Reporting Helper ###
-pub fn make_error(msg: String) -> ErrMode<ContextError> {
+pub fn make_error(_msg: String) -> ErrMode<ContextError> {
     // println!("Parser Error: {}", msg);
     ErrMode::Backtrack(ContextError::new())
 }

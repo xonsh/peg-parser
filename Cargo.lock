@@ -192,4 +192,12 @@ version = "0.1.4"
 dependencies = [
  "pyo3",
  "winnow",
+ "xtokens",
+]
+
+[[package]]
+name = "xtokens"
+version = "0.1.0"
+dependencies = [
+ "pyo3",
 ]

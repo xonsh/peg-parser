@@ -3,7 +3,7 @@ use super::expressions::{
     parse_expression, parse_generators, parse_star_expression, parse_star_expressions,
 };
 use super::{ctx_load, get_text, kw, make_error, op, parse_token_type, set_location, TokenStream};
-use crate::tokenizer::{TokInfo, Token};
+use xtokens::{Token, TokInfo};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use winnow::combinator::peek;
