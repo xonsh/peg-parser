@@ -1,0 +1,14 @@
+[package]
+name = "ser_rs"
+version = "0.1.0"
+edition = "2024"
+description = "A parser combinator with PEG formalization"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "ser_rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pyo3 = { workspace = true }
+thiserror = { workspace = true }
