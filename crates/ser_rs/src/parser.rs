@@ -175,6 +175,54 @@ impl<'a, I, O> Parser<'a, I, O> {
         })
     }
 
+    /// `p.repeat_discard(5)` repeat p exactly 5 times, discarding results
+    /// `p.repeat_discard(0..)` repeat p zero or more times
+    pub fn repeat_discard<R>(self, range: R) -> Parser<'a, I, ()>
+    where
+        R: RangeArgument<usize> + Debug + 'a,
+        O: 'a,
+    {
+        Parser::new(move |input: &'a [I], start: usize| {
+            let mut count = 0;
+            let mut pos = start;
+            loop {
+                match range.end() {
+                    Included(&max_count) => {
+                        if count >= max_count {
+                            break;
+                        }
+                    }
+                    Excluded(&max_count) => {
+                        if count + 1 >= max_count {
+                            break;
+                        }
+                    }
+                    Unbounded => (),
+                }
+
+                match (self.method)(input, pos) {
+                    Ok((_, item_pos)) => {
+                        count += 1;
+                        pos = item_pos;
+                    }
+                    Err(_) => break,
+                }
+            }
+            if let Included(&min_count) = range.start() {
+                if count < min_count {
+                    return Err(Error::Mismatch {
+                        message: format!(
+                            "expect repeat at least {} times, found {} times",
+                            min_count, count
+                        ),
+                        position: start,
+                    });
+                }
+            }
+            Ok(((), pos))
+        })
+    }
+
     #[cfg(not(feature = "trace"))]
     /// Give parser a name to identify parsing errors.
     pub fn name(self, name: &'a str) -> Self
