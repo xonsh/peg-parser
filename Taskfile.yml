@@ -40,7 +40,7 @@ tasks:
 
   dev:
     cmds:
-      - cd winnow-parser && maturin develop
+      - cd crates/winnow-parser && maturin develop
 
   profile:
     #    deps:
