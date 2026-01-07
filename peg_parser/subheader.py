@@ -22,6 +22,8 @@ Load = ast.Load()
 Store = ast.Store()
 Del = ast.Del()
 
+_MEMOIZE_COUNTER = [0]
+
 # Node = TypeVar("Node", bound=ast.stmt | ast.expr)
 
 
@@ -106,20 +108,22 @@ def logger(method: F) -> F:
 def memoize(method: F) -> F:
     """Memoize a symbol method."""
     method_name = method.__name__
+    method_id = _MEMOIZE_COUNTER[0]
+    _MEMOIZE_COUNTER[0] += 1
 
     def memoize_wrapper(self: P) -> Any:
-        mark = self._mark()
-        key = mark, method_name
+        mark = self._tokenizer._index
         # Fast path: cache hit, and not verbose.
-        if key in self._cache and not self._verbose:
-            tree, endmark = self._cache[key]
-            self._reset(endmark)
+        cache = self._caches[method_id]
+        if mark in cache and not self._verbose:
+            tree, endmark = cache[mark]
+            self._tokenizer._index = endmark
             return tree
         # Slow path: no cache hit, or verbose.
         verbose, argsr, fill = self._verbose, "", ""
         if verbose:
             fill = "  " * self._level
-        if key not in self._cache:
+        if mark not in cache:
             if verbose:
                 print(f"{fill}{method_name}({argsr}) ... (looking at {self.showpeek()})")
                 self._level += 1
@@ -127,13 +131,13 @@ def memoize(method: F) -> F:
             if verbose:
                 self._level -= 1
                 print(f"{fill}... {method_name}({argsr}) -> {tree!s:.200}")
-            endmark = self._mark()
-            self._cache[key] = tree, endmark
+            endmark = self._tokenizer._index
+            cache[mark] = tree, endmark
         else:
-            tree, endmark = self._cache[key]
+            tree, endmark = cache[mark]
             if verbose:
                 print(f"{fill}{method_name}({argsr}) -> {tree!s:.200}")
-            self._reset(endmark)
+            self._tokenizer._index = endmark
         return tree
 
     memoize_wrapper.__wrapped__ = method  # type: ignore
@@ -143,20 +147,22 @@ def memoize(method: F) -> F:
 def memoize_left_rec(method: Callable[[P], T | None]) -> Callable[[P], T | None]:
     """Memoize a left-recursive symbol method."""
     method_name = method.__name__
+    method_id = _MEMOIZE_COUNTER[0]
+    _MEMOIZE_COUNTER[0] += 1
 
     def memoize_left_rec_wrapper(self: P) -> T | Any | None:
-        mark = self._mark()
-        key = mark, method_name
+        mark = self._tokenizer._index
         # Fast path: cache hit, and not verbose.
-        if key in self._cache and not self._verbose:
-            tree, endmark = self._cache[key]
-            self._reset(endmark)
+        cache = self._caches[method_id]
+        if mark in cache and not self._verbose:
+            tree, endmark = cache[mark]
+            self._tokenizer._index = endmark
             return tree
         # Slow path: no cache hit, or verbose.
         verbose, fill = self._verbose, ""
         if verbose:
             fill = "  " * self._level
-        if key not in self._cache:
+        if mark not in cache:
             if verbose:
                 print(f"{fill}{method_name} ... (looking at {self.showpeek()})")
                 self._level += 1
@@ -170,7 +176,7 @@ def memoize_left_rec(method: Callable[[P], T | None]) -> Callable[[P], T | None]
             # (http://web.cs.ucla.edu/~todd/research/pub.php?id=pepm08).
 
             # Prime the cache with a failure.
-            self._cache[key] = None, mark
+            cache[mark] = None, mark
             lastresult: Any = None
             lastmark = mark
             depth = 0
@@ -178,13 +184,13 @@ def memoize_left_rec(method: Callable[[P], T | None]) -> Callable[[P], T | None]
                 print(f"{fill}Recursive {method_name} at {mark} depth {depth}")
 
             while True:
-                self._reset(mark)
+                self._tokenizer._index = mark
                 self.in_recursive_rule += 1
                 try:
                     result = method(self)
                 finally:
                     self.in_recursive_rule -= 1
-                endmark = self._mark()
+                endmark = self._tokenizer._index
                 depth += 1
                 if verbose:
                     print(
@@ -198,26 +204,26 @@ def memoize_left_rec(method: Callable[[P], T | None]) -> Callable[[P], T | None]
                     if verbose:
                         print(f"{fill}Bailing with {lastresult!s:.200} to {lastmark}")
                     break
-                self._cache[key] = lastresult, lastmark = result, endmark
+                cache[mark] = lastresult, lastmark = result, endmark
 
-            self._reset(lastmark)
+            self._tokenizer._index = lastmark
             tree = lastresult
 
             if verbose:
                 self._level -= 1
                 print(f"{fill}{method_name}() -> {tree!s:.200} [cached]")
             if tree:
-                endmark = self._mark()
+                endmark = self._tokenizer._index
             else:
                 endmark = mark
-                self._reset(endmark)
-            self._cache[key] = tree, endmark
+                self._tokenizer._index = endmark
+            cache[mark] = tree, endmark
         else:
-            tree, endmark = self._cache[key]
+            tree, endmark = cache[mark]
             if verbose:
                 print(f"{fill}{method_name}() -> {tree!s:.200} [fresh]")
             if tree:
-                self._reset(endmark)
+                self._tokenizer._index = endmark
         return tree
 
     memoize_left_rec_wrapper.__wrapped__ = method  # type: ignore
@@ -260,7 +266,7 @@ class Parser:
         "_tokenizer",
         "_verbose",
         "_level",
-        "_cache",
+        "_caches",
         "tok_cls",
         "in_recursive_rule",
         "_path_token",
@@ -285,7 +291,9 @@ class Parser:
         self._tokenizer = tokenizer
         self._verbose = verbose
         self._level = 0
-        self._cache: dict[tuple[Mark, str], tuple[Any, Mark]] = {}
+        self._verbose = verbose
+        self._level = 0
+        self._caches: list[dict[int, tuple[Any, Mark]]] = [{} for _ in range(_MEMOIZE_COUNTER[0] + 10)]
         self.tok_cls = tokenizer.tok_cls
 
         # Integer tracking wether we are in a left recursive rule or not. Can be useful
@@ -295,15 +303,17 @@ class Parser:
         # handle path literal joined-str
         self._path_token: TokenInfo | None = None
 
-        # Pass through common tokenizer methods.
-        self._mark = self._tokenizer.mark
-        self._reset = self._tokenizer.reset
-
         # Are we looking for syntax error ? When true enable matching on invalid rules
         self.call_invalid_rules = False
 
         self.filename = filename
         self.py_version = min(py_version, sys.version_info) if py_version else sys.version_info
+
+    def _mark(self) -> Mark:
+        return self._tokenizer._index
+
+    def _reset(self, index: Mark) -> None:
+        self._tokenizer._index = index
 
     def showpeek(self) -> str:
         tok = self._tokenizer.peek()
@@ -344,12 +354,12 @@ class Parser:
         return None
 
     def repeated(self, func: Callable[..., TR | None], *args: Any) -> list[TR]:
-        mark = self._mark()
+        mark = self._tokenizer._index
         children = []
         while result := func(*args):
             children.append(result)
-            mark = self._mark()
-        self._reset(mark)
+            mark = self._tokenizer._index
+        self._tokenizer._index = mark
         return children
 
     def sep_repeated(
@@ -370,24 +380,24 @@ class Parser:
     ) -> list[TG] | None:
         # gather: ','.e+
         seq: list[TG]
-        mark = self._mark()
+        mark = self._tokenizer._index
         if (elem := self.seq_alts(func)) is not None and (
             seq := self.repeated(self.sep_repeated, func, sep, *sep_args)
         ) is not None:
             return [elem, *seq]
-        self._reset(mark)
+        self._tokenizer._index = mark
         return None
 
     def positive_lookahead(self, func: Callable[..., T], *args: object) -> T:
-        mark = self._mark()
+        mark = self._tokenizer._index
         ok = func(*args)
-        self._reset(mark)
+        self._tokenizer._index = mark
         return ok
 
     def negative_lookahead(self, func: Callable[..., object], *args: object) -> bool:
-        mark = self._mark()
+        mark = self._tokenizer._index
         ok = func(*args)
-        self._reset(mark)
+        self._tokenizer._index = mark
         return not ok
 
     def span(self, lnum: int, col: int) -> SpanDict:
@@ -396,7 +406,7 @@ class Parser:
 
     def seq_alts(self, *alt: Callable[..., T] | tuple[Callable[..., T], Any]) -> T | None:
         """Handle sequence of alts that don't have action associated with them."""
-        mark = self._mark()
+        mark = self._tokenizer._index
         for arg in alt:
             if isinstance(arg, tuple):
                 method, *args = arg
@@ -405,7 +415,7 @@ class Parser:
                 res = arg()
             if res:
                 return res
-            self._reset(mark)
+            self._tokenizer._index = mark
         return None
 
     def parse(self, rule: str, call_invalid_rules: bool = False) -> Node | Any | None:
@@ -423,7 +433,8 @@ class Parser:
                 # Reset the parser cache to be able to restart parsing from the
                 # beginning.
                 self._reset(0)  # type: ignore
-                self._cache.clear()
+                for c in self._caches:
+                    c.clear()
 
                 res = getattr(self, rule)()
 

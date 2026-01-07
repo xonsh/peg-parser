@@ -112,6 +112,9 @@ class Tokenizer:
 
     def peek(self) -> TokenInfo:
         """Return the next token *without* updating the index."""
+        if self._index < len(self._tokens):
+            return self._tokens[self._index]
+
         try:
             while self._index == len(self._tokens):
                 # if self._with_macro:
