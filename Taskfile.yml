@@ -7,13 +7,13 @@ tasks:
   generate-meta:
     cmds:
       - git checkout pegen/grammar_parser.py
-      - python3 -m pegen pegen/metagrammar.gram -o pegen/grammar_parser.py
+      - uv run python3 -m pegen pegen/metagrammar.gram -o pegen/grammar_parser.py
       - ruff format pegen/grammar_parser.py
   generate:
     deps:
       - dev
     cmds:
-      - python3 tasks/generator.py
+      - uv run python3 tasks/generator.py
       - ruff check --fix peg_parser/parser.py
       - ruff format peg_parser/parser.py
       - scc peg_parser/parser.py --uloc
@@ -32,8 +32,8 @@ tasks:
 
   profile-tasks:
     cmds:
-      - python tasks/profile_mem.py | tee -a {{.LOG_FILE}}
-      - python tasks/simple.py | tee -a {{.LOG_FILE}}
+      - uv run python tasks/profile_mem.py | tee -a {{.LOG_FILE}}
+      - uv run python tasks/simple.py | tee -a {{.LOG_FILE}}
     vars:
       LOG_FILE:
         sh: echo ".local/logs/xonsh-parser-$(date "+%Y%m%d-%H%M%S").$(git rev-parse --short HEAD).log"
@@ -63,7 +63,7 @@ tasks:
     deps:
       - generate
     cmds:
-      - python -m pytest {{.CLI_ARGS}}
+      - uv run python -m pytest {{.CLI_ARGS}}
   #    sources:
   #      - '**/*.py'
 
@@ -82,23 +82,23 @@ tasks:
 
   memray:
     cmds:
-      - pytest --memray
+      - uv run pytest --memray
   mypy1:
     cmds:
-      - mypy peg_parser
+      - uv run mypy peg_parser
   mypy:
     cmds:
       - watchexec -e py,toml,gram --clear -- task generate mypy1
 
   build_dep:
     cmds:
-      - pip install setuptools_scm wheel
+      - uv run uv pip install setuptools_scm wheel
 
   mypycify:
     deps:
       - build_dep
     cmds:
-      - env COMPILE_WITH_MYPYC=1 pip install -e . --no-build-isolation
+      - env COMPILE_WITH_MYPYC=1 uv pip install -e . --no-build-isolation
     sources:
       - peg_parser/subheader.py
       - peg_parser/toke*.py
@@ -107,7 +107,7 @@ tasks:
     deps:
       - build_dep
     cmds:
-      - env COMPILE_WITH_CYTHON=1 pip install -e . --no-build-isolation
+      - env COMPILE_WITH_CYTHON=1 uv pip install -e . --no-build-isolation
     sources:
       - peg_parser/*.py
       - peg_parser/*.pxd
@@ -126,13 +126,13 @@ tasks:
 
   pytest-bench:
     cmds:
-      - pytest tests/benchmarks.py --benchmark-only --benchmark-autosave {{.CLI_ARGS}}
+      - uv run pytest tests/benchmarks.py --benchmark-only --benchmark-autosave {{.CLI_ARGS}}
 
   bench-lexer:
     deps:
       - dev
     cmds:
-      - pytest tests/bench_lexer.py --benchmark-only --benchmark-autosave {{.CLI_ARGS}}
+      - uv run pytest tests/bench_lexer.py --benchmark-only --benchmark-autosave {{.CLI_ARGS}}
 
   pytest-bench-plot:
     desc: Generate an SVG histogram of all recorded benchmarks

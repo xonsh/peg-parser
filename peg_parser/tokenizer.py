@@ -14,7 +14,7 @@ WS_TOKENS = {"ENDMARKER", "NEWLINE", "DEDENT", "INDENT"}
 SKIP_TOKENS = ("WS", "COMMENT", "NL")
 
 
-def rs_tokenize(source: str) -> list[TokenInfo]:
+def rs_tokenize(source: str) -> tuple:
     import winnow_parser as wp
 
     from peg_parser.tokenize import TokenInfo
@@ -22,7 +22,7 @@ def rs_tokenize(source: str) -> list[TokenInfo]:
     return wp.tokenize(source), wp.TokInfo, TokenInfo
 
 
-def py_tokenize(source: str) -> list[TokenInfo]:
+def py_tokenize(source: str) -> tuple:
     from peg_parser.tokenize import TokenInfo, generate_tokens
 
     return list(generate_tokens(source)), TokenInfo, TokenInfo

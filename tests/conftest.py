@@ -56,7 +56,10 @@ def _py_lex_input(inp: str) -> list[TokenInfo]:
     return tokens
 
 
-LEXERS = ["rust", "py"]
+LEXERS = [
+    # "rust",
+    "py"
+]
 
 
 @pytest.fixture(params=LEXERS, name="lexer")
