@@ -72,8 +72,8 @@ class XonshParser(Parser):
         if a := self.compound_stmt():
             return [a]
         self._reset(mark)
-        if a := self.simple_stmts():
-            return a
+        if a_1 := self.simple_stmts():
+            return a_1
         self._reset(mark)
         return None
 
@@ -600,8 +600,8 @@ class XonshParser(Parser):
         if (d := self.decorators()) and (f := self.function_def_raw()):
             return self.set_decorators(f, d)
         self._reset(mark)
-        if f := self.function_def_raw():
-            return self.set_decorators(f, [])
+        if f_1 := self.function_def_raw():
+            return self.set_decorators(f_1, [])
         self._reset(mark)
         return None
 
@@ -638,23 +638,23 @@ class XonshParser(Parser):
         if (
             (self.expect("async"))
             and (self.expect("def"))
-            and (n := self.name())
-            and (t := self.type_params(),)
+            and (n_1 := self.name())
+            and (t_1 := self.type_params(),)
             and (self.expect_forced(self.expect("("), "'('"))
-            and (params := self.params(),)
+            and (params_1 := self.params(),)
             and (self.expect(")"))
-            and (a := self.return_expr(),)
+            and (a_1 := self.return_expr(),)
             and (self.expect_forced(self.expect(":"), "':'"))
-            and (tc := self.func_type_comment(),)
-            and (b := self.block())
+            and (tc_1 := self.func_type_comment(),)
+            and (b_1 := self.block())
         ):
             return ast.AsyncFunctionDef(
-                name=n.string,
-                args=params or self.make_arguments(None, [], None, [], None),
-                returns=a,
-                body=b,
-                type_comment=tc,
-                **{"type_params": t or []} if sys.version_info >= (3, 12) else {},
+                name=n_1.string,
+                args=params_1 or self.make_arguments(None, [], None, [], None),
+                returns=a_1,
+                body=b_1,
+                type_comment=tc_1,
+                **{"type_params": t_1 or []} if sys.version_info >= (3, 12) else {},
                 **self.span(_lnum, _col),
             )
         self._reset(mark)
@@ -719,11 +719,11 @@ class XonshParser(Parser):
             return [(p, None) for p in a]
         self._reset(mark)
         if (
-            (a := self.repeated(self.param_no_default))
+            (a_1 := self.repeated(self.param_no_default))
             and (self.expect("/"))
             and (self.positive_lookahead(self.expect, ")"))
         ):
-            return [(p, None) for p in a]
+            return [(p, None) for p in a_1]
         self._reset(mark)
         return None
 
@@ -740,12 +740,12 @@ class XonshParser(Parser):
             return ([(p, None) for p in a] if a else []) + b
         self._reset(mark)
         if (
-            (a := self.repeated(self.param_no_default),)
-            and (b := self.repeated(self.param_with_default))
+            (a_1 := self.repeated(self.param_no_default),)
+            and (b_1 := self.repeated(self.param_with_default))
             and (self.expect("/"))
             and (self.positive_lookahead(self.expect, ")"))
         ):
-            return ([(p, None) for p in a] if a else []) + b
+            return ([(p, None) for p in a_1] if a_1 else []) + b_1
         self._reset(mark)
         return None
 
@@ -766,22 +766,22 @@ class XonshParser(Parser):
         self._reset(mark)
         if (
             (self.expect("*"))
-            and (a := self.param_no_default_star_annotation())
-            and (b := self.repeated(self.param_maybe_default),)
-            and (c := self.kwds(),)
+            and (a_1 := self.param_no_default_star_annotation())
+            and (b_1 := self.repeated(self.param_maybe_default),)
+            and (c_1 := self.kwds(),)
         ):
-            return (a, b, c)
+            return (a_1, b_1, c_1)
         self._reset(mark)
         if (
             (self.expect("*"))
             and (self.expect(","))
-            and (b := self.repeated(self.param_maybe_default))
-            and (c := self.kwds(),)
+            and (b_2 := self.repeated(self.param_maybe_default))
+            and (c_2 := self.kwds(),)
         ):
-            return (None, b, c)
+            return (None, b_2, c_2)
         self._reset(mark)
-        if a := self.kwds():
-            return (None, [], a)
+        if a_2 := self.kwds():
+            return (None, [], a_2)
         self._reset(mark)
         return None
 
@@ -805,11 +805,11 @@ class XonshParser(Parser):
             return a
         self._reset(mark)
         if (
-            (a := self.param())
+            (a_1 := self.param())
             and (self.token("TYPE_COMMENT"),)
             and (self.positive_lookahead(self.expect, ")"))
         ):
-            return a
+            return a_1
         self._reset(mark)
         return None
 
@@ -821,11 +821,11 @@ class XonshParser(Parser):
             return a
         self._reset(mark)
         if (
-            (a := self.param_star_annotation())
+            (a_1 := self.param_star_annotation())
             and (self.token("TYPE_COMMENT"),)
             and (self.positive_lookahead(self.expect, ")"))
         ):
-            return a
+            return a_1
         self._reset(mark)
         return None
 
@@ -842,12 +842,12 @@ class XonshParser(Parser):
             return (a, c)
         self._reset(mark)
         if (
-            (a := self.param())
-            and (c := self.default())
+            (a_1 := self.param())
+            and (c_1 := self.default())
             and (self.token("TYPE_COMMENT"),)
             and (self.positive_lookahead(self.expect, ")"))
         ):
-            return (a, c)
+            return (a_1, c_1)
         self._reset(mark)
         return None
 
@@ -864,12 +864,12 @@ class XonshParser(Parser):
             return (a, c)
         self._reset(mark)
         if (
-            (a := self.param())
-            and (c := self.default(),)
+            (a_1 := self.param())
+            and (c_1 := self.default(),)
             and (self.token("TYPE_COMMENT"),)
             and (self.positive_lookahead(self.expect, ")"))
         ):
-            return (a, c)
+            return (a_1, c_1)
         self._reset(mark)
         return None
 
@@ -942,12 +942,12 @@ class XonshParser(Parser):
         self._reset(mark)
         if (
             (self.expect("if"))
-            and (a := self.named_expression())
+            and (a_1 := self.named_expression())
             and (self.expect(":"))
-            and (b := self.block())
-            and (c := self.else_block(),)
+            and (b_1 := self.block())
+            and (c_1 := self.else_block(),)
         ):
-            return ast.If(test=a, body=b, orelse=c or [], **self.span(_lnum, _col))
+            return ast.If(test=a_1, body=b_1, orelse=c_1 or [], **self.span(_lnum, _col))
         self._reset(mark)
         return None
 
@@ -970,12 +970,12 @@ class XonshParser(Parser):
         self._reset(mark)
         if (
             (self.expect("elif"))
-            and (a := self.named_expression())
+            and (a_1 := self.named_expression())
             and (self.expect(":"))
-            and (b := self.block())
-            and (c := self.else_block(),)
+            and (b_1 := self.block())
+            and (c_1 := self.else_block(),)
         ):
-            return [ast.If(test=a, body=b, orelse=c or [], **self.span(_lnum, _col))]
+            return [ast.If(test=a_1, body=b_1, orelse=c_1 or [], **self.span(_lnum, _col))]
         self._reset(mark)
         return None
 
@@ -1040,17 +1040,22 @@ class XonshParser(Parser):
         if (
             (self.expect("async"))
             and (self.expect("for"))
-            and (t := self.star_targets())
+            and (t_1 := self.star_targets())
             and (self.expect("in"))
             and (cut := True)
-            and (ex := self.star_expressions())
+            and (ex_1 := self.star_expressions())
             and (self.expect(":"))
-            and (tc := self.type_comment_str(),)
-            and (b := self.block())
-            and (el := self.else_block(),)
+            and (tc_1 := self.type_comment_str(),)
+            and (b_1 := self.block())
+            and (el_1 := self.else_block(),)
         ):
             return ast.AsyncFor(
-                target=t, iter=ex, body=b, orelse=el or [], type_comment=tc, **self.span(_lnum, _col)
+                target=t_1,
+                iter=ex_1,
+                body=b_1,
+                orelse=el_1 or [],
+                type_comment=tc_1,
+                **self.span(_lnum, _col),
             )
         self._reset(mark)
         if cut:
@@ -1083,44 +1088,44 @@ class XonshParser(Parser):
         if (
             (self.expect("with"))
             and (self.expect("("))
-            and (a := self.gathered(self.with_item, self.expect, ","))
+            and (a_1 := self.gathered(self.with_item, self.expect, ","))
             and (self.expect(","),)
             and (self.expect(")"))
             and (self.expect(":"))
             and (b := self.block())
         ):
-            return ast.With(items=a, body=b, **self.span(_lnum, _col))
+            return ast.With(items=a_1, body=b, **self.span(_lnum, _col))
         self._reset(mark)
         if (
             (self.expect("with"))
-            and (a := self.gathered(self.with_item, self.expect, ","))
+            and (a_2 := self.gathered(self.with_item, self.expect, ","))
             and (self.expect(":"))
             and (tc := self.type_comment_str(),)
-            and (b := self.block())
+            and (b_1 := self.block())
         ):
-            return ast.With(items=a, body=b, type_comment=tc, **self.span(_lnum, _col))
+            return ast.With(items=a_2, body=b_1, type_comment=tc, **self.span(_lnum, _col))
         self._reset(mark)
         if (
             (self.expect("async"))
             and (self.expect("with"))
             and (self.expect("("))
-            and (a := self.gathered(self.with_item, self.expect, ","))
+            and (a_3 := self.gathered(self.with_item, self.expect, ","))
             and (self.expect(","),)
             and (self.expect(")"))
             and (self.expect(":"))
-            and (b := self.block())
+            and (b_2 := self.block())
         ):
-            return ast.AsyncWith(items=a, body=b, **self.span(_lnum, _col))
+            return ast.AsyncWith(items=a_3, body=b_2, **self.span(_lnum, _col))
         self._reset(mark)
         if (
             (self.expect("async"))
             and (self.expect("with"))
-            and (a := self.gathered(self.with_item, self.expect, ","))
+            and (a_4 := self.gathered(self.with_item, self.expect, ","))
             and (self.expect(":"))
-            and (tc := self.type_comment_str(),)
-            and (b := self.block())
+            and (tc_1 := self.type_comment_str(),)
+            and (b_3 := self.block())
         ):
-            return ast.AsyncWith(items=a, body=b, type_comment=tc, **self.span(_lnum, _col))
+            return ast.AsyncWith(items=a_4, body=b_3, type_comment=tc_1, **self.span(_lnum, _col))
         self._reset(mark)
         if self.call_invalid_rules and (self.invalid_with_stmt()):
             return None
@@ -1142,8 +1147,8 @@ class XonshParser(Parser):
         if self.call_invalid_rules and (self.invalid_with_item()):
             return None
         self._reset(mark)
-        if e := self.expression():
-            return ast.withitem(context_expr=e, optional_vars=None)
+        if e_1 := self.expression():
+            return ast.withitem(context_expr=e_1, optional_vars=None)
         self._reset(mark)
         return None
 
@@ -1166,25 +1171,29 @@ class XonshParser(Parser):
         if (
             (self.expect("try"))
             and (self.expect_forced(self.expect(":"), "':'"))
-            and (b := self.block())
+            and (b_1 := self.block())
             and (ex := self.repeated(self.except_block))
             and (el := self.else_block(),)
-            and (f := self.finally_block(),)
+            and (f_1 := self.finally_block(),)
         ):
-            return ast.Try(body=b, handlers=ex, orelse=el or [], finalbody=f or [], **self.span(_lnum, _col))
+            return ast.Try(
+                body=b_1, handlers=ex, orelse=el or [], finalbody=f_1 or [], **self.span(_lnum, _col)
+            )
         self._reset(mark)
         if (
             (self.expect("try"))
             and (self.expect_forced(self.expect(":"), "':'"))
-            and (b := self.block())
-            and (ex := self.repeated(self.except_star_block))
-            and (el := self.else_block(),)
-            and (f := self.finally_block(),)
+            and (b_2 := self.block())
+            and (ex_1 := self.repeated(self.except_star_block))
+            and (el_1 := self.else_block(),)
+            and (f_2 := self.finally_block(),)
         ):
             return self.check_version(
                 (3, 11),
                 "Exception groups are",
-                ast.TryStar(body=b, handlers=ex, orelse=el or [], finalbody=f or [], **self.span(_lnum, _col))
+                ast.TryStar(
+                    body=b_2, handlers=ex_1, orelse=el_1 or [], finalbody=f_2 or [], **self.span(_lnum, _col)
+                )
                 if sys.version_info >= (3, 11)
                 else None,
             )
@@ -1208,8 +1217,8 @@ class XonshParser(Parser):
         ):
             return ast.ExceptHandler(type=e, name=t, body=b, **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.expect("except")) and (self.expect(":")) and (b := self.block()):
-            return ast.ExceptHandler(type=None, name=None, body=b, **self.span(_lnum, _col))
+        if (self.expect("except")) and (self.expect(":")) and (b_1 := self.block()):
+            return ast.ExceptHandler(type=None, name=None, body=b_1, **self.span(_lnum, _col))
         self._reset(mark)
         if self.call_invalid_rules and (self.invalid_except_stmt()):
             return None
@@ -1388,11 +1397,11 @@ class XonshParser(Parser):
         if (value := self.signed_number()) and (self.negative_lookahead(self._tmp_18)):
             return ast.MatchValue(value=value, **self.span(_lnum, _col))
         self._reset(mark)
-        if value := self.complex_number():
-            return ast.MatchValue(value=value, **self.span(_lnum, _col))
+        if value_1 := self.complex_number():
+            return ast.MatchValue(value=value_1, **self.span(_lnum, _col))
         self._reset(mark)
-        if value := self.strings():
-            return ast.MatchValue(value=value, **self.span(_lnum, _col))
+        if value_2 := self.strings():
+            return ast.MatchValue(value=value_2, **self.span(_lnum, _col))
         self._reset(mark)
         if self.expect("None"):
             return ast.MatchSingleton(value=None, **self.span(_lnum, _col))
@@ -1438,8 +1447,12 @@ class XonshParser(Parser):
         if (real := self.signed_real_number()) and (self.expect("+")) and (imag := self.imaginary_number()):
             return ast.BinOp(left=real, op=ast.Add(), right=imag, **self.span(_lnum, _col))
         self._reset(mark)
-        if (real := self.signed_real_number()) and (self.expect("-")) and (imag := self.imaginary_number()):
-            return ast.BinOp(left=real, op=ast.Sub(), right=imag, **self.span(_lnum, _col))
+        if (
+            (real_1 := self.signed_real_number())
+            and (self.expect("-"))
+            and (imag_1 := self.imaginary_number())
+        ):
+            return ast.BinOp(left=real_1, op=ast.Sub(), right=imag_1, **self.span(_lnum, _col))
         self._reset(mark)
         return None
 
@@ -1451,15 +1464,15 @@ class XonshParser(Parser):
         if a := self.token("NUMBER"):
             return ast.Constant(value=ast.literal_eval(a.string), **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.expect("-")) and (a := self.token("NUMBER")):
+        if (self.expect("-")) and (a_1 := self.token("NUMBER")):
             return ast.UnaryOp(
                 op=ast.USub(),
                 operand=ast.Constant(
-                    value=ast.literal_eval(a.string),
-                    lineno=a.start[0],
-                    col_offset=a.start[1],
-                    end_lineno=a.end[0],
-                    end_col_offset=a.end[1],
+                    value=ast.literal_eval(a_1.string),
+                    lineno=a_1.start[0],
+                    col_offset=a_1.start[1],
+                    end_lineno=a_1.end[0],
+                    end_col_offset=a_1.end[1],
                 ),
                 **self.span(_lnum, _col),
             )
@@ -1582,8 +1595,8 @@ class XonshParser(Parser):
         if (self.expect("[")) and (patterns := self.maybe_sequence_pattern(),) and (self.expect("]")):
             return ast.MatchSequence(patterns=patterns or [], **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.expect("(")) and (patterns := self.open_sequence_pattern(),) and (self.expect(")")):
-            return ast.MatchSequence(patterns=patterns or [], **self.span(_lnum, _col))
+        if (self.expect("(")) and (patterns_1 := self.open_sequence_pattern(),) and (self.expect(")")):
+            return ast.MatchSequence(patterns=patterns_1 or [], **self.span(_lnum, _col))
         self._reset(mark)
         return None
 
@@ -1650,26 +1663,26 @@ class XonshParser(Parser):
             (self.expect("{"))
             and (items := self.items_pattern())
             and (self.expect(","))
-            and (rest := self.double_star_pattern())
+            and (rest_1 := self.double_star_pattern())
             and (self.expect(","),)
             and (self.expect("}"))
         ):
             return ast.MatchMapping(
                 keys=[k for k, _ in items],
                 patterns=[p for _, p in items],
-                rest=rest,
+                rest=rest_1,
                 **self.span(_lnum, _col),
             )
         self._reset(mark)
         if (
             (self.expect("{"))
-            and (items := self.items_pattern())
+            and (items_1 := self.items_pattern())
             and (self.expect(","),)
             and (self.expect("}"))
         ):
             return ast.MatchMapping(
-                keys=[k for k, _ in items],
-                patterns=[p for _, p in items],
+                keys=[k for k, _ in items_1],
+                patterns=[p for _, p in items_1],
                 rest=None,
                 **self.span(_lnum, _col),
             )
@@ -1714,25 +1727,25 @@ class XonshParser(Parser):
             )
         self._reset(mark)
         if (
-            (cls := self.name_or_attr())
+            (cls_1 := self.name_or_attr())
             and (self.expect("("))
             and (patterns := self.positional_patterns())
             and (self.expect(","),)
             and (self.expect(")"))
         ):
             return ast.MatchClass(
-                cls=cls, patterns=patterns, kwd_attrs=[], kwd_patterns=[], **self.span(_lnum, _col)
+                cls=cls_1, patterns=patterns, kwd_attrs=[], kwd_patterns=[], **self.span(_lnum, _col)
             )
         self._reset(mark)
         if (
-            (cls := self.name_or_attr())
+            (cls_2 := self.name_or_attr())
             and (self.expect("("))
             and (keywords := self.keyword_patterns())
             and (self.expect(","),)
             and (self.expect(")"))
         ):
             return ast.MatchClass(
-                cls=cls,
+                cls=cls_2,
                 patterns=[],
                 kwd_attrs=[k for k, _ in keywords],
                 kwd_patterns=[p for _, p in keywords],
@@ -1740,19 +1753,19 @@ class XonshParser(Parser):
             )
         self._reset(mark)
         if (
-            (cls := self.name_or_attr())
+            (cls_3 := self.name_or_attr())
             and (self.expect("("))
-            and (patterns := self.positional_patterns())
+            and (patterns_1 := self.positional_patterns())
             and (self.expect(","))
-            and (keywords := self.keyword_patterns())
+            and (keywords_1 := self.keyword_patterns())
             and (self.expect(","),)
             and (self.expect(")"))
         ):
             return ast.MatchClass(
-                cls=cls,
-                patterns=patterns,
-                kwd_attrs=[k for k, _ in keywords],
-                kwd_patterns=[p for _, p in keywords],
+                cls=cls_3,
+                patterns=patterns_1,
+                kwd_attrs=[k for k, _ in keywords_1],
+                kwd_patterns=[p for _, p in keywords_1],
                 **self.span(_lnum, _col),
             )
         self._reset(mark)
@@ -1854,19 +1867,24 @@ class XonshParser(Parser):
                 colon,
             )
         self._reset(mark)
-        if (self.expect("*")) and (a := self.name()):
-            return ast.TypeVarTuple(name=a.string, **self.span(_lnum, _col))
+        if (self.expect("*")) and (a_1 := self.name()):
+            return ast.TypeVarTuple(name=a_1.string, **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.expect("**")) and (self.name()) and (colon := self.expect(":")) and (e := self.expression()):
+        if (
+            (self.expect("**"))
+            and (self.name())
+            and (colon_1 := self.expect(":"))
+            and (e_1 := self.expression())
+        ):
             self.raise_syntax_error_starting_from(
                 "cannot use constraints with ParamSpec"
-                if isinstance(e, ast.Tuple)
+                if isinstance(e_1, ast.Tuple)
                 else "cannot use bound with ParamSpec",
-                colon,
+                colon_1,
             )
         self._reset(mark)
-        if (self.expect("**")) and (a := self.name()):
-            return ast.ParamSpec(name=a.string, **self.span(_lnum, _col))
+        if (self.expect("**")) and (a_2 := self.name()):
+            return ast.ParamSpec(name=a_2.string, **self.span(_lnum, _col))
         self._reset(mark)
         return None
 
@@ -1887,8 +1905,8 @@ class XonshParser(Parser):
         if (a := self.expression()) and (b := self.repeated(self.comma_expression)) and (self.expect(","),):
             return ast.Tuple(elts=[a] + b, ctx=Load, **self.span(_lnum, _col))
         self._reset(mark)
-        if (a := self.expression()) and (self.expect(",")):
-            return ast.Tuple(elts=[a], ctx=Load, **self.span(_lnum, _col))
+        if (a_1 := self.expression()) and (self.expect(",")):
+            return ast.Tuple(elts=[a_1], ctx=Load, **self.span(_lnum, _col))
         self._reset(mark)
         if expression := self.expression():
             return expression
@@ -1940,8 +1958,8 @@ class XonshParser(Parser):
         if (self.expect("yield")) and (self.expect("from")) and (a := self.expression()):
             return ast.YieldFrom(value=a, **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.expect("yield")) and (a := self.star_expressions(),):
-            return ast.Yield(value=a, **self.span(_lnum, _col))
+        if (self.expect("yield")) and (a_1 := self.star_expressions(),):
+            return ast.Yield(value=a_1, **self.span(_lnum, _col))
         self._reset(mark)
         return None
 
@@ -1957,8 +1975,8 @@ class XonshParser(Parser):
         ):
             return ast.Tuple(elts=[a] + b, ctx=Load, **self.span(_lnum, _col))
         self._reset(mark)
-        if (a := self.star_expression()) and (self.expect(",")):
-            return ast.Tuple(elts=[a], ctx=Load, **self.span(_lnum, _col))
+        if (a_1 := self.star_expression()) and (self.expect(",")):
+            return ast.Tuple(elts=[a_1], ctx=Load, **self.span(_lnum, _col))
         self._reset(mark)
         if star_expression := self.star_expression():
             return star_expression
@@ -2230,7 +2248,7 @@ class XonshParser(Parser):
         return None
 
     @memoize_left_rec
-    def bitwise_or(self) -> Any | None:
+    def bitwise_or(self) -> ast.expr | None:
         # bitwise_or: bitwise_or '|' bitwise_xor | bitwise_xor
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -2243,7 +2261,7 @@ class XonshParser(Parser):
         return None
 
     @memoize_left_rec
-    def bitwise_xor(self) -> Any | None:
+    def bitwise_xor(self) -> ast.expr | None:
         # bitwise_xor: bitwise_xor '^' bitwise_and | bitwise_and
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -2256,7 +2274,7 @@ class XonshParser(Parser):
         return None
 
     @memoize_left_rec
-    def bitwise_and(self) -> Any | None:
+    def bitwise_and(self) -> ast.expr | None:
         # bitwise_and: bitwise_and '&' shift_expr | shift_expr
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -2269,15 +2287,15 @@ class XonshParser(Parser):
         return None
 
     @memoize_left_rec
-    def shift_expr(self) -> Any | None:
+    def shift_expr(self) -> ast.expr | None:
         # shift_expr: shift_expr '<<' sum | shift_expr '>>' sum | sum
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.shift_expr()) and (self.expect("<<")) and (b := self.sum()):
             return ast.BinOp(left=a, op=ast.LShift(), right=b, **self.span(_lnum, _col))
         self._reset(mark)
-        if (a := self.shift_expr()) and (self.expect(">>")) and (b := self.sum()):
-            return ast.BinOp(left=a, op=ast.RShift(), right=b, **self.span(_lnum, _col))
+        if (a_1 := self.shift_expr()) and (self.expect(">>")) and (b_1 := self.sum()):
+            return ast.BinOp(left=a_1, op=ast.RShift(), right=b_1, **self.span(_lnum, _col))
         self._reset(mark)
         if sum := self.sum():
             return sum
@@ -2285,15 +2303,15 @@ class XonshParser(Parser):
         return None
 
     @memoize_left_rec
-    def sum(self) -> Any | None:
+    def sum(self) -> ast.expr | None:
         # sum: sum '+' term | sum '-' term | term
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.sum()) and (self.expect("+")) and (b := self.term()):
             return ast.BinOp(left=a, op=ast.Add(), right=b, **self.span(_lnum, _col))
         self._reset(mark)
-        if (a := self.sum()) and (self.expect("-")) and (b := self.term()):
-            return ast.BinOp(left=a, op=ast.Sub(), right=b, **self.span(_lnum, _col))
+        if (a_1 := self.sum()) and (self.expect("-")) and (b_1 := self.term()):
+            return ast.BinOp(left=a_1, op=ast.Sub(), right=b_1, **self.span(_lnum, _col))
         self._reset(mark)
         if term := self.term():
             return term
@@ -2301,24 +2319,24 @@ class XonshParser(Parser):
         return None
 
     @memoize_left_rec
-    def term(self) -> Any | None:
+    def term(self) -> ast.expr | None:
         # term: term '*' factor | term '/' factor | term '//' factor | term '%' factor | term '@' factor | factor
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (a := self.term()) and (self.expect("*")) and (b := self.factor()):
             return ast.BinOp(left=a, op=ast.Mult(), right=b, **self.span(_lnum, _col))
         self._reset(mark)
-        if (a := self.term()) and (self.expect("/")) and (b := self.factor()):
-            return ast.BinOp(left=a, op=ast.Div(), right=b, **self.span(_lnum, _col))
+        if (a_1 := self.term()) and (self.expect("/")) and (b_1 := self.factor()):
+            return ast.BinOp(left=a_1, op=ast.Div(), right=b_1, **self.span(_lnum, _col))
         self._reset(mark)
-        if (a := self.term()) and (self.expect("//")) and (b := self.factor()):
-            return ast.BinOp(left=a, op=ast.FloorDiv(), right=b, **self.span(_lnum, _col))
+        if (a_2 := self.term()) and (self.expect("//")) and (b_2 := self.factor()):
+            return ast.BinOp(left=a_2, op=ast.FloorDiv(), right=b_2, **self.span(_lnum, _col))
         self._reset(mark)
-        if (a := self.term()) and (self.expect("%")) and (b := self.factor()):
-            return ast.BinOp(left=a, op=ast.Mod(), right=b, **self.span(_lnum, _col))
+        if (a_3 := self.term()) and (self.expect("%")) and (b_3 := self.factor()):
+            return ast.BinOp(left=a_3, op=ast.Mod(), right=b_3, **self.span(_lnum, _col))
         self._reset(mark)
-        if (a := self.term()) and (self.expect("@")) and (b := self.factor()):
-            return ast.BinOp(left=a, op=ast.MatMult(), right=b, **self.span(_lnum, _col))
+        if (a_4 := self.term()) and (self.expect("@")) and (b_4 := self.factor()):
+            return ast.BinOp(left=a_4, op=ast.MatMult(), right=b_4, **self.span(_lnum, _col))
         self._reset(mark)
         if factor := self.factor():
             return factor
@@ -2326,18 +2344,18 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def factor(self) -> Any | None:
+    def factor(self) -> ast.expr | None:
         # factor: '+' factor | '-' factor | '~' factor | power
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
         if (self.expect("+")) and (a := self.factor()):
             return ast.UnaryOp(op=ast.UAdd(), operand=a, **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.expect("-")) and (a := self.factor()):
-            return ast.UnaryOp(op=ast.USub(), operand=a, **self.span(_lnum, _col))
+        if (self.expect("-")) and (a_1 := self.factor()):
+            return ast.UnaryOp(op=ast.USub(), operand=a_1, **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.expect("~")) and (a := self.factor()):
-            return ast.UnaryOp(op=ast.Invert(), operand=a, **self.span(_lnum, _col))
+        if (self.expect("~")) and (a_2 := self.factor()):
+            return ast.UnaryOp(op=ast.Invert(), operand=a_2, **self.span(_lnum, _col))
         self._reset(mark)
         if power := self.power():
             return power
@@ -2345,7 +2363,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def power(self) -> Any | None:
+    def power(self) -> ast.expr | None:
         # power: await_primary '**' factor | await_primary
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -2358,7 +2376,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def await_primary(self) -> Any | None:
+    def await_primary(self) -> ast.expr | None:
         # await_primary: 'await' primary | primary
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -2371,7 +2389,7 @@ class XonshParser(Parser):
         return None
 
     @memoize_left_rec
-    def primary(self) -> Any | None:
+    def primary(self) -> ast.expr | None:
         # primary: primary '.' NAME | primary genexp | func_macro_start ~ MACRO_PARAM*? &&')' | primary '(' arguments? ')' | primary '[' slices ']' | &('$(' | '$[' | '![' | '!(') ~ sub_procs | env_atom | (".".help_atom+) | atom
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -2438,20 +2456,20 @@ class XonshParser(Parser):
         if cut:
             return None
         cut = False
-        if (self.expect("$[")) and (cut := True) and (args := self.proc_cmds()) and (self.expect("]")):
-            return self.handle_proc("subproc_uncaptured", args, **self.span(_lnum, _col))
+        if (self.expect("$[")) and (cut := True) and (args_1 := self.proc_cmds()) and (self.expect("]")):
+            return self.handle_proc("subproc_uncaptured", args_1, **self.span(_lnum, _col))
         self._reset(mark)
         if cut:
             return None
         cut = False
-        if (self.expect("![")) and (cut := True) and (args := self.proc_cmds()) and (self.expect("]")):
-            return self.handle_proc("subproc_captured_hiddenobject", args, **self.span(_lnum, _col))
+        if (self.expect("![")) and (cut := True) and (args_2 := self.proc_cmds()) and (self.expect("]")):
+            return self.handle_proc("subproc_captured_hiddenobject", args_2, **self.span(_lnum, _col))
         self._reset(mark)
         if cut:
             return None
         cut = False
-        if (self.expect("!(")) and (cut := True) and (args := self.proc_cmds()) and (self.expect(")")):
-            return self.handle_proc("subproc_captured_object", args, **self.span(_lnum, _col))
+        if (self.expect("!(")) and (cut := True) and (args_3 := self.proc_cmds()) and (self.expect(")")):
+            return self.handle_proc("subproc_captured_object", args_3, **self.span(_lnum, _col))
         self._reset(mark)
         if cut:
             return None
@@ -2474,8 +2492,8 @@ class XonshParser(Parser):
         if (self.expect("$")) and (a := self.name()):
             return self.expand_env_name(a, **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.expect("${")) and (a := self.slices()) and (self.expect("}")):
-            return self.expand_env_expr(a, **self.span(_lnum, _col))
+        if (self.expect("${")) and (a_1 := self.slices()) and (self.expect("}")):
+            return self.expand_env_expr(a_1, **self.span(_lnum, _col))
         self._reset(mark)
         return None
 
@@ -2503,8 +2521,8 @@ class XonshParser(Parser):
         if cut:
             return None
         cut = False
-        if (self.expect("@$(")) and (cut := True) and (a := self.proc_cmds()) and (self.expect(")")):
-            return self.proc_inject(a, **self.span(_lnum, _col))
+        if (self.expect("@$(")) and (cut := True) and (a_1 := self.proc_cmds()) and (self.expect(")")):
+            return self.proc_inject(a_1, **self.span(_lnum, _col))
         self._reset(mark)
         if cut:
             return None
@@ -2515,13 +2533,13 @@ class XonshParser(Parser):
             return search_path
         self._reset(mark)
         cut = False
-        if (self.proc_macro_start()) and (cut := True) and (a := self.repeated(self._tmp_28),):
-            return self.proc_macro_arg(a, **self.span(_lnum, _col))
+        if (self.proc_macro_start()) and (cut := True) and (a_2 := self.repeated(self._tmp_28),):
+            return self.proc_macro_arg(a_2, **self.span(_lnum, _col))
         self._reset(mark)
         if cut:
             return None
-        if a := self.cmd_group():
-            return self.proc_macro_arg(a, **self.span(_lnum, _col))
+        if a_3 := self.cmd_group():
+            return self.proc_macro_arg(a_3, **self.span(_lnum, _col))
         self._reset(mark)
         if cmd_name := self.cmd_name():
             return cmd_name
@@ -2576,8 +2594,8 @@ class XonshParser(Parser):
         if (a := self._tmp_29()) and (b := self.repeated(self.any_cmd),) and (c := self.expect(")")):
             return "".join(i.string for i in [a, *b, c])
         self._reset(mark)
-        if (a := self._tmp_30()) and (b := self.repeated(self.any_cmd),) and (c := self.expect("]")):
-            return "".join(i.string for i in [a, *b, c])
+        if (a_1 := self._tmp_30()) and (b_1 := self.repeated(self.any_cmd),) and (c_1 := self.expect("]")):
+            return "".join(i.string for i in [a_1, *b_1, c_1])
         self._reset(mark)
         return None
 
@@ -2589,8 +2607,8 @@ class XonshParser(Parser):
         if (a := self.slice()) and (self.negative_lookahead(self.expect, ",")):
             return a
         self._reset(mark)
-        if (a := self.gathered(self._tmp_31, self.expect, ",")) and (self.expect(","),):
-            return ast.Tuple(elts=a, ctx=Load, **self.span(_lnum, _col))
+        if (a_1 := self.gathered(self._tmp_31, self.expect, ",")) and (self.expect(","),):
+            return ast.Tuple(elts=a_1, ctx=Load, **self.span(_lnum, _col))
         self._reset(mark)
         return None
 
@@ -2607,13 +2625,13 @@ class XonshParser(Parser):
         ):
             return ast.Slice(lower=a, upper=b, step=c, **self.span(_lnum, _col))
         self._reset(mark)
-        if a := self.named_expression():
-            return a
+        if a_1 := self.named_expression():
+            return a_1
         self._reset(mark)
         return None
 
     @memoize
-    def atom(self) -> Any | None:
+    def atom(self) -> ast.expr | None:
         # atom: search_path | NAME | 'True' | 'False' | 'None' | &(STRING | FSTRING_START) strings | NUMBER | &'(' (ptuple | group | genexp) | &'[' (plist | listcomp) | &'{' (dict | set | dictcomp | setcomp) | '...'
         mark = self._mark()
         _lnum, _col = self._tokenizer.peek().start
@@ -2635,8 +2653,8 @@ class XonshParser(Parser):
         if (self.positive_lookahead(self._tmp_33)) and (strings := self.strings()):
             return strings
         self._reset(mark)
-        if a := self.token("NUMBER"):
-            return ast.Constant(value=ast.literal_eval(a.string), **self.span(_lnum, _col))
+        if a_1 := self.token("NUMBER"):
+            return ast.Constant(value=ast.literal_eval(a_1.string), **self.span(_lnum, _col))
         self._reset(mark)
         if (self.positive_lookahead(self.expect, "(")) and (_tmp_34 := self._tmp_34()):
             return _tmp_34
@@ -2743,11 +2761,11 @@ class XonshParser(Parser):
             return [(p, None) for p in a]
         self._reset(mark)
         if (
-            (a := self.repeated(self.lambda_param_no_default))
+            (a_1 := self.repeated(self.lambda_param_no_default))
             and (self.expect("/"))
             and (self.positive_lookahead(self.expect, ":"))
         ):
-            return [(p, None) for p in a]
+            return [(p, None) for p in a_1]
         self._reset(mark)
         return None
 
@@ -2764,12 +2782,12 @@ class XonshParser(Parser):
             return ([(p, None) for p in a] if a else []) + b
         self._reset(mark)
         if (
-            (a := self.repeated(self.lambda_param_no_default),)
-            and (b := self.repeated(self.lambda_param_with_default))
+            (a_1 := self.repeated(self.lambda_param_no_default),)
+            and (b_1 := self.repeated(self.lambda_param_with_default))
             and (self.expect("/"))
             and (self.positive_lookahead(self.expect, ":"))
         ):
-            return ([(p, None) for p in a] if a else []) + b
+            return ([(p, None) for p in a_1] if a_1 else []) + b_1
         self._reset(mark)
         return None
 
@@ -2791,13 +2809,13 @@ class XonshParser(Parser):
         if (
             (self.expect("*"))
             and (self.expect(","))
-            and (b := self.repeated(self.lambda_param_maybe_default))
-            and (c := self.lambda_kwds(),)
+            and (b_1 := self.repeated(self.lambda_param_maybe_default))
+            and (c_1 := self.lambda_kwds(),)
         ):
-            return (None, b, c)
+            return (None, b_1, c_1)
         self._reset(mark)
-        if a := self.lambda_kwds():
-            return (None, [], a)
+        if a_1 := self.lambda_kwds():
+            return (None, [], a_1)
         self._reset(mark)
         return None
 
@@ -2820,8 +2838,8 @@ class XonshParser(Parser):
         if (a := self.lambda_param()) and (self.expect(",")):
             return a
         self._reset(mark)
-        if (a := self.lambda_param()) and (self.positive_lookahead(self.expect, ":")):
-            return a
+        if (a_1 := self.lambda_param()) and (self.positive_lookahead(self.expect, ":")):
+            return a_1
         self._reset(mark)
         return None
 
@@ -2833,11 +2851,11 @@ class XonshParser(Parser):
             return (a, c)
         self._reset(mark)
         if (
-            (a := self.lambda_param())
-            and (c := self.default())
+            (a_1 := self.lambda_param())
+            and (c_1 := self.default())
             and (self.positive_lookahead(self.expect, ":"))
         ):
-            return (a, c)
+            return (a_1, c_1)
         self._reset(mark)
         return None
 
@@ -2849,11 +2867,11 @@ class XonshParser(Parser):
             return (a, c)
         self._reset(mark)
         if (
-            (a := self.lambda_param())
-            and (c := self.default(),)
+            (a_1 := self.lambda_param())
+            and (c_1 := self.default(),)
             and (self.positive_lookahead(self.expect, ":"))
         ):
-            return (a, c)
+            return (a_1, c_1)
         self._reset(mark)
         return None
 
@@ -2941,7 +2959,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def strings(self) -> Any | None:
+    def strings(self) -> ast.expr | None:
         # strings: (anystr)+
         mark = self._mark()
         if a := self.repeated(self.anystr):
@@ -3017,7 +3035,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def double_starred_kvpair(self) -> tuple[ast.expr, ast.expr] | None:
+    def double_starred_kvpair(self) -> tuple[ast.expr | None, ast.expr] | None:
         # double_starred_kvpair: '**' bitwise_or | kvpair
         mark = self._mark()
         if (self.expect("**")) and (a := self.bitwise_or()):
@@ -3067,13 +3085,13 @@ class XonshParser(Parser):
         cut = False
         if (
             (self.expect("for"))
-            and (a := self.star_targets())
+            and (a_1 := self.star_targets())
             and (self.expect("in"))
             and (cut := True)
-            and (b := self.disjunction())
-            and (c := self.repeated(self.for_if_disjunction),)
+            and (b_1 := self.disjunction())
+            and (c_1 := self.repeated(self.for_if_disjunction),)
         ):
-            return ast.comprehension(target=a, iter=b, ifs=c, is_async=0)
+            return ast.comprehension(target=a_1, iter=b_1, ifs=c_1, is_async=0)
         self._reset(mark)
         if cut:
             return None
@@ -3195,10 +3213,10 @@ class XonshParser(Parser):
                 [e for e in b if not isinstance(e, ast.Starred)] if b else [],
             )
         self._reset(mark)
-        if a := self.kwargs():
+        if a_1 := self.kwargs():
             return (
-                [e for e in a if isinstance(e, ast.Starred)],
-                [e for e in a if not isinstance(e, ast.Starred)],
+                [e for e in a_1 if isinstance(e, ast.Starred)],
+                [e for e in a_1 if not isinstance(e, ast.Starred)],
             )
         self._reset(mark)
         return None
@@ -3229,8 +3247,8 @@ class XonshParser(Parser):
         if gathered := self.gathered(self.kwarg_or_starred, self.expect, ","):
             return gathered
         self._reset(mark)
-        if gathered := self.gathered(self.kwarg_or_double_starred, self.expect, ","):
-            return gathered
+        if gathered_1 := self.gathered(self.kwarg_or_double_starred, self.expect, ","):
+            return gathered_1
         self._reset(mark)
         return None
 
@@ -3287,8 +3305,8 @@ class XonshParser(Parser):
         if (a := self.star_target()) and (self.negative_lookahead(self.expect, ",")):
             return a
         self._reset(mark)
-        if (a := self.star_target()) and (b := self.repeated(self.star_target_a),) and (self.expect(","),):
-            return ast.Tuple(elts=[a] + b, ctx=Store, **self.span(_lnum, _col))
+        if (a_1 := self.star_target()) and (b := self.repeated(self.star_target_a),) and (self.expect(","),):
+            return ast.Tuple(elts=[a_1] + b, ctx=Store, **self.span(_lnum, _col))
         self._reset(mark)
         return None
 
@@ -3308,8 +3326,8 @@ class XonshParser(Parser):
         if (a := self.star_target()) and (b := self.repeated(self.star_target_a)) and (self.expect(","),):
             return [a] + b
         self._reset(mark)
-        if (a := self.star_target()) and (self.expect(",")):
-            return [a]
+        if (a_1 := self.star_target()) and (self.expect(",")):
+            return [a_1]
         self._reset(mark)
         return None
 
@@ -3349,19 +3367,19 @@ class XonshParser(Parser):
             return ast.Attribute(value=a, attr=b.string, ctx=Store, **self.span(_lnum, _col))
         self._reset(mark)
         if (
-            (a := self.t_primary())
+            (a_1 := self.t_primary())
             and (self.expect("["))
-            and (b := self.slices())
+            and (b_1 := self.slices())
             and (self.expect("]"))
             and (self.negative_lookahead(self.t_lookahead))
         ):
-            return ast.Subscript(value=a, slice=b, ctx=Store, **self.span(_lnum, _col))
+            return ast.Subscript(value=a_1, slice=b_1, ctx=Store, **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.expect("$")) and (a := self.name()):
-            return self.expand_env_name(a, ctx=Store, **self.span(_lnum, _col))
+        if (self.expect("$")) and (a_2 := self.name()):
+            return self.expand_env_name(a_2, ctx=Store, **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.expect("${")) and (a := self.slices()) and (self.expect("}")):
-            return self.expand_env_expr(a, ctx=Store, **self.span(_lnum, _col))
+        if (self.expect("${")) and (a_3 := self.slices()) and (self.expect("}")):
+            return self.expand_env_expr(a_3, ctx=Store, **self.span(_lnum, _col))
         self._reset(mark)
         if star_atom := self.star_atom():
             return star_atom
@@ -3398,8 +3416,8 @@ class XonshParser(Parser):
         if a := self.name():
             return ast.Name(id=a.string, ctx=Store, **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.expect("(")) and (a := self.single_target()) and (self.expect(")")):
-            return a
+        if (self.expect("(")) and (a_1 := self.single_target()) and (self.expect(")")):
+            return a_1
         self._reset(mark)
         return None
 
@@ -3417,13 +3435,13 @@ class XonshParser(Parser):
             return ast.Attribute(value=a, attr=b.string, ctx=Store, **self.span(_lnum, _col))
         self._reset(mark)
         if (
-            (a := self.t_primary())
+            (a_1 := self.t_primary())
             and (self.expect("["))
-            and (b := self.slices())
+            and (b_1 := self.slices())
             and (self.expect("]"))
             and (self.negative_lookahead(self.t_lookahead))
         ):
-            return ast.Subscript(value=a, slice=b, ctx=Store, **self.span(_lnum, _col))
+            return ast.Subscript(value=a_1, slice=b_1, ctx=Store, **self.span(_lnum, _col))
         self._reset(mark)
         return None
 
@@ -3441,30 +3459,34 @@ class XonshParser(Parser):
             return ast.Attribute(value=a, attr=b.string, ctx=Load, **self.span(_lnum, _col))
         self._reset(mark)
         if (
-            (a := self.t_primary())
+            (a_1 := self.t_primary())
             and (self.expect("["))
-            and (b := self.slices())
+            and (b_1 := self.slices())
             and (self.expect("]"))
             and (self.positive_lookahead(self.t_lookahead))
         ):
-            return ast.Subscript(value=a, slice=b, ctx=Load, **self.span(_lnum, _col))
-        self._reset(mark)
-        if (a := self.t_primary()) and (b := self.genexp()) and (self.positive_lookahead(self.t_lookahead)):
-            return ast.Call(func=a, args=[b], keywords=[], **self.span(_lnum, _col))
+            return ast.Subscript(value=a_1, slice=b_1, ctx=Load, **self.span(_lnum, _col))
         self._reset(mark)
         if (
-            (a := self.t_primary())
+            (a_2 := self.t_primary())
+            and (b_2 := self.genexp())
+            and (self.positive_lookahead(self.t_lookahead))
+        ):
+            return ast.Call(func=a_2, args=[b_2], keywords=[], **self.span(_lnum, _col))
+        self._reset(mark)
+        if (
+            (a_3 := self.t_primary())
             and (self.expect("("))
-            and (b := self.arguments(),)
+            and (b_3 := self.arguments(),)
             and (self.expect(")"))
             and (self.positive_lookahead(self.t_lookahead))
         ):
             return ast.Call(
-                func=a, args=b[0] if b else [], keywords=b[1] if b else [], **self.span(_lnum, _col)
+                func=a_3, args=b_3[0] if b_3 else [], keywords=b_3[1] if b_3 else [], **self.span(_lnum, _col)
             )
         self._reset(mark)
-        if (a := self.atom()) and (self.positive_lookahead(self.t_lookahead)):
-            return a
+        if (a_4 := self.atom()) and (self.positive_lookahead(self.t_lookahead)):
+            return a_4
         self._reset(mark)
         return None
 
@@ -3500,13 +3522,13 @@ class XonshParser(Parser):
             return ast.Attribute(value=a, attr=b.string, ctx=Del, **self.span(_lnum, _col))
         self._reset(mark)
         if (
-            (a := self.t_primary())
+            (a_1 := self.t_primary())
             and (self.expect("["))
-            and (b := self.slices())
+            and (b_1 := self.slices())
             and (self.expect("]"))
             and (self.negative_lookahead(self.t_lookahead))
         ):
-            return ast.Subscript(value=a, slice=b, ctx=Del, **self.span(_lnum, _col))
+            return ast.Subscript(value=a_1, slice=b_1, ctx=Del, **self.span(_lnum, _col))
         self._reset(mark)
         if del_t_atom := self.del_t_atom():
             return del_t_atom
@@ -3527,8 +3549,8 @@ class XonshParser(Parser):
         if (self.expect("(")) and (c := self.del_targets(),) and (self.expect(")")):
             return ast.Tuple(elts=c or [], ctx=Del, **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.expect("[")) and (c := self.del_targets(),) and (self.expect("]")):
-            return ast.List(elts=c or [], ctx=Del, **self.span(_lnum, _col))
+        if (self.expect("[")) and (c_1 := self.del_targets(),) and (self.expect("]")):
+            return ast.List(elts=c_1 or [], ctx=Del, **self.span(_lnum, _col))
         self._reset(mark)
         return None
 
@@ -3789,26 +3811,26 @@ class XonshParser(Parser):
             )
         self._reset(mark)
         if (
-            (a := self.star_named_expression())
+            (a_1 := self.star_named_expression())
             and (self.expect(","))
             and (self.repeated(self.star_named_expressions),)
             and (self.expect(":"))
             and (self.expression())
         ):
-            self.raise_syntax_error_known_location("only single target (not tuple) can be annotated", a)
+            self.raise_syntax_error_known_location("only single target (not tuple) can be annotated", a_1)
         self._reset(mark)
-        if (a := self.expression()) and (self.expect(":")) and (self.expression()):
-            self.raise_syntax_error_known_location("illegal target for annotation", a)
+        if (a_2 := self.expression()) and (self.expect(":")) and (self.expression()):
+            self.raise_syntax_error_known_location("illegal target for annotation", a_2)
         self._reset(mark)
-        if (self.repeated(self._tmp_56),) and (a := self.star_expressions()) and (self.expect("=")):
-            self.raise_syntax_error_invalid_target(Target.STAR_TARGETS, a)
+        if (self.repeated(self._tmp_56),) and (a_3 := self.star_expressions()) and (self.expect("=")):
+            self.raise_syntax_error_invalid_target(Target.STAR_TARGETS, a_3)
         self._reset(mark)
-        if (self.repeated(self._tmp_56),) and (a := self.yield_expr()) and (self.expect("=")):
-            self.raise_syntax_error_known_location("assignment to yield expression not possible", a)
+        if (self.repeated(self._tmp_56),) and (a_4 := self.yield_expr()) and (self.expect("=")):
+            self.raise_syntax_error_known_location("assignment to yield expression not possible", a_4)
         self._reset(mark)
-        if (a := self.star_expressions()) and (self.augassign()) and (self.annotated_rhs()):
+        if (a_5 := self.star_expressions()) and (self.augassign()) and (self.annotated_rhs()):
             self.raise_syntax_error_known_location(
-                f"'{self.get_expr_name(a)}' is an illegal expression for augmented assignment", a
+                f"'{self.get_expr_name(a_5)}' is an illegal expression for augmented assignment", a_5
             )
         self._reset(mark)
         return None
@@ -3871,12 +3893,12 @@ class XonshParser(Parser):
         self._reset(mark)
         if (
             (self._tmp_59())
-            and (a := self.star_named_expression())
-            and (b := self.expect(","))
+            and (a_1 := self.star_named_expression())
+            and (b_1 := self.expect(","))
             and (self.for_if_clauses())
         ):
             self.raise_syntax_error_known_range(
-                "did you forget parentheses around the comprehension target?", a, b
+                "did you forget parentheses around the comprehension target?", a_1, b_1
             )
         self._reset(mark)
         return None
@@ -3960,17 +3982,17 @@ class XonshParser(Parser):
         if (self.expect("*")) and (self.expect(",")) and (self.token("TYPE_COMMENT")):
             self.raise_syntax_error("bare * has associated type comment")
         self._reset(mark)
-        if (self.expect("*")) and (self.param()) and (a := self.expect("=")):
-            self.raise_syntax_error_known_location("var-positional argument cannot have default value", a)
+        if (self.expect("*")) and (self.param()) and (a_1 := self.expect("=")):
+            self.raise_syntax_error_known_location("var-positional argument cannot have default value", a_1)
         self._reset(mark)
         if (
             (self.expect("*"))
             and (self._tmp_66())
             and (self.repeated(self.param_maybe_default),)
-            and (a := self.expect("*"))
+            and (a_2 := self.expect("*"))
             and (self._tmp_66())
         ):
-            self.raise_syntax_error_known_location("* argument may appear only once", a)
+            self.raise_syntax_error_known_location("* argument may appear only once", a_2)
         self._reset(mark)
         return None
 
@@ -3984,8 +4006,8 @@ class XonshParser(Parser):
         if (self.expect("**")) and (self.param()) and (self.expect(",")) and (a1 := self.param()):
             self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a1)
         self._reset(mark)
-        if (self.expect("**")) and (self.param()) and (self.expect(",")) and (a := self._tmp_68()):
-            self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a)
+        if (self.expect("**")) and (self.param()) and (self.expect(",")) and (a_1 := self._tmp_68()):
+            self.raise_syntax_error_known_location("arguments cannot follow var-keyword argument", a_1)
         self._reset(mark)
         return None
 
@@ -3996,8 +4018,8 @@ class XonshParser(Parser):
         if a := self.slash_with_default():
             return [a]
         self._reset(mark)
-        if a := self.repeated(self.param_with_default):
-            return a
+        if a_1 := self.repeated(self.param_with_default):
+            return a_1
         self._reset(mark)
         return None
 
@@ -4061,8 +4083,8 @@ class XonshParser(Parser):
         if a := self.lambda_slash_with_default():
             return [a]
         self._reset(mark)
-        if a := self.repeated(self.lambda_param_with_default):
-            return a
+        if a_1 := self.repeated(self.lambda_param_with_default):
+            return a_1
         self._reset(mark)
         return None
 
@@ -4080,10 +4102,10 @@ class XonshParser(Parser):
             (self.expect("*"))
             and (self._tmp_73())
             and (self.repeated(self.lambda_param_maybe_default),)
-            and (a := self.expect("*"))
+            and (a_1 := self.expect("*"))
             and (self._tmp_73())
         ):
-            self.raise_syntax_error_known_location("* argument may appear only once", a)
+            self.raise_syntax_error_known_location("* argument may appear only once", a_1)
         self._reset(mark)
         return None
 
@@ -4223,7 +4245,7 @@ class XonshParser(Parser):
         self._reset(mark)
         if (
             (self.expect("async"),)
-            and (a := self.expect("with"))
+            and (a_1 := self.expect("with"))
             and (self.expect("("))
             and (self.gathered(self._tmp_78, self.expect, ","))
             and (self.expect(","),)
@@ -4233,7 +4255,7 @@ class XonshParser(Parser):
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
             self.raise_indentation_error(
-                f"expected an indented block after 'with' statement on line {a.start[0]}"
+                f"expected an indented block after 'with' statement on line {a_1.start[0]}"
             )
         self._reset(mark)
         return None
@@ -4265,14 +4287,14 @@ class XonshParser(Parser):
             and (self.expect(":"))
             and (self.repeated(self.block),)
             and (self.repeated(self.except_block))
-            and (a := self.expect("except"))
+            and (a_1 := self.expect("except"))
             and (b := self.expect("*"))
             and (self.expression())
             and (self._tmp_82(),)
             and (self.expect(":"))
         ):
             self.raise_syntax_error_known_range(
-                "cannot have both 'except' and 'except*' on the same 'try'", a, b
+                "cannot have both 'except' and 'except*' on the same 'try'", a_1, b
             )
         self._reset(mark)
         if (
@@ -4280,12 +4302,12 @@ class XonshParser(Parser):
             and (self.expect(":"))
             and (self.repeated(self.block),)
             and (self.repeated(self.except_star_block))
-            and (a := self.expect("except"))
+            and (a_2 := self.expect("except"))
             and (self._tmp_83(),)
             and (self.expect(":"))
         ):
             self.raise_syntax_error_known_location(
-                "cannot have both 'except' and 'except*' on the same 'try'", a
+                "cannot have both 'except' and 'except*' on the same 'try'", a_2
             )
         self._reset(mark)
         return None
@@ -4355,13 +4377,13 @@ class XonshParser(Parser):
             )
         self._reset(mark)
         if (
-            (a := self.expect("except"))
+            (a_1 := self.expect("except"))
             and (self.expect(":"))
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
         ):
             self.raise_indentation_error(
-                f"expected an indented block after 'except' statement on line {a.start[0]}"
+                f"expected an indented block after 'except' statement on line {a_1.start[0]}"
             )
         self._reset(mark)
         return None
@@ -4485,7 +4507,7 @@ class XonshParser(Parser):
         self._reset(mark)
         if (
             (a := self.expect("if"))
-            and (a_1 := self.named_expression())
+            and (self.named_expression())
             and (self.expect(":"))
             and (self.token("NEWLINE"))
             and (self.negative_lookahead(self.token, "INDENT"))
@@ -4648,8 +4670,8 @@ class XonshParser(Parser):
         if (self.expression()) and (self.expect(":")) and (a := self.expect("*")) and (self.bitwise_or()):
             self.raise_syntax_error_starting_from("cannot use a starred expression in a dictionary value", a)
         self._reset(mark)
-        if (self.expression()) and (a := self.expect(":")) and (self.positive_lookahead(self._tmp_92)):
-            self.raise_syntax_error_known_location("expression expected after dictionary key and ':'", a)
+        if (self.expression()) and (a_1 := self.expect(":")) and (self.positive_lookahead(self._tmp_92)):
+            self.raise_syntax_error_known_location("expression expected after dictionary key and ':'", a_1)
         self._reset(mark)
         return None
 
@@ -4696,14 +4718,14 @@ class XonshParser(Parser):
         if (self.expect("{")) and (a := self.expect("=")):
             self.raise_syntax_error_known_location("f-string: valid expression required before '='", a)
         self._reset(mark)
-        if (self.expect("{")) and (a := self.expect("!")):
-            self.raise_syntax_error_known_location("f-string: valid expression required before '!'", a)
+        if (self.expect("{")) and (a_1 := self.expect("!")):
+            self.raise_syntax_error_known_location("f-string: valid expression required before '!'", a_1)
         self._reset(mark)
-        if (self.expect("{")) and (a := self.expect(":")):
-            self.raise_syntax_error_known_location("f-string: valid expression required before ':'", a)
+        if (self.expect("{")) and (a_2 := self.expect(":")):
+            self.raise_syntax_error_known_location("f-string: valid expression required before ':'", a_2)
         self._reset(mark)
-        if (self.expect("{")) and (a := self.expect("}")):
-            self.raise_syntax_error_known_location("f-string: valid expression required before '}'", a)
+        if (self.expect("{")) and (a_3 := self.expect("}")):
+            self.raise_syntax_error_known_location("f-string: valid expression required before '}'", a_3)
         self._reset(mark)
         if (self.expect("{")) and (self.negative_lookahead(self.annotated_rhs)):
             self.raise_syntax_error_on_next_token("f-string: expecting a valid expression after '{'")
@@ -5252,8 +5274,8 @@ class XonshParser(Parser):
         if literal := self.expect(")"):
             return literal
         self._reset(mark)
-        if (literal := self.expect(",")) and (_tmp_101 := self._tmp_101()):
-            return [literal, _tmp_101]
+        if (literal_1 := self.expect(",")) and (_tmp_101 := self._tmp_101()):
+            return [literal_1, _tmp_101]
         self._reset(mark)
         return None
 
@@ -5297,8 +5319,8 @@ class XonshParser(Parser):
         if literal := self.expect(":"):
             return literal
         self._reset(mark)
-        if (literal := self.expect(",")) and (_tmp_102 := self._tmp_102()):
-            return [literal, _tmp_102]
+        if (literal_1 := self.expect(",")) and (_tmp_102 := self._tmp_102()):
+            return [literal_1, _tmp_102]
         self._reset(mark)
         return None
 

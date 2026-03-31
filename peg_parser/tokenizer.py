@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Final, NewType
 
+from .tokenize import TokenInfo, generate_tokens
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from .tokenize import TokenInfo
 
 Mark = NewType("Mark", int)
 
@@ -14,25 +15,16 @@ WS_TOKENS = {"ENDMARKER", "NEWLINE", "DEDENT", "INDENT"}
 SKIP_TOKENS = ("WS", "COMMENT", "NL")
 
 
-def rs_tokenize(source: str) -> tuple:
-    import winnow_parser as wp
-
-    from peg_parser.tokenize import TokenInfo
-
-    return wp.tokenize(source), wp.TokInfo, TokenInfo
-
-
-def py_tokenize(source: str) -> tuple:
-    from peg_parser.tokenize import TokenInfo, generate_tokens
-
-    return list(generate_tokens(source)), TokenInfo, TokenInfo
+# def rs_tokenize(source: str) -> tuple:
+#     import winnow_parser as wp
+#
+#     return wp.tokenize(source), wp.TokInfo
 
 
 class Tokenizer:
     """Caching wrapper for the tokenize module"""
 
     __slots__ = (
-        "_readline",
         "_tokens",
         "_index",
         "_verbose",
@@ -54,9 +46,7 @@ class Tokenizer:
         *,
         path: str = "",
         verbose: bool = False,
-        use_rust_tokenizer=True,
     ):
-        self._readline = readline
         self._tokens: list[TokenInfo] = []
         self._index = Mark(0)
         self._verbose = verbose
@@ -66,8 +56,9 @@ class Tokenizer:
         self._call_macro = False
         self._proc_macro = False
 
-        self._raw_tokens: list[TokenInfo] = []
         self._raw_index = 0
+        self.new_tok = TokenInfo
+        self.tok_cls = TokenInfo
 
         # Read all source and tokenize
         source = ""
@@ -78,10 +69,10 @@ class Tokenizer:
             source += line
             self._lines[len(self._lines) + 1] = line
 
-        if use_rust_tokenizer:
-            self._raw_tokens, self.tok_cls, self.new_tok = rs_tokenize(source)
-        else:
-            self._raw_tokens, self.tok_cls, self.new_tok = py_tokenize(source)
+        # if use_rust_tokenizer:
+        #     self._raw_tokens = rs_tokenize(source)
+        # else:
+        self._raw_tokens = list(generate_tokens(source))
 
         self._end_parens: Final = {
             ")": "(",

@@ -82,7 +82,7 @@ P1 = ParamSpec("P1")
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def logger(method: F) -> F:
+def logger[F: Callable[..., Any]](method: F) -> F:
     """For non-memoized functions that we want to be logged.
 
     (In practice this is only non-leader left-recursive functions.)
@@ -105,7 +105,7 @@ def logger(method: F) -> F:
     return cast("F", logger_wrapper)
 
 
-def memoize(method: F) -> F:
+def memoize[F: Callable[..., Any]](method: F) -> F:
     """Memoize a symbol method."""
     method_name = method.__name__
     method_id = _MEMOIZE_COUNTER[0]
@@ -144,7 +144,7 @@ def memoize(method: F) -> F:
     return cast("F", memoize_wrapper)
 
 
-def memoize_left_rec(method: Callable[[P], T | None]) -> Callable[[P], T | None]:
+def memoize_left_rec[P: "Parser", T](method: Callable[[P], T | None]) -> Callable[[P], T | None]:
     """Memoize a left-recursive symbol method."""
     method_name = method.__name__
     method_id = _MEMOIZE_COUNTER[0]
@@ -273,6 +273,7 @@ class Parser:
         "_index",
         "filename",
         "py_version",
+        "call_invalid_rules",
     )
     KEYWORDS: ClassVar[tuple[str, ...]]
     SOFT_KEYWORDS: ClassVar[tuple[str, ...]]
@@ -743,7 +744,7 @@ class Parser:
 
         locs = {"lineno": tree.lineno, "col_offset": tree.col_offset}
         if isinstance(tree, ast.Constant) and isinstance(cmd, self.tok_cls):
-            return ast.Constant(value=tree.value + cmd.string, kind=None, **locs, **cmd.loc_end())
+            return ast.Constant(value=str(tree.value) + cmd.string, kind=None, **locs, **cmd.loc_end())
 
         # prefix@(...)
         if isinstance(tree, ast.Constant) and isinstance(cmd, ast.Starred):
@@ -983,12 +984,15 @@ class Parser:
         path: Path,
         py_version: tuple[int, ...] | None = None,
         verbose: bool = False,
-        use_rust_tokenizer=False,
+        # use_rust_tokenizer=False,
     ) -> ast.Module | Node | None:
         """Parse a file or string."""
         with open(path) as f:
             tokenizer = Tokenizer(
-                f.readline, verbose=verbose, path=str(path), use_rust_tokenizer=use_rust_tokenizer
+                f.readline,
+                verbose=verbose,
+                path=str(path),
+                # use_rust_tokenizer=use_rust_tokenizer
             )
             parser = cls(
                 tokenizer,
@@ -1005,13 +1009,15 @@ class Parser:
         mode: Literal["eval", "exec"] = "eval",
         py_version: tuple[int, ...] | None = None,
         verbose: bool = False,
-        use_rust_tokenizer=False,
+        # use_rust_tokenizer=False,
     ) -> Any:
         """Parse a string."""
         import io
 
         tokenizer = Tokenizer(
-            io.StringIO(source).readline, verbose=verbose, use_rust_tokenizer=use_rust_tokenizer
+            io.StringIO(source).readline,
+            verbose=verbose,
+            # use_rust_tokenizer=use_rust_tokenizer
         )
         parser = cls(tokenizer, verbose=verbose, py_version=py_version)
         return parser.parse(mode if mode == "eval" else "file")

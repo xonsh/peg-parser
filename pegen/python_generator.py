@@ -247,6 +247,17 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
             "end_lineno=end_lineno, end_col_offset=end_col_offset"
         )
         self.cleanup_statements: List[str] = []
+        self.rule_variable_names: Set[str] = set()
+
+    def dedupe(self, name: str) -> str:
+        origname = name
+        counter = 0
+        while name in self.local_variable_names or name in self.rule_variable_names:
+            counter += 1
+            name = f"{origname}_{counter}"
+        self.local_variable_names.append(name)
+        self.rule_variable_names.add(name)
+        return name
 
     def generate(self, filename: str) -> None:
         header = self.grammar.metas.get("header", MODULE_PREFIX)
@@ -292,6 +303,8 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
         is_loop = node.is_loop()
         is_gather = node.is_gather()
         rhs = node.flatten()
+
+        self.rule_variable_names.clear()
         if node.left_recursive:
             if node.leader:
                 self.print("@memoize_left_rec")
@@ -345,7 +358,10 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
             self.print(f"({call})")
         else:
             if name != "cut":
-                name = self.dedupe(name)
+                new_name = self.dedupe(name)
+                if new_name != name and hasattr(self, "rename_map"):
+                    self.rename_map[name] = new_name
+                name = new_name
             self.print(f"({name} := {call})")
 
     def visit_Rhs(self, node: Rhs, is_loop: bool = False, is_gather: bool = False) -> None:
@@ -363,6 +379,19 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
         is_loop: bool,
         has_invalid: bool,
     ) -> None:
+        if action and hasattr(self, "rename_map") and self.rename_map:
+            try:
+                tree = ast.parse(action, mode="eval")
+                class KeywordRenamer(ast.NodeTransformer):
+                    def visit_Name(self_, node: ast.Name):
+                        if node.id in self.rename_map:
+                            return ast.copy_location(ast.Name(id=self.rename_map[node.id], ctx=node.ctx), node)
+                        return node
+                tree = KeywordRenamer().visit(tree)
+                action = ast.unparse(tree)
+            except Exception:
+                pass
+
         if not action:
             if is_gather:
                 assert len(self.local_variable_names) == 2
@@ -412,6 +441,7 @@ class PythonParserGenerator(ParserGenerator, GrammarVisitor):
                 used.add("cut")
 
         with self.local_variable_context():
+            self.rename_map = {}
             if has_cut:
                 self.print("cut = False")
             if is_loop:

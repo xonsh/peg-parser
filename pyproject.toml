@@ -169,6 +169,7 @@ dev = [
     "psutil",
     "maturin>=1.8.1",
     "winnow-parser",
+    "mypy",
 ]
 docs = ["mkdocs-material", "mkdocstrings[python]"]
 profile = [
@@ -194,7 +195,7 @@ description = "Xonsh parser using PLY"
 readme = "README.md"
 dynamic = ["version"]
 classifiers = ["Programming Language :: Python :: 3 :: Only"]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = ["mypy-extensions>=1.0.0"]
 
 [tool.setuptools.package-dir]

@@ -871,19 +871,19 @@ is_bitwise_or[tuple[ast.cmpop, ast.expr]]: 'is' a=bitwise_or { (ast.Is(), a) }
 # Logical operators
 # -----------------
 
-bitwise_or:
+bitwise_or[ast.expr]:
     | a=bitwise_or '|' b=bitwise_xor { ast.BinOp(left=a, op=ast.BitOr(), right=b, LOCATIONS) }
     | bitwise_xor
 
-bitwise_xor:
+bitwise_xor[ast.expr]:
     | a=bitwise_xor '^' b=bitwise_and { ast.BinOp(left=a, op=ast.BitXor(), right=b, LOCATIONS) }
     | bitwise_and
 
-bitwise_and:
+bitwise_and[ast.expr]:
     | a=bitwise_and '&' b=shift_expr { ast.BinOp(left=a, op=ast.BitAnd(), right=b, LOCATIONS) }
     | shift_expr
 
-shift_expr:
+shift_expr[ast.expr]:
     | a=shift_expr '<<' b=sum { ast.BinOp(left=a, op=ast.LShift(), right=b, LOCATIONS) }
     | a=shift_expr '>>' b=sum { ast.BinOp(left=a, op=ast.RShift(), right=b, LOCATIONS) }
     | sum
@@ -891,12 +891,12 @@ shift_expr:
 # Arithmetic operators
 # --------------------
 
-sum:
+sum[ast.expr]:
     | a=sum '+' b=term { ast.BinOp(left=a, op=ast.Add(), right=b, LOCATIONS) }
     | a=sum '-' b=term { ast.BinOp(left=a, op=ast.Sub(), right=b, LOCATIONS) }
     | term
 
-term:
+term[ast.expr]:
     | a=term '*' b=factor { ast.BinOp(left=a, op=ast.Mult(), right=b, LOCATIONS) }
     | a=term '/' b=factor { ast.BinOp(left=a, op=ast.Div(), right=b, LOCATIONS) }
     | a=term '//' b=factor { ast.BinOp(left=a, op=ast.FloorDiv(), right=b, LOCATIONS) }
@@ -904,13 +904,13 @@ term:
     | a=term '@' b=factor { ast.BinOp(left=a, op=ast.MatMult(), right=b, LOCATIONS) }
     | factor
 
-factor (memo):
+factor[ast.expr] (memo):
     | '+' a=factor { ast.UnaryOp(op=ast.UAdd(), operand=a, LOCATIONS) }
     | '-' a=factor { ast.UnaryOp(op=ast.USub(), operand=a, LOCATIONS) }
     | '~' a=factor { ast.UnaryOp(op=ast.Invert(), operand=a, LOCATIONS) }
     | power
 
-power:
+power[ast.expr]:
     | a=await_primary '**' b=factor { ast.BinOp(left=a, op=ast.Pow(), right=b, LOCATIONS) }
     | await_primary
 
@@ -919,11 +919,11 @@ power:
 
 # Primary elements are things like "obj.something.something", "obj[something]", "obj(something)", "obj" ...
 
-await_primary (memo):
+await_primary[ast.expr] (memo):
     | 'await' a=primary { ast.Await(a, LOCATIONS) }
     | primary
 
-primary:
+primary[ast.expr]:
     | a=primary '.' b=NAME { ast.Attribute(value=a, attr=b.string, ctx=Load, LOCATIONS) }
     | a1=primary b1=genexp { ast.Call(func=a1, args=[b1], keywords=[], LOCATIONS) }
 #    | a2=primary '!(' b2=[call_macro_arg*] &&')' { self.handle_func_macro_start(a2, LOCATIONS) }
@@ -1011,7 +1011,7 @@ slice:
         a
      }
 
-atom:
+atom[ast.expr]:
     | search_path
     | a=NAME { ast.Name(id=a.string, ctx=Load, LOCATIONS) }
     | 'True' { ast.Constant(value=True, LOCATIONS) }
@@ -1141,7 +1141,7 @@ fstring[ast.JoinedStr]:
         self.handle_fstring(a, b, LOCATIONS)
      }
 
-strings (memo): a=(anystr)+ {
+strings[ast.expr] (memo): a=(anystr)+ {
     self.concatenate_strings(a)
 }
 
@@ -1170,7 +1170,7 @@ dict[ast.Dict]:
 
 double_starred_kvpairs[list[Any]]: a=','.double_starred_kvpair+ [','] { a }
 
-double_starred_kvpair[tuple[ast.expr, ast.expr]]:
+double_starred_kvpair[tuple[ast.expr | None, ast.expr]]:
     | '**' a=bitwise_or { (None, a) }
     | kvpair
 
@@ -1755,7 +1755,7 @@ invalid_class_argument_pattern:
     | [positional_patterns ','] keyword_patterns ',' a=positional_patterns { a }
 invalid_if_stmt[NoReturn]:
     | 'if' named_expression NEWLINE { self.raise_syntax_error("expected ':'") }
-    | a='if' a=named_expression ':' NEWLINE !INDENT {
+    | a='if' b=named_expression ':' NEWLINE !INDENT {
         self.raise_indentation_error(
             f"expected an indented block after 'if' statement on line {a.start[0]}"
         )

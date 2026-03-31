@@ -152,6 +152,7 @@ class XonshParserGenerator(PythonParserGenerator):
         self.unreachable_formatting = unreachable_formatting or "None  # pragma: no cover"
         self.location_formatting = "**self.span(_lnum, _col)"
         self.cleanup_statements: list[str] = []
+        self.rule_variable_names: set[str] = set()
 
     def artifical_rule_from_rhs(self, rhs: Rhs) -> str:
         self.counter += 1
@@ -205,6 +206,7 @@ class XonshParserGenerator(PythonParserGenerator):
         is_gather = node.is_gather()
         rhs = node.flatten()
         method_args = ""
+        self.rule_variable_names.clear()
         if node.left_recursive:
             if node.leader:
                 self.print("@memoize_left_rec")
@@ -256,6 +258,23 @@ class XonshParserGenerator(PythonParserGenerator):
         is_loop: bool,
         has_invalid: bool,
     ) -> None:
+        if action and hasattr(self, "rename_map") and self.rename_map:
+            try:
+                tree = ast.parse(action, mode="eval")
+
+                class KeywordRenamer(ast.NodeTransformer):
+                    def visit_Name(self_, node: ast.Name):
+                        if node.id in self.rename_map:
+                            return ast.copy_location(
+                                ast.Name(id=self.rename_map[node.id], ctx=node.ctx), node
+                            )
+                        return node
+
+                tree = KeywordRenamer().visit(tree)
+                action = ast.unparse(tree)
+            except Exception:
+                pass
+
         if not action:
             if is_gather:
                 assert len(self.local_variable_names) == 2

@@ -84,6 +84,8 @@ tasks:
     cmds:
       - uv run pytest --memray
   mypy1:
+    deps:
+      - generate
     cmds:
       - uv run mypy peg_parser
   mypy:
