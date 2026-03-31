@@ -9,8 +9,6 @@ pub use tok_info::TokInfo;
 /// A Python module implemented in Rust.
 #[pymodule]
 mod xtokens {
-    use pyo3::prelude::*;
-
     #[pymodule_export]
     use crate::token::Token;
 
