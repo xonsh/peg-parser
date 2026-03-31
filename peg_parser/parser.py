@@ -2476,7 +2476,7 @@ class XonshParser(Parser):
         return None
 
     @memoize
-    def help_atom(self) -> tuple[ast.Name, TokenInfo] | None:
+    def help_atom(self) -> tuple[ast.expr, TokenInfo] | None:
         # help_atom: atom ('??' | '?')
         mark = self._mark()
         if (a := self.atom()) and (b := self._tmp_26()):
@@ -2656,14 +2656,14 @@ class XonshParser(Parser):
         if a_1 := self.token("NUMBER"):
             return ast.Constant(value=ast.literal_eval(a_1.string), **self.span(_lnum, _col))
         self._reset(mark)
-        if (self.positive_lookahead(self.expect, "(")) and (_tmp_34 := self._tmp_34()):
-            return _tmp_34
+        if (self.positive_lookahead(self.expect, "(")) and (a_2 := self._tmp_34()):
+            return cast(ast.expr, a_2)
         self._reset(mark)
-        if (self.positive_lookahead(self.expect, "[")) and (_tmp_35 := self._tmp_35()):
-            return _tmp_35
+        if (self.positive_lookahead(self.expect, "[")) and (a_3 := self._tmp_35()):
+            return cast(ast.expr, a_3)
         self._reset(mark)
-        if (self.positive_lookahead(self.expect, "{")) and (_tmp_36 := self._tmp_36()):
-            return _tmp_36
+        if (self.positive_lookahead(self.expect, "{")) and (a_4 := self._tmp_36()):
+            return cast(ast.expr, a_4)
         self._reset(mark)
         if self.expect("..."):
             return ast.Constant(value=Ellipsis, **self.span(_lnum, _col))

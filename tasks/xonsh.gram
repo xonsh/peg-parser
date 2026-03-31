@@ -957,7 +957,7 @@ sub_procs[ast.Call]:
     | '![' ~ args=proc_cmds ']' { self.handle_proc("subproc_captured_hiddenobject", args, LOCATIONS) }
     | '!(' ~ args=proc_cmds ')' { self.handle_proc("subproc_captured_object", args, LOCATIONS) }
 
-help_atom[tuple[ast.Name, TokenInfo]]:
+help_atom[tuple[ast.expr, TokenInfo]]:
     | a=atom b=('??' | '?') { (a, b) }
 
 env_atom[ast.Subscript]:
@@ -1025,9 +1025,9 @@ atom[ast.expr]:
     | a=NUMBER {
         ast.Constant(value=ast.literal_eval(a.string), LOCATIONS)
      }
-    | &'(' (ptuple | group | genexp)
-    | &'[' (plist | listcomp)
-    | &'{' (dict | set | dictcomp | setcomp)
+    | &'(' a=(ptuple | group | genexp) { cast(ast.expr, a) }
+    | &'[' a=(plist | listcomp) { cast(ast.expr, a) }
+    | &'{' a=(dict | set | dictcomp | setcomp) { cast(ast.expr, a) }
     | '...' {
         ast.Constant(value=Ellipsis, LOCATIONS)
      }
